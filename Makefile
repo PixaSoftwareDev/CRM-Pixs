@@ -1,4 +1,4 @@
-.PHONY: db-up db-down migrate migrate-new sqlc lint vet test test-cover build run-api help
+.PHONY: db-up db-down migrate migrate-new sqlc lint vet test test-cover build run-api seed help
 
 # ── Tool paths ───────────────────────────────────────────────────────────────
 
@@ -75,6 +75,9 @@ build:
 run-api:
 	$(GO) run ./cmd/api
 
+seed:
+	$(GO) run ./cmd/seed
+
 # ── Help ──────────────────────────────────────────────────────────────────────
 
 help:
@@ -92,4 +95,5 @@ help:
 	@echo "  test-cover     Run tests and generate HTML coverage report"
 	@echo "  build          Compile all three binaries to /bin"
 	@echo "  run-api        Run the API server (loads .env if present)"
+	@echo "  seed           Insert dev admin user (admin@pixs.local) — dev only"
 	@echo ""

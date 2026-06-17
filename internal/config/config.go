@@ -21,8 +21,22 @@ type Config struct {
 	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`
 
 	// CORSAllowedOrigins is a comma-separated list of allowed origins.
-	// Use "*" for development only.
 	CORSAllowedOrigins []string `envconfig:"CORS_ALLOWED_ORIGINS" default:"http://localhost:3000"`
+
+	// EncryptionKey is a 32-byte hex-encoded key used for AES-256-GCM encryption
+	// of sensitive fields (TOTP secrets, API keys).
+	// Generate with: openssl rand -hex 32
+	EncryptionKey string `envconfig:"ENCRYPTION_KEY" required:"true"`
+
+	// SessionTTLHours is the sliding TTL for user sessions. Default 8h.
+	SessionTTLHours int `envconfig:"SESSION_TTL_HOURS" default:"8"`
+
+	// MaxSessionsPerUser is the maximum number of concurrent active sessions.
+	// When exceeded, the oldest session is revoked. Default 5.
+	MaxSessionsPerUser int `envconfig:"MAX_SESSIONS_PER_USER" default:"5"`
+
+	// DevSeedAdminPassword is only used by the seed command in dev/staging.
+	DevSeedAdminPassword string `envconfig:"DEV_SEED_ADMIN_PASSWORD" default:"admin123!"`
 }
 
 // Load reads configuration from environment variables with the PIXS prefix.

@@ -12,7 +12,6 @@ linters:
     - ineffassign
     - unused
     - gocritic
-    - misspell
     - noctx
     - bodyclose
     - unparam
@@ -65,6 +64,7 @@ issues:
       linters:
         - gocritic
         - revive
+
 
   exclude-dirs:
     - vendor

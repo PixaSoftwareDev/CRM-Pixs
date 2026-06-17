@@ -17,7 +17,15 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/redis/go-redis/v9"
 
+	"pixs/internal/auth/encrypt"
+	"pixs/internal/auth/rbac"
+	"pixs/internal/auth/session"
 	"pixs/internal/config"
+	sqlcgen "pixs/internal/repository/sqlc"
+	svcidentity "pixs/internal/service/identity"
+	"pixs/internal/transport/http/handler"
+	mw "pixs/internal/transport/http/middleware"
+	"pixs/internal/transport/http/validator"
 )
 
 func main() {
@@ -74,10 +82,31 @@ func run() error {
 	}
 	slog.Info("redis connected")
 
+	// --- Auth infrastructure ---
+	cipher, err := encrypt.New(cfg.EncryptionKey)
+	if err != nil {
+		return fmt.Errorf("initializing encryption: %w", err)
+	}
+
+	sessStore := session.New(rdb, db, cfg.SessionTTLHours, cfg.MaxSessionsPerUser)
+
+	q := sqlcgen.New(db)
+	roles, err := q.ListRoles(context.Background(), seedCompanyID())
+	if err != nil {
+		return fmt.Errorf("loading roles: %w", err)
+	}
+	policy, err := svcidentity.LoadPolicy(context.Background(), q, roles)
+	if err != nil {
+		return fmt.Errorf("loading rbac policy: %w", err)
+	}
+
+	authSvc := svcidentity.NewAuthService(db, sessStore, cipher, policy, logger)
+
 	// --- Echo ---
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
+	e.Validator = validator.New()
 
 	e.Use(middleware.RequestID())
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -120,7 +149,7 @@ func run() error {
 		AllowCredentials: true,
 	}))
 
-	registerRoutes(e, db, rdb)
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, logger)
 
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
@@ -148,8 +177,61 @@ func run() error {
 	return nil
 }
 
-func registerRoutes(e *echo.Echo, db *pgxpool.Pool, rdb *redis.Client) {
+func registerRoutes(
+	e *echo.Echo,
+	db *pgxpool.Pool,
+	rdb *redis.Client,
+	sessStore *session.Store,
+	q *sqlcgen.Queries,
+	policy *rbac.Policy,
+	authSvc *svcidentity.AuthService,
+	logger *slog.Logger,
+) {
 	e.GET("/health", healthHandler(db, rdb))
+
+	authDeps := mw.AuthDeps{
+		Sessions: sessStore,
+		Queries:  q,
+		Logger:   logger,
+	}
+	authMiddleware := mw.RequireAuth(authDeps)
+
+	// Rate limiters for login and password reset.
+	loginIPLimit := mw.RateLimit(rdb, mw.RateLimitConfig{
+		KeyFn:  mw.IPKey,
+		Limit:  5,
+		Window: 15 * time.Minute,
+		Prefix: "login:ip",
+	})
+	pwdResetLimit := mw.RateLimit(rdb, mw.RateLimitConfig{
+		KeyFn:  mw.IPKey,
+		Limit:  3,
+		Window: time.Hour,
+		Prefix: "pwdreset:ip",
+	})
+
+	authHandler := handler.NewAuthHandler(authSvc)
+
+	// Mount /auth group — apply rate limits selectively per handler.
+	auth := e.Group("/auth")
+
+	// Rate-limited public endpoints.
+	auth.POST("/login", authHandler.Login, loginIPLimit)
+	auth.POST("/login/totp", authHandler.LoginTOTP, loginIPLimit)
+	auth.POST("/password-reset/request", authHandler.RequestPasswordReset, pwdResetLimit)
+	auth.POST("/password-reset/confirm", authHandler.ConfirmPasswordReset, pwdResetLimit)
+
+	// Protected endpoints (session required).
+	protected := auth.Group("", authMiddleware)
+	protected.POST("/logout", authHandler.Logout)
+	protected.GET("/me", authHandler.Me)
+	protected.GET("/sessions", authHandler.ListSessions)
+	protected.DELETE("/sessions/:id", authHandler.RevokeSession)
+	protected.POST("/2fa/enable", authHandler.Enable2FA)
+	protected.POST("/2fa/verify", authHandler.Verify2FA)
+	protected.POST("/2fa/disable", authHandler.Disable2FA)
+
+	_ = policy // will be used by feature route groups
 }
 
 func healthHandler(db *pgxpool.Pool, rdb *redis.Client) echo.HandlerFunc {
@@ -160,9 +242,7 @@ func healthHandler(db *pgxpool.Pool, rdb *redis.Client) echo.HandlerFunc {
 		redisErr := rdb.Ping(ctx).Err()
 
 		if dbErr != nil || redisErr != nil {
-			resp := map[string]any{
-				"status": "degraded",
-			}
+			resp := map[string]any{"status": "degraded"}
 			if dbErr != nil {
 				resp["postgres"] = dbErr.Error()
 			}
@@ -189,4 +269,11 @@ func buildLogger(level string) *slog.Logger {
 		lvl = slog.LevelInfo
 	}
 	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+}
+
+// seedCompanyID returns the UUID of the seeded dev company.
+// In a multi-company setup this would be resolved from the request domain/header.
+func seedCompanyID() [16]byte {
+	// c0000000-0000-4000-8000-000000000001
+	return [16]byte{0xc0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x01}
 }
