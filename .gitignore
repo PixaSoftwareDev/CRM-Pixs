@@ -40,8 +40,6 @@ go.work.sum
 # Uncomment if you prefer not to commit generated code:
 # internal/repository/sqlc/*.go
 
-# Atlas
-atlas.sum
 
 # OS
 Thumbs.db

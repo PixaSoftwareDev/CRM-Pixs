@@ -29,7 +29,7 @@ db-up:
 	@echo "Postgres and Redis are healthy."
 
 db-down:
-	docker compose down
+	docker compose down -v
 
 # ── Migrations (Atlas) ────────────────────────────────────────────────────────
 

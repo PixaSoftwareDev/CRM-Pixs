@@ -1,15 +1,16 @@
 -- Migration: 20260617000001_init_identity
 -- Identity & Auth schema: companies, users, roles, permissions, sessions, audit_logs.
 --
--- Seed UUIDs (document here for reference in fixtures and runbooks):
---   Company seed:     c0000000-0000-4000-8000-000000000001
---   Role admin:       d0000000-0000-4000-8000-000000000001
---   Role direccion:   d0000000-0000-4000-8000-000000000002
---   Role ventas:      d0000000-0000-4000-8000-000000000003
---   Role cobranzas:   d0000000-0000-4000-8000-000000000004
---   Role soporte:     d0000000-0000-4000-8000-000000000005
---   Role desarrollo:  d0000000-0000-4000-8000-000000000006
---   Role contable:    d0000000-0000-4000-8000-000000000007
+-- What lives here:
+--   - All table definitions
+--   - 57 system permissions (module+action catalog — defines the system capability
+--     surface, has no company dependency, never changes at runtime)
+--
+-- What lives in `make seed`:
+--   - Company seed record (tenant data)
+--   - 7 system roles (require company_id, therefore tenant-scoped)
+--   - RBAC matrix in role_permissions (depend on role UUIDs from seed)
+--   - Dev admin user
 
 -- ─── Extensions ────────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -33,18 +34,6 @@ CREATE TABLE companies (
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at          TIMESTAMPTZ
 );
-
-INSERT INTO companies (id, legal_name, fantasy_name, cuit, vat_condition, city, province)
-VALUES (
-    'c0000000-0000-4000-8000-000000000001',
-    'PIXS S.R.L.',
-    'PIXS',
-    '30-12345678-9',
-    'ri',
-    'Buenos Aires',
-    'Buenos Aires'
-)
-ON CONFLICT (id) DO NOTHING;
 
 -- ─── users ─────────────────────────────────────────────────────────────────────
 CREATE TABLE users (
@@ -96,17 +85,10 @@ CREATE TABLE roles (
     UNIQUE (company_id, name)
 );
 
-INSERT INTO roles (id, company_id, name, description, is_system) VALUES
-    ('d0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'admin',      'Acceso total al sistema',                                    true),
-    ('d0000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001', 'direccion',  'Gerencia y dirección',                                       true),
-    ('d0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001', 'ventas',     'Gestión comercial y pipeline',                               true),
-    ('d0000000-0000-4000-8000-000000000004', 'c0000000-0000-4000-8000-000000000001', 'cobranzas',  'Gestión de cobros, facturas y finanzas',                     true),
-    ('d0000000-0000-4000-8000-000000000005', 'c0000000-0000-4000-8000-000000000001', 'soporte',    'Atención al cliente y soporte técnico',                      true),
-    ('d0000000-0000-4000-8000-000000000006', 'c0000000-0000-4000-8000-000000000001', 'desarrollo', 'Desarrollo de proyectos',                                    true),
-    ('d0000000-0000-4000-8000-000000000007', 'c0000000-0000-4000-8000-000000000001', 'contable',   'Acceso de solo lectura a módulos financieros para contador', true)
-ON CONFLICT (id) DO NOTHING;
-
 -- ─── permissions ───────────────────────────────────────────────────────────────
+-- System capability catalog. No company_id — permissions are global to the system.
+-- These are seeded here because they define what the application can authorize;
+-- they never change at runtime and have no tenant dependency.
 CREATE TABLE permissions (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     module      VARCHAR(50) NOT NULL,
@@ -185,129 +167,6 @@ CREATE TABLE role_permissions (
     restricted_to_own BOOLEAN NOT NULL DEFAULT false,
     PRIMARY KEY (role_id, permission_id)
 );
-
--- admin: all permissions
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000001', id, false FROM permissions
-ON CONFLICT DO NOTHING;
-
--- direccion
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000002', p.id, false
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('contacts','view'),('contacts','create'),('contacts','edit'),('contacts','delete'),('contacts','export'),
-    ('pipeline','view'),('pipeline','view_all'),('pipeline','create'),('pipeline','edit'),
-    ('quotes','view'),('quotes','create'),('quotes','edit'),('quotes','approve'),
-    ('projects','view'),('projects','create'),('projects','edit'),('projects','view_profitability'),
-    ('tasks','view'),('tasks','view_all'),('tasks','create'),('tasks','edit'),('tasks','assign'),
-    ('time_tracking','view_own'),('time_tracking','view_all'),('time_tracking','export'),
-    ('invoices_issued','view'),('invoices_issued','create'),('invoices_issued','edit'),
-    ('invoices_issued','emit'),('invoices_issued','void'),('invoices_issued','export'),
-    ('invoices_received','view'),('invoices_received','create'),('invoices_received','edit'),
-    ('receipts','view'),('receipts','create'),('receipts','void'),
-    ('cash_registers','view'),('cash_registers','create_movement'),('cash_registers','reconcile'),
-    ('banks','view'),('banks','reconcile'),
-    ('expenses','create'),('expenses','approve'),('expenses','view'),
-    ('cash_flow','view'),
-    ('leads','view'),('leads','view_all'),('leads','convert'),
-    ('scraping','launch'),('scraping','view_costs'),
-    ('reports','view_financial'),('reports','view_sales'),('reports','export'),
-    ('documents','view'),('documents','upload'),('documents','delete')
-)
-ON CONFLICT DO NOTHING;
-
--- ventas (pipeline/view, pipeline/create, pipeline/edit, quotes/view, tasks/view, leads/view → restricted_to_own)
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000003', p.id,
-    CASE WHEN (p.module, p.action) IN (
-        ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
-        ('quotes','view'),
-        ('tasks','view'),
-        ('leads','view')
-    ) THEN true ELSE false END
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('contacts','view'),('contacts','create'),('contacts','edit'),('contacts','export'),
-    ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
-    ('quotes','view'),('quotes','create'),('quotes','edit'),
-    ('projects','view'),('projects','create'),('projects','edit'),
-    ('tasks','view'),('tasks','create'),('tasks','edit'),
-    ('time_tracking','view_own'),
-    ('invoices_issued','view'),('invoices_issued','create'),('invoices_issued','edit'),
-    ('expenses','create'),
-    ('leads','view'),('leads','convert'),
-    ('scraping','launch'),
-    ('reports','view_sales'),
-    ('documents','view'),('documents','upload')
-)
-ON CONFLICT DO NOTHING;
-
--- cobranzas
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000004', p.id, false
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('contacts','view'),('contacts','create'),('contacts','edit'),('contacts','export'),
-    ('pipeline','view'),('pipeline','view_all'),
-    ('invoices_issued','view'),('invoices_issued','create'),('invoices_issued','edit'),
-    ('invoices_issued','emit'),('invoices_issued','export'),
-    ('invoices_received','view'),('invoices_received','create'),('invoices_received','edit'),
-    ('receipts','view'),('receipts','create'),
-    ('cash_registers','view'),('cash_registers','create_movement'),('cash_registers','reconcile'),
-    ('banks','view'),('banks','reconcile'),
-    ('expenses','create'),('expenses','view'),
-    ('cash_flow','view'),
-    ('reports','view_financial'),('reports','export'),
-    ('documents','view'),('documents','upload')
-)
-ON CONFLICT DO NOTHING;
-
--- soporte
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000005', p.id, false
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('contacts','view'),('contacts','create'),('contacts','edit'),
-    ('projects','view'),
-    ('tasks','view'),('tasks','create'),('tasks','edit'),
-    ('time_tracking','view_own'),
-    ('expenses','create'),
-    ('documents','view'),('documents','upload')
-)
-ON CONFLICT DO NOTHING;
-
--- desarrollo
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000006', p.id, false
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('contacts','view'),
-    ('projects','view'),
-    ('tasks','view'),('tasks','create'),('tasks','edit'),
-    ('time_tracking','view_own'),
-    ('expenses','create'),
-    ('documents','view'),('documents','upload')
-)
-ON CONFLICT DO NOTHING;
-
--- contable (read-only financial)
-INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
-SELECT 'd0000000-0000-4000-8000-000000000007', p.id, false
-FROM permissions p
-WHERE (p.module, p.action) IN (
-    ('quotes','view'),
-    ('time_tracking','export'),
-    ('invoices_issued','view'),('invoices_issued','export'),
-    ('invoices_received','view'),
-    ('receipts','view'),
-    ('cash_registers','view'),
-    ('banks','view'),
-    ('expenses','view'),
-    ('cash_flow','view'),
-    ('reports','view_financial'),('reports','export')
-)
-ON CONFLICT DO NOTHING;
 
 -- ─── user_roles ─────────────────────────────────────────────────────────────────
 CREATE TABLE user_roles (
