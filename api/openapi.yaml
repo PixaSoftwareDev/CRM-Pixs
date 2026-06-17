@@ -1,0 +1,88 @@
+openapi: 3.1.0
+
+info:
+  title: PIXS API
+  version: 0.1.0
+  description: |
+    CRM + ERP ligero con generación de leads por scraping.
+    PyME argentina de servicios.
+  contact:
+    name: PIXS Team
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+  - url: https://api.pixs.app
+    description: Producción
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+      description: |
+        Cookie HttpOnly + Secure + SameSite=Strict.
+        Se obtiene en POST /auth/login.
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          example: ok
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Código de error legible por máquina
+          example: validation_failed
+        message:
+          type: string
+          description: Descripción en español para mostrar al usuario
+          example: El campo CUIT es inválido
+        details:
+          type: object
+          description: Contexto adicional (campos con error, etc.)
+          additionalProperties: true
+
+security:
+  - cookieAuth: []
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Health check
+      description: Verifica que el servidor, Postgres y Redis estén disponibles.
+      security: []
+      tags: [Sistema]
+      responses:
+        "200":
+          description: Sistema operativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Uno o más componentes degradados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/HealthResponse"
+                  - type: object
+                    properties:
+                      postgres:
+                        type: string
+                      redis:
+                        type: string
+
+# Endpoints adicionales se agregarán módulo por módulo en sesiones futuras.
+# Ver especificación completa en docs/spec.md

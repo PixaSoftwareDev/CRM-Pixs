@@ -1,0 +1,53 @@
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build artifacts
+*.test
+*.out
+coverage.html
+coverage.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node / Frontend
+/web/node_modules/
+/web/.next/
+/web/out/
+/web/.env
+/web/.env.local
+
+# sqlc generated (regenerate with make sqlc)
+# Uncomment if you prefer not to commit generated code:
+# internal/repository/sqlc/*.go
+
+# Atlas
+atlas.sum
+
+# OS
+Thumbs.db
+
+# Logs
+*.log
+
+# Test / benchmark artifacts
+/tmp/

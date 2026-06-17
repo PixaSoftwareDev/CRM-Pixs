@@ -1,0 +1,71 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck  # includes gosimple, stylecheck (merged in golangci-lint v2)
+    - errcheck
+    - ineffassign
+    - unused
+    - gocritic
+    - misspell
+    - noctx
+    - bodyclose
+    - unparam
+    - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+linters-settings:
+  goimports:
+    local-prefixes: pixs
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+
+  misspell:
+    locale: US
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
+
+  exclude-rules:
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+        - unparam
+        - gocritic
+
+    - path: "internal/repository/sqlc/"
+      linters:
+        - gocritic
+        - revive
+
+  exclude-dirs:
+    - vendor
+    - internal/repository/sqlc
