@@ -136,7 +136,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		return fmt.Errorf("admin RBAC: %w", err)
 	}
 
-	// direccion: broad access, all unrestricted.
+	// direccion: broad access, all unrestricted. Includes management capabilities
+	// because this role is used by the company owner/partner.
 	if _, err := db.Exec(ctx, `
 		INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
 		SELECT $1, p.id, false FROM permissions p
@@ -158,19 +159,22 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('leads','view'),('leads','view_all'),('leads','convert'),
 		    ('scraping','launch'),('scraping','view_costs'),
 		    ('reports','view_financial'),('reports','view_sales'),('reports','export'),
-		    ('documents','view'),('documents','upload'),('documents','delete')
+		    ('documents','view'),('documents','upload'),('documents','delete'),
+		    ('users','manage'),('audit','view'),('settings','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleDireccion); err != nil {
 		return fmt.Errorf("direccion RBAC: %w", err)
 	}
 
-	// ventas: pipeline/view, pipeline/create, pipeline/edit, quotes/view, tasks/view, leads/view → restricted_to_own.
+	// ventas: pipeline, quotes, tasks, leads → restricted_to_own. A salesperson
+	// works exclusively on their own pipeline, quotes, tasks, and leads.
 	if _, err := db.Exec(ctx, `
 		INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
 		SELECT $1, p.id,
 		    CASE WHEN (p.module, p.action) IN (
 		        ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
-		        ('quotes','view'),('tasks','view'),('leads','view')
+		        ('quotes','view'),('quotes','create'),('quotes','edit'),
+		        ('tasks','view'),('leads','view')
 		    ) THEN true ELSE false END
 		FROM permissions p
 		WHERE (p.module, p.action) IN (
@@ -245,7 +249,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		return fmt.Errorf("desarrollo RBAC: %w", err)
 	}
 
-	// contable: read-only financial view.
+	// contable: read-only financial view + documents/view so they can open
+	// attached invoices and contracts without being able to modify anything.
 	if _, err := db.Exec(ctx, `
 		INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
 		SELECT $1, p.id, false FROM permissions p
@@ -259,7 +264,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('banks','view'),
 		    ('expenses','view'),
 		    ('cash_flow','view'),
-		    ('reports','view_financial'),('reports','export')
+		    ('reports','view_financial'),('reports','export'),
+		    ('documents','view')
 		)
 		ON CONFLICT DO NOTHING`, roleContable); err != nil {
 		return fmt.Errorf("contable RBAC: %w", err)
