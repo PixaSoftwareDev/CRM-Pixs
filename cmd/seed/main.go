@@ -104,6 +104,9 @@ func run() error {
 	if err := seedLostReasons(ctx, db); err != nil {
 		return fmt.Errorf("seeding lost reasons: %w", err)
 	}
+	if err := seedFinanceCatalogs(ctx, db); err != nil {
+		return fmt.Errorf("seeding finance catalogs: %w", err)
+	}
 
 	slog.Info("seed complete",
 		"company_id", seedCompanyID,
@@ -181,6 +184,10 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('cash_registers','view'),('cash_registers','create_movement'),('cash_registers','reconcile'),
 		    ('banks','view'),('banks','reconcile'),
 		    ('expenses','create'),('expenses','approve'),('expenses','view'),
+		    ('payment_orders','view'),('payment_orders','create'),('payment_orders','void'),
+		    ('recurring_payments','view'),('recurring_payments','manage'),
+		    ('payment_calendar','view'),
+		    ('cta_cte','view'),
 		    ('cash_flow','view'),
 		    ('leads','view'),('leads','view_all'),('leads','convert'),
 		    ('scraping','launch'),('scraping','view_costs'),
@@ -238,6 +245,10 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('receipts','view'),('receipts','create'),
 		    ('cash_registers','view'),('cash_registers','create_movement'),('cash_registers','reconcile'),
 		    ('banks','view'),('banks','reconcile'),
+		    ('payment_orders','view'),('payment_orders','create'),('payment_orders','void'),
+		    ('recurring_payments','view'),('recurring_payments','manage'),
+		    ('payment_calendar','view'),
+		    ('cta_cte','view'),
 		    ('expenses','create'),('expenses','view'),
 		    ('cash_flow','view'),
 		    ('reports','view_financial'),('reports','export'),
@@ -296,6 +307,10 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('receipts','view'),
 		    ('cash_registers','view'),
 		    ('banks','view'),
+		    ('payment_orders','view'),
+		    ('recurring_payments','view'),
+		    ('payment_calendar','view'),
+		    ('cta_cte','view'),
 		    ('expenses','view'),
 		    ('cash_flow','view'),
 		    ('reports','view_financial'),('reports','export'),
@@ -407,6 +422,52 @@ func seedPipelineStages(ctx context.Context, db *pgxpool.Pool) error {
 		}
 	}
 	slog.Info("pipeline stages seeded", "count", len(stages))
+	return nil
+}
+
+// seedFinanceCatalogs inserts the company-scoped finance catalogs and the
+// sequence-number rows. These live here (not in the migration) because the
+// company row is also created by the seed, so they share its lifecycle.
+func seedFinanceCatalogs(ctx context.Context, db *pgxpool.Pool) error {
+	stmts := []string{
+		`INSERT INTO vat_rates (id, company_id, name, rate_pct) VALUES
+		    ('f3000001-0000-4000-8000-000000000001', $1, 'Exento', 0),
+		    ('f3000001-0000-4000-8000-000000000002', $1, 'IVA 10.5%', 10.5),
+		    ('f3000001-0000-4000-8000-000000000003', $1, 'IVA 21%', 21),
+		    ('f3000001-0000-4000-8000-000000000004', $1, 'IVA 27%', 27)
+		 ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO payment_conditions (id, company_id, name, days) VALUES
+		    ('f4000001-0000-4000-8000-000000000001', $1, 'Contado', 0),
+		    ('f4000001-0000-4000-8000-000000000002', $1, '15 días', 15),
+		    ('f4000001-0000-4000-8000-000000000003', $1, '30 días', 30),
+		    ('f4000001-0000-4000-8000-000000000004', $1, '60 días', 60),
+		    ('f4000001-0000-4000-8000-000000000005', $1, '90 días', 90)
+		 ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO expense_categories (id, company_id, name) VALUES
+		    ('f5000001-0000-4000-8000-000000000001', $1, 'Viáticos'),
+		    ('f5000001-0000-4000-8000-000000000002', $1, 'Papelería'),
+		    ('f5000001-0000-4000-8000-000000000003', $1, 'Hosting'),
+		    ('f5000001-0000-4000-8000-000000000004', $1, 'Herramientas'),
+		    ('f5000001-0000-4000-8000-000000000005', $1, 'Impuestos'),
+		    ('f5000001-0000-4000-8000-000000000006', $1, 'Sueldos'),
+		    ('f5000001-0000-4000-8000-000000000007', $1, 'Honorarios'),
+		    ('f5000001-0000-4000-8000-000000000008', $1, 'Otros')
+		 ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO sequence_numbers (company_id, document_type, sale_point, last_number) VALUES
+		    ($1, 'invoice_A', 1, 0),
+		    ($1, 'invoice_B', 1, 0),
+		    ($1, 'invoice_C', 1, 0),
+		    ($1, 'invoice_M', 1, 0),
+		    ($1, 'receipt', 1, 0),
+		    ($1, 'payment_order', 1, 0)
+		 ON CONFLICT (company_id, document_type, sale_point) DO NOTHING`,
+	}
+	for _, stmt := range stmts {
+		if _, err := db.Exec(ctx, stmt, seedCompanyID); err != nil {
+			return err
+		}
+	}
+	slog.Info("finance catalogs seeded")
 	return nil
 }
 

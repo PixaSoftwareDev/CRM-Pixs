@@ -8,20 +8,31 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	// ─── Contact Tags ──────────────────────────────────────────────────────────────
 	AddContactTag(ctx context.Context, arg AddContactTagParams) error
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
+	AdvanceRecurringNextDue(ctx context.Context, arg AdvanceRecurringNextDueParams) (RecurringPayment, error)
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
 	ClearPrimaryContactPerson(ctx context.Context, contactID uuid.UUID) error
+	CloseSession(ctx context.Context, arg CloseSessionParams) (CashRegisterSession, error)
 	CountActiveSessions(ctx context.Context, userID uuid.UUID) (int32, error)
+	// ─── Bank accounts ─────────────────────────────────────────────────────────────
+	CreateBankAccountFinance(ctx context.Context, arg CreateBankAccountFinanceParams) (BankAccountsFinance, error)
+	// ─── Bank movements ────────────────────────────────────────────────────────────
+	CreateBankMovement(ctx context.Context, arg CreateBankMovementParams) (BankMovement, error)
 	// ─── Calendar Events ───────────────────────────────────────────────────────────
 	CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (CalendarEvent, error)
 	// Calendar queries for sqlc generation.
 	// ─── Calendar Event Types ──────────────────────────────────────────────────────
 	CreateCalendarEventType(ctx context.Context, arg CreateCalendarEventTypeParams) (CalendarEventType, error)
+	// ─── Cash movements ────────────────────────────────────────────────────────────
+	CreateCashMovement(ctx context.Context, arg CreateCashMovementParams) (CashMovement, error)
+	// ─── Cash registers ────────────────────────────────────────────────────────────
+	CreateCashRegister(ctx context.Context, arg CreateCashRegisterParams) (CashRegister, error)
 	// Contact queries for sqlc generation.
 	// NOTE: contacts has a generated tsvector column (search_vector). All queries
 	// use explicit column lists to exclude it from result structs where needed,
@@ -34,16 +45,43 @@ type Querier interface {
 	CreateContactNote(ctx context.Context, arg CreateContactNoteParams) (ContactNote, error)
 	// ─── Contact Persons ────────────────────────────────────────────────────────────
 	CreateContactPerson(ctx context.Context, arg CreateContactPersonParams) (ContactPerson, error)
+	CreateExchangeRate(ctx context.Context, arg CreateExchangeRateParams) (ExchangeRate, error)
+	// ─── Expenses ──────────────────────────────────────────────────────────────────
+	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Expense, error)
+	// ─── Invoices issued ───────────────────────────────────────────────────────────
+	CreateInvoiceDraft(ctx context.Context, arg CreateInvoiceDraftParams) (InvoicesIssued, error)
+	// ─── Invoice items ─────────────────────────────────────────────────────────────
+	CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemParams) (InvoiceItem, error)
+	// ─── Invoices received ─────────────────────────────────────────────────────────
+	CreateInvoiceReceived(ctx context.Context, arg CreateInvoiceReceivedParams) (InvoicesReceived, error)
+	// ─── Invoice taxes ─────────────────────────────────────────────────────────────
+	CreateInvoiceTax(ctx context.Context, arg CreateInvoiceTaxParams) (InvoiceTax, error)
 	CreateLostReason(ctx context.Context, arg CreateLostReasonParams) (LostReason, error)
 	CreateMilestone(ctx context.Context, arg CreateMilestoneParams) (ProjectMilestone, error)
 	CreateOpportunity(ctx context.Context, arg CreateOpportunityParams) (Opportunity, error)
 	// ─── Password Reset Tokens ─────────────────────────────────────────────────────
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error)
+	// ─── Payment obligations ───────────────────────────────────────────────────────
+	CreatePaymentObligation(ctx context.Context, arg CreatePaymentObligationParams) (PaymentObligation, error)
+	// ─── Payment orders ────────────────────────────────────────────────────────────
+	CreatePaymentOrder(ctx context.Context, arg CreatePaymentOrderParams) (PaymentOrder, error)
+	// ─── Payment order applications ────────────────────────────────────────────────
+	CreatePaymentOrderApplication(ctx context.Context, arg CreatePaymentOrderApplicationParams) (PaymentOrderApplication, error)
+	// ─── Payment order methods ─────────────────────────────────────────────────────
+	CreatePaymentOrderMethod(ctx context.Context, arg CreatePaymentOrderMethodParams) (PaymentOrderMethod, error)
 	CreatePipelineStage(ctx context.Context, arg CreatePipelineStageParams) (PipelineStage, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateQuote(ctx context.Context, arg CreateQuoteParams) (Quote, error)
 	CreateQuoteItem(ctx context.Context, arg CreateQuoteItemParams) (QuoteItem, error)
+	// ─── Receipts ──────────────────────────────────────────────────────────────────
+	CreateReceipt(ctx context.Context, arg CreateReceiptParams) (Receipt, error)
+	// ─── Receipt applications ──────────────────────────────────────────────────────
+	CreateReceiptApplication(ctx context.Context, arg CreateReceiptApplicationParams) (ReceiptInvoiceApplication, error)
+	// ─── Receipt payment methods ───────────────────────────────────────────────────
+	CreateReceiptPaymentMethod(ctx context.Context, arg CreateReceiptPaymentMethodParams) (ReceiptPaymentMethod, error)
+	// ─── Recurring payments ────────────────────────────────────────────────────────
+	CreateRecurringPayment(ctx context.Context, arg CreateRecurringPaymentParams) (RecurringPayment, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	// ─── Sessions ──────────────────────────────────────────────────────────────────
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -57,31 +95,59 @@ type Querier interface {
 	// ─── Users ─────────────────────────────────────────────────────────────────────
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
+	DeleteInvoiceItems(ctx context.Context, invoiceID uuid.UUID) error
+	DeleteInvoiceTaxes(ctx context.Context, invoiceID uuid.UUID) error
 	DeleteQuoteItems(ctx context.Context, quoteID uuid.UUID) error
 	DeleteRole(ctx context.Context, arg DeleteRoleParams) error
 	DeleteRolePermission(ctx context.Context, arg DeleteRolePermissionParams) error
 	DeleteUserTOTPBackupCodes(ctx context.Context, userID uuid.UUID) error
+	GetArPayables(ctx context.Context, arg GetArPayablesParams) ([]GetArPayablesRow, error)
+	// ─── Accounts receivable (CtaCte / cash flow) ──────────────────────────────────
+	GetArReceivables(ctx context.Context, arg GetArReceivablesParams) ([]GetArReceivablesRow, error)
+	GetBankAccountFinanceByID(ctx context.Context, arg GetBankAccountFinanceByIDParams) (BankAccountsFinance, error)
 	GetCalendarEventByID(ctx context.Context, arg GetCalendarEventByIDParams) (CalendarEvent, error)
 	GetCalendarEventTypeByID(ctx context.Context, arg GetCalendarEventTypeByIDParams) (CalendarEventType, error)
+	GetCashBalance(ctx context.Context, cashRegisterID uuid.UUID) (pgtype.Numeric, error)
+	GetCashFlowProjection(ctx context.Context, arg GetCashFlowProjectionParams) ([]GetCashFlowProjectionRow, error)
+	GetCashRegisterByID(ctx context.Context, arg GetCashRegisterByIDParams) (CashRegister, error)
 	// Identity queries for sqlc generation.
 	// All queries filter by company_id to enforce multi-tenancy.
 	// ─── Companies ─────────────────────────────────────────────────────────────────
 	GetCompanyByID(ctx context.Context, id uuid.UUID) (Company, error)
+	GetConsolidatedBalance(ctx context.Context, companyID uuid.UUID) ([]GetConsolidatedBalanceRow, error)
 	// ─── Contact Balances ──────────────────────────────────────────────────────────
 	GetContactBalance(ctx context.Context, arg GetContactBalanceParams) (ContactBalance, error)
 	GetContactBankAccountByID(ctx context.Context, id uuid.UUID) (ContactBankAccount, error)
 	GetContactBankAccountForContact(ctx context.Context, arg GetContactBankAccountForContactParams) (ContactBankAccount, error)
 	GetContactByID(ctx context.Context, arg GetContactByIDParams) (GetContactByIDRow, error)
+	// ─── Account statement (CtaCte for a single contact) ───────────────────────────
+	GetContactInvoicesIssued(ctx context.Context, arg GetContactInvoicesIssuedParams) ([]GetContactInvoicesIssuedRow, error)
 	GetContactPersonByID(ctx context.Context, id uuid.UUID) (ContactPerson, error)
 	GetContactPersonForContact(ctx context.Context, arg GetContactPersonForContactParams) (ContactPerson, error)
+	GetContactReceipts(ctx context.Context, arg GetContactReceiptsParams) ([]GetContactReceiptsRow, error)
+	GetExpenseByID(ctx context.Context, arg GetExpenseByIDParams) (Expense, error)
+	// ─── Contact balances ──────────────────────────────────────────────────────────
+	GetFinanceContactBalance(ctx context.Context, arg GetFinanceContactBalanceParams) (ContactBalance, error)
+	GetInvoiceApplicationSum(ctx context.Context, invoiceID uuid.UUID) (pgtype.Numeric, error)
+	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (InvoicesIssued, error)
+	GetInvoiceByIdempotencyKey(ctx context.Context, arg GetInvoiceByIdempotencyKeyParams) (InvoicesIssued, error)
+	GetInvoiceForUpdate(ctx context.Context, arg GetInvoiceForUpdateParams) (InvoicesIssued, error)
+	GetInvoiceReceivedApplicationSum(ctx context.Context, invoiceReceivedID uuid.UUID) (pgtype.Numeric, error)
+	GetInvoiceReceivedByID(ctx context.Context, arg GetInvoiceReceivedByIDParams) (InvoicesReceived, error)
+	GetInvoiceReceivedForUpdate(ctx context.Context, arg GetInvoiceReceivedForUpdateParams) (InvoicesReceived, error)
+	GetLatestExchangeRate(ctx context.Context, arg GetLatestExchangeRateParams) (ExchangeRate, error)
 	GetLossStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
 	GetMaxQuoteNumber(ctx context.Context, companyID uuid.UUID) (int32, error)
 	GetMilestoneByID(ctx context.Context, id uuid.UUID) (ProjectMilestone, error)
 	GetOldestActiveSession(ctx context.Context, userID uuid.UUID) (Session, error)
+	GetOpenSession(ctx context.Context, cashRegisterID uuid.UUID) (CashRegisterSession, error)
 	GetOpenTimer(ctx context.Context, userID uuid.UUID) (TaskTimeEntry, error)
 	GetOpenTimerForTask(ctx context.Context, arg GetOpenTimerForTaskParams) (TaskTimeEntry, error)
 	GetOpportunityByID(ctx context.Context, arg GetOpportunityByIDParams) (Opportunity, error)
 	GetPasswordResetToken(ctx context.Context, tokenHash string) (PasswordResetToken, error)
+	GetPaymentObligationByID(ctx context.Context, arg GetPaymentObligationByIDParams) (PaymentObligation, error)
+	GetPaymentOrderByID(ctx context.Context, arg GetPaymentOrderByIDParams) (PaymentOrder, error)
+	GetPaymentOrderByIdempotencyKey(ctx context.Context, arg GetPaymentOrderByIdempotencyKeyParams) (PaymentOrder, error)
 	GetPermissionByModuleAction(ctx context.Context, arg GetPermissionByModuleActionParams) (Permission, error)
 	GetPipelineStageByID(ctx context.Context, arg GetPipelineStageByIDParams) (PipelineStage, error)
 	GetProductByID(ctx context.Context, arg GetProductByIDParams) (Product, error)
@@ -90,6 +156,9 @@ type Querier interface {
 	GetQuoteByID(ctx context.Context, arg GetQuoteByIDParams) (Quote, error)
 	GetQuoteByNumber(ctx context.Context, arg GetQuoteByNumberParams) (Quote, error)
 	GetQuoteVersions(ctx context.Context, arg GetQuoteVersionsParams) ([]Quote, error)
+	GetReceiptByID(ctx context.Context, arg GetReceiptByIDParams) (GetReceiptByIDRow, error)
+	GetReceiptByIdempotencyKey(ctx context.Context, arg GetReceiptByIdempotencyKeyParams) (Receipt, error)
+	GetRecurringPaymentByID(ctx context.Context, arg GetRecurringPaymentByIDParams) (RecurringPayment, error)
 	// ─── Roles ─────────────────────────────────────────────────────────────────────
 	GetRoleByID(ctx context.Context, arg GetRoleByIDParams) (Role, error)
 	GetRoleByName(ctx context.Context, arg GetRoleByNameParams) (Role, error)
@@ -114,23 +183,42 @@ type Querier interface {
 	// ─── User Roles ────────────────────────────────────────────────────────────────
 	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]GetUserRolesRow, error)
 	GetUtilizationStats(ctx context.Context, arg GetUtilizationStatsParams) (GetUtilizationStatsRow, error)
+	GetVATRateByID(ctx context.Context, arg GetVATRateByIDParams) (VatRate, error)
 	GetWinStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
 	// ─── Audit Logs ────────────────────────────────────────────────────────────────
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
+	IssueInvoice(ctx context.Context, arg IssueInvoiceParams) (InvoicesIssued, error)
+	ListActiveRecurringDue(ctx context.Context, arg ListActiveRecurringDueParams) ([]RecurringPayment, error)
 	ListActiveSessions(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	ListBankAccountsFinance(ctx context.Context, companyID uuid.UUID) ([]BankAccountsFinance, error)
+	ListBankMovements(ctx context.Context, arg ListBankMovementsParams) ([]BankMovement, error)
 	ListCalendarEventTypes(ctx context.Context, companyID uuid.UUID) ([]CalendarEventType, error)
 	ListCalendarEvents(ctx context.Context, arg ListCalendarEventsParams) ([]CalendarEvent, error)
 	ListCalendarEventsForContact(ctx context.Context, arg ListCalendarEventsForContactParams) ([]CalendarEvent, error)
+	ListCashMovements(ctx context.Context, arg ListCashMovementsParams) ([]CashMovement, error)
+	ListCashRegisters(ctx context.Context, companyID uuid.UUID) ([]CashRegister, error)
 	ListContactBankAccounts(ctx context.Context, contactID uuid.UUID) ([]ContactBankAccount, error)
 	ListContactNotes(ctx context.Context, contactID uuid.UUID) ([]ContactNote, error)
 	ListContactPersons(ctx context.Context, contactID uuid.UUID) ([]ContactPerson, error)
 	ListContactTags(ctx context.Context, contactID uuid.UUID) ([]Tag, error)
 	ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error)
+	ListCurrencies(ctx context.Context) ([]Currency, error)
+	ListExpenseCategories(ctx context.Context, companyID uuid.UUID) ([]ExpenseCategory, error)
+	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
+	ListInvoiceItems(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceItem, error)
+	ListInvoiceTaxes(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceTax, error)
+	ListInvoices(ctx context.Context, arg ListInvoicesParams) ([]InvoicesIssued, error)
+	ListInvoicesReceived(ctx context.Context, arg ListInvoicesReceivedParams) ([]InvoicesReceived, error)
 	ListLostReasons(ctx context.Context, companyID uuid.UUID) ([]LostReason, error)
 	ListMilestones(ctx context.Context, projectID uuid.UUID) ([]ProjectMilestone, error)
 	ListOpportunities(ctx context.Context, arg ListOpportunitiesParams) ([]Opportunity, error)
 	ListOpportunitiesForForecast(ctx context.Context, companyID uuid.UUID) ([]ListOpportunitiesForForecastRow, error)
+	ListPaymentConditions(ctx context.Context, companyID uuid.UUID) ([]PaymentCondition, error)
+	ListPaymentObligations(ctx context.Context, arg ListPaymentObligationsParams) ([]PaymentObligation, error)
+	ListPaymentOrderApplications(ctx context.Context, paymentOrderID uuid.UUID) ([]PaymentOrderApplication, error)
+	ListPaymentOrderMethods(ctx context.Context, paymentOrderID uuid.UUID) ([]PaymentOrderMethod, error)
+	ListPaymentOrders(ctx context.Context, arg ListPaymentOrdersParams) ([]PaymentOrder, error)
 	// ─── Permissions ───────────────────────────────────────────────────────────────
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListPipelineStages(ctx context.Context, companyID uuid.UUID) ([]PipelineStage, error)
@@ -139,16 +227,31 @@ type Querier interface {
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListQuoteItems(ctx context.Context, quoteID uuid.UUID) ([]QuoteItem, error)
 	ListQuotes(ctx context.Context, arg ListQuotesParams) ([]Quote, error)
+	ListReceiptApplications(ctx context.Context, receiptID uuid.UUID) ([]ReceiptInvoiceApplication, error)
+	ListReceiptPaymentMethods(ctx context.Context, receiptID uuid.UUID) ([]ReceiptPaymentMethod, error)
+	ListReceipts(ctx context.Context, arg ListReceiptsParams) ([]Receipt, error)
+	ListRecurringPayments(ctx context.Context, companyID uuid.UUID) ([]RecurringPayment, error)
 	ListRoles(ctx context.Context, companyID uuid.UUID) ([]Role, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListTaskComments(ctx context.Context, taskID uuid.UUID) ([]TaskComment, error)
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error)
 	ListTimeEntries(ctx context.Context, arg ListTimeEntriesParams) ([]TimeEntry, error)
 	ListUsers(ctx context.Context, companyID uuid.UUID) ([]User, error)
+	// ─── Catalogs ──────────────────────────────────────────────────────────────────
+	ListVATRates(ctx context.Context, companyID uuid.UUID) ([]VatRate, error)
 	LoseOpportunity(ctx context.Context, arg LoseOpportunityParams) (Opportunity, error)
+	MarkObligationPaid(ctx context.Context, arg MarkObligationPaidParams) (PaymentObligation, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	MarkTOTPBackupCodeUsed(ctx context.Context, id uuid.UUID) error
 	MoveOpportunityStage(ctx context.Context, arg MoveOpportunityStageParams) (Opportunity, error)
+	// ─── Sequence numbering ────────────────────────────────────────────────────────
+	// Allocates the next document number atomically. The UPDATE acquires a
+	// row-level lock on the matching sequence_numbers row, so concurrent
+	// transactions are serialized and numbers are unique and gap-free.
+	NextSequenceNumber(ctx context.Context, arg NextSequenceNumberParams) (int32, error)
+	// ─── Cash sessions ─────────────────────────────────────────────────────────────
+	OpenCashSession(ctx context.Context, arg OpenCashSessionParams) (CashRegisterSession, error)
+	ReconcileBankMovement(ctx context.Context, arg ReconcileBankMovementParams) (BankMovement, error)
 	RecordTaskHistory(ctx context.Context, arg RecordTaskHistoryParams) (TaskStatusHistory, error)
 	RemoveContactTag(ctx context.Context, arg RemoveContactTagParams) error
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
@@ -156,22 +259,37 @@ type Querier interface {
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	SoftDeleteCalendarEvent(ctx context.Context, arg SoftDeleteCalendarEventParams) error
+	SoftDeleteCashRegister(ctx context.Context, arg SoftDeleteCashRegisterParams) error
 	SoftDeleteContact(ctx context.Context, arg SoftDeleteContactParams) error
 	SoftDeleteContactBankAccount(ctx context.Context, id uuid.UUID) error
 	SoftDeleteContactPerson(ctx context.Context, id uuid.UUID) error
+	SoftDeleteExpense(ctx context.Context, arg SoftDeleteExpenseParams) error
+	SoftDeleteInvoice(ctx context.Context, arg SoftDeleteInvoiceParams) error
+	SoftDeleteInvoiceReceived(ctx context.Context, arg SoftDeleteInvoiceReceivedParams) error
 	SoftDeleteMilestone(ctx context.Context, arg SoftDeleteMilestoneParams) error
 	SoftDeleteOpportunity(ctx context.Context, arg SoftDeleteOpportunityParams) error
+	SoftDeletePaymentOrder(ctx context.Context, arg SoftDeletePaymentOrderParams) error
 	SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) error
 	SoftDeleteQuote(ctx context.Context, arg SoftDeleteQuoteParams) error
+	SoftDeleteReceipt(ctx context.Context, arg SoftDeleteReceiptParams) error
+	SoftDeleteRecurringPayment(ctx context.Context, arg SoftDeleteRecurringPaymentParams) error
 	SoftDeleteTask(ctx context.Context, arg SoftDeleteTaskParams) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
 	StartTaskTimer(ctx context.Context, arg StartTaskTimerParams) (TaskTimeEntry, error)
 	StopTaskTimer(ctx context.Context, arg StopTaskTimerParams) (TaskTimeEntry, error)
+	UpdateBankAccountBalance(ctx context.Context, arg UpdateBankAccountBalanceParams) (BankAccountsFinance, error)
+	UpdateBankAccountFinance(ctx context.Context, arg UpdateBankAccountFinanceParams) (BankAccountsFinance, error)
 	UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEventParams) (CalendarEvent, error)
+	UpdateCashRegister(ctx context.Context, arg UpdateCashRegisterParams) (CashRegister, error)
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (Company, error)
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (UpdateContactRow, error)
 	UpdateContactPerson(ctx context.Context, arg UpdateContactPersonParams) (ContactPerson, error)
+	UpdateExpenseStatus(ctx context.Context, arg UpdateExpenseStatusParams) (Expense, error)
+	UpdateInvoiceDraft(ctx context.Context, arg UpdateInvoiceDraftParams) (InvoicesIssued, error)
+	UpdateInvoicePaidAmount(ctx context.Context, arg UpdateInvoicePaidAmountParams) (InvoicesIssued, error)
+	UpdateInvoiceReceived(ctx context.Context, arg UpdateInvoiceReceivedParams) (InvoicesReceived, error)
+	UpdateInvoiceReceivedPaidAmount(ctx context.Context, arg UpdateInvoiceReceivedPaidAmountParams) (InvoicesReceived, error)
 	UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams) (ProjectMilestone, error)
 	UpdateOpportunity(ctx context.Context, arg UpdateOpportunityParams) (Opportunity, error)
 	UpdatePipelineStage(ctx context.Context, arg UpdatePipelineStageParams) (PipelineStage, error)
@@ -179,6 +297,7 @@ type Querier interface {
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateQuote(ctx context.Context, arg UpdateQuoteParams) (Quote, error)
 	UpdateQuoteStatus(ctx context.Context, arg UpdateQuoteStatusParams) (Quote, error)
+	UpdateRecurringPayment(ctx context.Context, arg UpdateRecurringPaymentParams) (RecurringPayment, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)
@@ -187,7 +306,10 @@ type Querier interface {
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserTOTP(ctx context.Context, arg UpdateUserTOTPParams) error
 	UpsertContactBalance(ctx context.Context, arg UpsertContactBalanceParams) error
+	UpsertFinanceContactBalance(ctx context.Context, arg UpsertFinanceContactBalanceParams) error
 	UpsertRolePermission(ctx context.Context, arg UpsertRolePermissionParams) error
+	VoidInvoice(ctx context.Context, arg VoidInvoiceParams) (InvoicesIssued, error)
+	VoidInvoiceReceived(ctx context.Context, arg VoidInvoiceReceivedParams) (InvoicesReceived, error)
 	WinOpportunity(ctx context.Context, arg WinOpportunityParams) (Opportunity, error)
 }
 

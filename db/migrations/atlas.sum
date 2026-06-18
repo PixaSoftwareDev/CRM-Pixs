@@ -1,5 +1,6 @@
-h1:LyO2Qt1Et6FdN9aVY7wXNLtLpQIYnJTPR7Jcz+iAtKI=
+h1:s/78j/DA4NQ+z4ODxXbplJklrSpnynJIcvTojnvhf3M=
 20260617000001_init_identity.sql h1:9DknYootjplIIj5c6G+fWpRDw0DkJwGXgGajtcVQYRE=
 20260617000002_crm_core.sql h1:MjNzSPQYewFHXFrDC9fDlKym0sJ8JIHbPyDxI2dKVQE=
 20260617000003_calendar_permissions.sql h1:3GYxsUMRc1BFL5QtTgKkLng6COX1nHhS0fULWVkVyo8=
 20260617000004_sales_projects_tasks.sql h1:3z8W278Q63Aw9sWjvW3WaXlpkvLB7mpALXCCpOsvQzY=
+20260617000005_finance.sql h1:hjsrXV6lQjUxk0jSuPpEp0xoj1knF1bou/it+6atlds=

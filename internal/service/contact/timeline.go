@@ -121,6 +121,47 @@ func (s *ContactService) GetTimeline(ctx context.Context, companyID, contactID u
 		events = append(events, e)
 	}
 
+	// Source 5: invoices issued to this contact.
+	invoices, err := s.q.ListInvoices(ctx, sqlcgen.ListInvoicesParams{
+		CompanyID: companyID,
+		ContactID: pgtype.UUID{Bytes: contactID, Valid: true},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "loading invoices for timeline")
+	}
+	for _, inv := range invoices {
+		e := &TimelineEvent{
+			ID:         inv.ID,
+			Kind:       "invoice_issued",
+			OccurredAt: inv.IssueDate.Time,
+			Title:      "Factura " + inv.InvoiceType,
+			Meta: map[string]any{
+				"status":   inv.Status,
+				"currency": inv.Currency,
+			},
+		}
+		events = append(events, e)
+	}
+
+	// Source 6: receipts for this contact.
+	receipts, err := s.q.ListReceipts(ctx, sqlcgen.ListReceiptsParams{
+		CompanyID: companyID,
+		ContactID: pgtype.UUID{Bytes: contactID, Valid: true},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "loading receipts for timeline")
+	}
+	for _, r := range receipts {
+		e := &TimelineEvent{
+			ID:         r.ID,
+			Kind:       "receipt",
+			OccurredAt: r.Date.Time,
+			Title:      "Recibo",
+			Meta:       map[string]any{"currency": r.Currency},
+		}
+		events = append(events, e)
+	}
+
 	// Sort newest-first.
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].OccurredAt.After(events[j].OccurredAt)

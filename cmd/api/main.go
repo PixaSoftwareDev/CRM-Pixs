@@ -24,6 +24,7 @@ import (
 	sqlcgen "pixs/internal/repository/sqlc"
 	svccalendar "pixs/internal/service/calendar"
 	svccontact "pixs/internal/service/contact"
+	svcfinance "pixs/internal/service/finance"
 	svcidentity "pixs/internal/service/identity"
 	svcproject "pixs/internal/service/project"
 	svcsales "pixs/internal/service/sales"
@@ -169,7 +170,21 @@ func run() error {
 		timeTracking:  svctimetracking.NewTimeTrackingService(db, logger),
 	}
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, logger)
+	financeServices := &financeServices{
+		invoices:  svcfinance.NewInvoiceService(db, logger),
+		received:  svcfinance.NewInvoiceReceivedService(db, logger),
+		receipts:  svcfinance.NewReceiptService(db, logger),
+		orders:    svcfinance.NewPaymentOrderService(db, logger),
+		cash:      svcfinance.NewCashService(db, logger),
+		banks:     svcfinance.NewBankService(db, logger),
+		expenses:  svcfinance.NewExpenseService(db, logger),
+		recurring: svcfinance.NewRecurringService(db, logger),
+		cashflow:  svcfinance.NewCashFlowService(db, logger),
+		ctacte:    svcfinance.NewCtaCteService(db, logger),
+		catalog:   svcfinance.NewCatalogService(db, logger),
+	}
+
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, logger)
 
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
@@ -208,6 +223,7 @@ func registerRoutes(
 	contactSvc *svccontact.ContactService,
 	calendarSvc *svccalendar.CalendarService,
 	spt *salesProjectTaskServices,
+	fin *financeServices,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -256,6 +272,162 @@ func registerRoutes(
 
 	registerCRMRoutes(e, authMiddleware, policy, contactSvc, calendarSvc)
 	registerSalesProjectTaskRoutes(e, authMiddleware, policy, spt)
+	registerFinanceRoutes(e, authMiddleware, policy, fin)
+}
+
+// financeServices bundles the finance bounded-context services.
+type financeServices struct {
+	invoices  *svcfinance.InvoiceService
+	received  *svcfinance.InvoiceReceivedService
+	receipts  *svcfinance.ReceiptService
+	orders    *svcfinance.PaymentOrderService
+	cash      *svcfinance.CashService
+	banks     *svcfinance.BankService
+	expenses  *svcfinance.ExpenseService
+	recurring *svcfinance.RecurringService
+	cashflow  *svcfinance.CashFlowService
+	ctacte    *svcfinance.CtaCteService
+	catalog   *svcfinance.CatalogService
+}
+
+func registerFinanceRoutes(
+	e *echo.Echo,
+	authMiddleware echo.MiddlewareFunc,
+	policy *rbac.Policy,
+	fin *financeServices,
+) {
+	h := handler.NewFinanceHandler(
+		fin.invoices, fin.received, fin.receipts, fin.orders, fin.cash, fin.banks,
+		fin.expenses, fin.recurring, fin.cashflow, fin.ctacte, fin.catalog,
+	)
+
+	api := e.Group("/api/v1", authMiddleware)
+
+	// ─── Invoices issued ───────────────────────────────────────────────────────
+	canViewInv := mw.RequirePermission(policy, "invoices_issued", "view")
+	canCreateInv := mw.RequirePermission(policy, "invoices_issued", "create")
+	canEditInv := mw.RequirePermission(policy, "invoices_issued", "edit")
+	canEmitInv := mw.RequirePermission(policy, "invoices_issued", "emit")
+	canVoidInv := mw.RequirePermission(policy, "invoices_issued", "void")
+
+	invoices := api.Group("/invoices")
+	invoices.POST("", h.CreateInvoiceDraft, canCreateInv)
+	invoices.GET("", h.ListInvoices, canViewInv)
+	invoices.GET("/:id", h.GetInvoice, canViewInv)
+	invoices.PUT("/:id", h.UpdateInvoiceDraft, canEditInv)
+	invoices.POST("/:id/issue", h.IssueInvoice, canEmitInv)
+	invoices.POST("/:id/void", h.VoidInvoice, canVoidInv)
+	invoices.DELETE("/:id", h.DeleteInvoiceDraft, canEditInv)
+	invoices.GET("/:id/items", h.ListInvoiceItems, canViewInv)
+	invoices.GET("/:id/taxes", h.ListInvoiceTaxes, canViewInv)
+
+	// ─── Invoices received ─────────────────────────────────────────────────────
+	canViewRecv := mw.RequirePermission(policy, "invoices_received", "view")
+	canCreateRecv := mw.RequirePermission(policy, "invoices_received", "create")
+	canEditRecv := mw.RequirePermission(policy, "invoices_received", "edit")
+
+	recv := api.Group("/invoices-received")
+	recv.POST("", h.CreateInvoiceReceived, canCreateRecv)
+	recv.GET("", h.ListInvoicesReceived, canViewRecv)
+	recv.GET("/:id", h.GetInvoiceReceived, canViewRecv)
+	recv.PUT("/:id", h.UpdateInvoiceReceived, canEditRecv)
+	recv.DELETE("/:id", h.SoftDeleteInvoiceReceived, canEditRecv)
+
+	// ─── Receipts ──────────────────────────────────────────────────────────────
+	canViewRcpt := mw.RequirePermission(policy, "receipts", "view")
+	canCreateRcpt := mw.RequirePermission(policy, "receipts", "create")
+	canVoidRcpt := mw.RequirePermission(policy, "receipts", "void")
+
+	receipts := api.Group("/receipts")
+	receipts.POST("", h.CreateReceipt, canCreateRcpt)
+	receipts.GET("", h.ListReceipts, canViewRcpt)
+	receipts.GET("/:id", h.GetReceipt, canViewRcpt)
+	receipts.DELETE("/:id", h.VoidReceipt, canVoidRcpt)
+
+	// ─── Payment orders ────────────────────────────────────────────────────────
+	canViewPO := mw.RequirePermission(policy, "payment_orders", "view")
+	canCreatePO := mw.RequirePermission(policy, "payment_orders", "create")
+	canVoidPO := mw.RequirePermission(policy, "payment_orders", "void")
+
+	orders := api.Group("/payment-orders")
+	orders.POST("", h.CreatePaymentOrder, canCreatePO)
+	orders.GET("", h.ListPaymentOrders, canViewPO)
+	orders.GET("/:id", h.GetPaymentOrder, canViewPO)
+	orders.DELETE("/:id", h.VoidPaymentOrder, canVoidPO)
+
+	// ─── Cash registers ────────────────────────────────────────────────────────
+	canViewCash := mw.RequirePermission(policy, "cash_registers", "view")
+	canMoveCash := mw.RequirePermission(policy, "cash_registers", "create_movement")
+	canReconcileCash := mw.RequirePermission(policy, "cash_registers", "reconcile")
+
+	cash := api.Group("/cash-registers")
+	cash.POST("", h.CreateCashRegister, canReconcileCash)
+	cash.GET("", h.ListCashRegisters, canViewCash)
+	cash.POST("/transfer", h.TransferBetweenCashes, canMoveCash)
+	cash.GET("/:id", h.GetCashRegister, canViewCash)
+	cash.PUT("/:id", h.UpdateCashRegister, canReconcileCash)
+	cash.POST("/:id/open", h.OpenSession, canReconcileCash)
+	cash.POST("/:id/close", h.CloseSession, canReconcileCash)
+	cash.GET("/:id/movements", h.ListCashMovements, canViewCash)
+	cash.POST("/:id/movements", h.CreateCashMovement, canMoveCash)
+
+	// ─── Bank accounts ─────────────────────────────────────────────────────────
+	canViewBank := mw.RequirePermission(policy, "banks", "view")
+	canReconcileBank := mw.RequirePermission(policy, "banks", "reconcile")
+
+	banks := api.Group("/bank-accounts")
+	banks.POST("", h.CreateBankAccount, canReconcileBank)
+	banks.GET("", h.ListBankAccounts, canViewBank)
+	banks.GET("/:id", h.GetBankAccount, canViewBank)
+	banks.PUT("/:id", h.UpdateBankAccount, canReconcileBank)
+	banks.GET("/:id/movements", h.ListBankMovements, canViewBank)
+	banks.POST("/:id/movements", h.CreateBankMovement, canReconcileBank)
+	banks.POST("/:id/reconcile", h.ReconcileMovements, canReconcileBank)
+
+	// ─── Expenses ──────────────────────────────────────────────────────────────
+	canViewExp := mw.RequirePermission(policy, "expenses", "view")
+	canCreateExp := mw.RequirePermission(policy, "expenses", "create")
+	canApproveExp := mw.RequirePermission(policy, "expenses", "approve")
+
+	expenses := api.Group("/expenses")
+	expenses.POST("", h.CreateExpense, canCreateExp)
+	expenses.GET("", h.ListExpenses, canViewExp)
+	expenses.GET("/:id", h.GetExpense, canViewExp)
+	expenses.PUT("/:id", h.UpdateExpense, canCreateExp)
+	expenses.POST("/:id/approve", h.ApproveExpense, canApproveExp)
+	expenses.POST("/:id/reject", h.RejectExpense, canApproveExp)
+	expenses.DELETE("/:id", h.SoftDeleteExpense, canApproveExp)
+
+	// ─── Recurring payments ────────────────────────────────────────────────────
+	canViewRec := mw.RequirePermission(policy, "recurring_payments", "view")
+	canManageRec := mw.RequirePermission(policy, "recurring_payments", "manage")
+
+	rec := api.Group("/recurring-payments")
+	rec.POST("", h.CreateRecurringPayment, canManageRec)
+	rec.GET("", h.ListRecurringPayments, canViewRec)
+	rec.GET("/:id", h.GetRecurringPayment, canViewRec)
+	rec.PUT("/:id", h.UpdateRecurringPayment, canManageRec)
+	rec.DELETE("/:id", h.SoftDeleteRecurringPayment, canManageRec)
+
+	// ─── Payment calendar ──────────────────────────────────────────────────────
+	canViewCal := mw.RequirePermission(policy, "payment_calendar", "view")
+	cal := api.Group("/payment-calendar")
+	cal.GET("", h.ListPaymentObligations, canViewCal)
+	cal.POST("/:id/pay", h.MarkObligationPaid, canCreatePO)
+
+	// ─── Reports ───────────────────────────────────────────────────────────────
+	canViewFlow := mw.RequirePermission(policy, "cash_flow", "view")
+	canViewCtaCte := mw.RequirePermission(policy, "cta_cte", "view")
+	api.GET("/cash-flow", h.GetCashFlowProjection, canViewFlow)
+	api.GET("/contacts/:id/account-statement", h.GetAccountStatement, canViewCtaCte)
+	api.GET("/consolidated-balance", h.GetConsolidatedBalance, canViewFlow)
+
+	// ─── Catalogs (any invoices viewer) ────────────────────────────────────────
+	finCatalog := api.Group("/finance", canViewInv)
+	finCatalog.GET("/vat-rates", h.ListVATRates)
+	finCatalog.GET("/payment-conditions", h.ListPaymentConditions)
+	finCatalog.GET("/expense-categories", h.ListExpenseCategories)
+	finCatalog.GET("/currencies", h.ListCurrencies)
 }
 
 // salesProjectTaskServices bundles the services for the sales, projects,

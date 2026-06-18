@@ -88,6 +88,40 @@ type AuditLogs202609 struct {
 	AfterState  []byte             `db:"after_state" json:"after_state"`
 }
 
+type BankAccountsFinance struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	CompanyID     uuid.UUID          `db:"company_id" json:"company_id"`
+	BankName      string             `db:"bank_name" json:"bank_name"`
+	AccountNumber *string            `db:"account_number" json:"account_number"`
+	Cbu           *string            `db:"cbu" json:"cbu"`
+	Alias         *string            `db:"alias" json:"alias"`
+	Currency      string             `db:"currency" json:"currency"`
+	AccountHolder *string            `db:"account_holder" json:"account_holder"`
+	BookBalance   pgtype.Numeric     `db:"book_balance" json:"book_balance"`
+	IsActive      bool               `db:"is_active" json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type BankMovement struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	CompanyID     uuid.UUID          `db:"company_id" json:"company_id"`
+	BankAccountID uuid.UUID          `db:"bank_account_id" json:"bank_account_id"`
+	Type          string             `db:"type" json:"type"`
+	Amount        pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency      string             `db:"currency" json:"currency"`
+	Description   *string            `db:"description" json:"description"`
+	ReferenceType *string            `db:"reference_type" json:"reference_type"`
+	ReferenceID   pgtype.UUID        `db:"reference_id" json:"reference_id"`
+	Reconciled    bool               `db:"reconciled" json:"reconciled"`
+	ReconciledAt  pgtype.Timestamptz `db:"reconciled_at" json:"reconciled_at"`
+	ValueDate     pgtype.Date        `db:"value_date" json:"value_date"`
+	CreatedBy     uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
 type CalendarEvent struct {
 	ID                   uuid.UUID          `db:"id" json:"id"`
 	CompanyID            uuid.UUID          `db:"company_id" json:"company_id"`
@@ -115,6 +149,48 @@ type CalendarEventType struct {
 	Color     string             `db:"color" json:"color"`
 	Icon      *string            `db:"icon" json:"icon"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type CashMovement struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CompanyID      uuid.UUID          `db:"company_id" json:"company_id"`
+	CashRegisterID uuid.UUID          `db:"cash_register_id" json:"cash_register_id"`
+	SessionID      pgtype.UUID        `db:"session_id" json:"session_id"`
+	Type           string             `db:"type" json:"type"`
+	Amount         pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency       string             `db:"currency" json:"currency"`
+	Description    *string            `db:"description" json:"description"`
+	ReferenceType  *string            `db:"reference_type" json:"reference_type"`
+	ReferenceID    pgtype.UUID        `db:"reference_id" json:"reference_id"`
+	CreatedBy      uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type CashRegister struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	CompanyID     uuid.UUID          `db:"company_id" json:"company_id"`
+	Name          string             `db:"name" json:"name"`
+	Currency      string             `db:"currency" json:"currency"`
+	ResponsibleID pgtype.UUID        `db:"responsible_id" json:"responsible_id"`
+	IsActive      bool               `db:"is_active" json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type CashRegisterSession struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	CashRegisterID           uuid.UUID          `db:"cash_register_id" json:"cash_register_id"`
+	OpenedBy                 uuid.UUID          `db:"opened_by" json:"opened_by"`
+	OpenedAt                 pgtype.Timestamptz `db:"opened_at" json:"opened_at"`
+	ClosedBy                 pgtype.UUID        `db:"closed_by" json:"closed_by"`
+	ClosedAt                 pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
+	OpeningBalance           pgtype.Numeric     `db:"opening_balance" json:"opening_balance"`
+	DeclaredClosingBalance   pgtype.Numeric     `db:"declared_closing_balance" json:"declared_closing_balance"`
+	CalculatedClosingBalance pgtype.Numeric     `db:"calculated_closing_balance" json:"calculated_closing_balance"`
+	Difference               pgtype.Numeric     `db:"difference" json:"difference"`
+	Status                   string             `db:"status" json:"status"`
 }
 
 type Company struct {
@@ -161,6 +237,7 @@ type Contact struct {
 	CreatedAt                 pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	DeletedAt                 pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	PaymentConditionID        pgtype.UUID        `db:"payment_condition_id" json:"payment_condition_id"`
 }
 
 type ContactBalance struct {
@@ -212,6 +289,12 @@ type ContactTag struct {
 	TagID     uuid.UUID `db:"tag_id" json:"tag_id"`
 }
 
+type Currency struct {
+	Code   string `db:"code" json:"code"`
+	Name   string `db:"name" json:"name"`
+	Symbol string `db:"symbol" json:"symbol"`
+}
+
 type EmailVerificationToken struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
@@ -219,6 +302,124 @@ type EmailVerificationToken struct {
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type ExchangeRate struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	CompanyID    uuid.UUID          `db:"company_id" json:"company_id"`
+	FromCurrency string             `db:"from_currency" json:"from_currency"`
+	ToCurrency   string             `db:"to_currency" json:"to_currency"`
+	Rate         pgtype.Numeric     `db:"rate" json:"rate"`
+	Date         pgtype.Date        `db:"date" json:"date"`
+	Source       *string            `db:"source" json:"source"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Expense struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	CompanyID           uuid.UUID          `db:"company_id" json:"company_id"`
+	Date                pgtype.Date        `db:"date" json:"date"`
+	CategoryID          uuid.UUID          `db:"category_id" json:"category_id"`
+	Description         string             `db:"description" json:"description"`
+	Amount              pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency            *string            `db:"currency" json:"currency"`
+	PaidByUserID        pgtype.UUID        `db:"paid_by_user_id" json:"paid_by_user_id"`
+	PaidByCashID        pgtype.UUID        `db:"paid_by_cash_id" json:"paid_by_cash_id"`
+	PaidByBankID        pgtype.UUID        `db:"paid_by_bank_id" json:"paid_by_bank_id"`
+	FileKey             *string            `db:"file_key" json:"file_key"`
+	ProjectID           pgtype.UUID        `db:"project_id" json:"project_id"`
+	Status              string             `db:"status" json:"status"`
+	ApproverID          pgtype.UUID        `db:"approver_id" json:"approver_id"`
+	ApprovedAt          pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ReimbursementStatus string             `db:"reimbursement_status" json:"reimbursement_status"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt           pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ExpenseCategory struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	IsActive  bool               `db:"is_active" json:"is_active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type InvoiceItem struct {
+	ID          uuid.UUID      `db:"id" json:"id"`
+	InvoiceID   uuid.UUID      `db:"invoice_id" json:"invoice_id"`
+	ProductID   pgtype.UUID    `db:"product_id" json:"product_id"`
+	Description string         `db:"description" json:"description"`
+	Quantity    pgtype.Numeric `db:"quantity" json:"quantity"`
+	UnitPrice   pgtype.Numeric `db:"unit_price" json:"unit_price"`
+	DiscountPct pgtype.Numeric `db:"discount_pct" json:"discount_pct"`
+	VatRateID   pgtype.UUID    `db:"vat_rate_id" json:"vat_rate_id"`
+	LineNet     pgtype.Numeric `db:"line_net" json:"line_net"`
+	LineTax     pgtype.Numeric `db:"line_tax" json:"line_tax"`
+	LineTotal   pgtype.Numeric `db:"line_total" json:"line_total"`
+	OrderPos    *int16         `db:"order_pos" json:"order_pos"`
+}
+
+type InvoiceTax struct {
+	ID         uuid.UUID      `db:"id" json:"id"`
+	InvoiceID  uuid.UUID      `db:"invoice_id" json:"invoice_id"`
+	TaxType    string         `db:"tax_type" json:"tax_type"`
+	RatePct    pgtype.Numeric `db:"rate_pct" json:"rate_pct"`
+	BaseAmount pgtype.Numeric `db:"base_amount" json:"base_amount"`
+	TaxAmount  pgtype.Numeric `db:"tax_amount" json:"tax_amount"`
+}
+
+type InvoicesIssued struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	CompanyID          uuid.UUID          `db:"company_id" json:"company_id"`
+	IdempotencyKey     uuid.UUID          `db:"idempotency_key" json:"idempotency_key"`
+	InvoiceType        string             `db:"invoice_type" json:"invoice_type"`
+	SalePoint          int16              `db:"sale_point" json:"sale_point"`
+	Number             *int32             `db:"number" json:"number"`
+	ContactID          uuid.UUID          `db:"contact_id" json:"contact_id"`
+	IssueDate          pgtype.Date        `db:"issue_date" json:"issue_date"`
+	DueDate            pgtype.Date        `db:"due_date" json:"due_date"`
+	PaymentConditionID pgtype.UUID        `db:"payment_condition_id" json:"payment_condition_id"`
+	Currency           string             `db:"currency" json:"currency"`
+	ExchangeRate       pgtype.Numeric     `db:"exchange_rate" json:"exchange_rate"`
+	ExchangeRateDate   pgtype.Date        `db:"exchange_rate_date" json:"exchange_rate_date"`
+	Status             string             `db:"status" json:"status"`
+	NetAmount          pgtype.Numeric     `db:"net_amount" json:"net_amount"`
+	TaxAmount          pgtype.Numeric     `db:"tax_amount" json:"tax_amount"`
+	TotalAmount        pgtype.Numeric     `db:"total_amount" json:"total_amount"`
+	PaidAmount         pgtype.Numeric     `db:"paid_amount" json:"paid_amount"`
+	ProjectID          pgtype.UUID        `db:"project_id" json:"project_id"`
+	QuoteID            pgtype.UUID        `db:"quote_id" json:"quote_id"`
+	Notes              *string            `db:"notes" json:"notes"`
+	PdfKey             *string            `db:"pdf_key" json:"pdf_key"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type InvoicesReceived struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	CompanyID        uuid.UUID          `db:"company_id" json:"company_id"`
+	SupplierID       uuid.UUID          `db:"supplier_id" json:"supplier_id"`
+	InvoiceType      *string            `db:"invoice_type" json:"invoice_type"`
+	SalePoint        *int16             `db:"sale_point" json:"sale_point"`
+	Number           *int32             `db:"number" json:"number"`
+	IssueDate        pgtype.Date        `db:"issue_date" json:"issue_date"`
+	DueDate          pgtype.Date        `db:"due_date" json:"due_date"`
+	Currency         *string            `db:"currency" json:"currency"`
+	ExchangeRate     pgtype.Numeric     `db:"exchange_rate" json:"exchange_rate"`
+	ExchangeRateDate pgtype.Date        `db:"exchange_rate_date" json:"exchange_rate_date"`
+	NetAmount        pgtype.Numeric     `db:"net_amount" json:"net_amount"`
+	TaxAmount        pgtype.Numeric     `db:"tax_amount" json:"tax_amount"`
+	TotalAmount      pgtype.Numeric     `db:"total_amount" json:"total_amount"`
+	PaidAmount       pgtype.Numeric     `db:"paid_amount" json:"paid_amount"`
+	Status           string             `db:"status" json:"status"`
+	ProjectID        pgtype.UUID        `db:"project_id" json:"project_id"`
+	FileKey          *string            `db:"file_key" json:"file_key"`
+	Notes            *string            `db:"notes" json:"notes"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
 type LostReason struct {
@@ -255,6 +456,68 @@ type PasswordResetToken struct {
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type PaymentCondition struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	Days      int32              `db:"days" json:"days"`
+	IsActive  bool               `db:"is_active" json:"is_active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type PaymentObligation struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CompanyID      uuid.UUID          `db:"company_id" json:"company_id"`
+	SourceType     string             `db:"source_type" json:"source_type"`
+	SourceID       pgtype.UUID        `db:"source_id" json:"source_id"`
+	Description    string             `db:"description" json:"description"`
+	Amount         pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency       *string            `db:"currency" json:"currency"`
+	DueDate        pgtype.Date        `db:"due_date" json:"due_date"`
+	Status         string             `db:"status" json:"status"`
+	PaidAt         pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
+	PaymentOrderID pgtype.UUID        `db:"payment_order_id" json:"payment_order_id"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type PaymentOrder struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CompanyID      uuid.UUID          `db:"company_id" json:"company_id"`
+	IdempotencyKey uuid.UUID          `db:"idempotency_key" json:"idempotency_key"`
+	SupplierID     uuid.UUID          `db:"supplier_id" json:"supplier_id"`
+	Date           pgtype.Date        `db:"date" json:"date"`
+	Number         int32              `db:"number" json:"number"`
+	Currency       string             `db:"currency" json:"currency"`
+	ExchangeRate   pgtype.Numeric     `db:"exchange_rate" json:"exchange_rate"`
+	TotalAmount    pgtype.Numeric     `db:"total_amount" json:"total_amount"`
+	Notes          *string            `db:"notes" json:"notes"`
+	PdfKey         *string            `db:"pdf_key" json:"pdf_key"`
+	CreatedBy      uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type PaymentOrderApplication struct {
+	ID                uuid.UUID      `db:"id" json:"id"`
+	PaymentOrderID    uuid.UUID      `db:"payment_order_id" json:"payment_order_id"`
+	InvoiceReceivedID uuid.UUID      `db:"invoice_received_id" json:"invoice_received_id"`
+	Amount            pgtype.Numeric `db:"amount" json:"amount"`
+}
+
+type PaymentOrderMethod struct {
+	ID             uuid.UUID      `db:"id" json:"id"`
+	PaymentOrderID uuid.UUID      `db:"payment_order_id" json:"payment_order_id"`
+	MethodType     string         `db:"method_type" json:"method_type"`
+	CashRegisterID pgtype.UUID    `db:"cash_register_id" json:"cash_register_id"`
+	BankAccountID  pgtype.UUID    `db:"bank_account_id" json:"bank_account_id"`
+	Amount         pgtype.Numeric `db:"amount" json:"amount"`
+	Currency       *string        `db:"currency" json:"currency"`
+	CheckNumber    *string        `db:"check_number" json:"check_number"`
+	CheckDate      pgtype.Date    `db:"check_date" json:"check_date"`
 }
 
 type Permission struct {
@@ -374,6 +637,61 @@ type QuoteItem struct {
 	OrderPos     *int16         `db:"order_pos" json:"order_pos"`
 }
 
+type Receipt struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	CompanyID       uuid.UUID          `db:"company_id" json:"company_id"`
+	IdempotencyKey  uuid.UUID          `db:"idempotency_key" json:"idempotency_key"`
+	ContactID       uuid.UUID          `db:"contact_id" json:"contact_id"`
+	Date            pgtype.Date        `db:"date" json:"date"`
+	Number          int32              `db:"number" json:"number"`
+	Currency        string             `db:"currency" json:"currency"`
+	ExchangeRate    pgtype.Numeric     `db:"exchange_rate" json:"exchange_rate"`
+	TotalAmount     pgtype.Numeric     `db:"total_amount" json:"total_amount"`
+	OnAccountAmount pgtype.Numeric     `db:"on_account_amount" json:"on_account_amount"`
+	Notes           *string            `db:"notes" json:"notes"`
+	PdfKey          *string            `db:"pdf_key" json:"pdf_key"`
+	CreatedBy       uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ReceiptInvoiceApplication struct {
+	ID        uuid.UUID      `db:"id" json:"id"`
+	ReceiptID uuid.UUID      `db:"receipt_id" json:"receipt_id"`
+	InvoiceID uuid.UUID      `db:"invoice_id" json:"invoice_id"`
+	Amount    pgtype.Numeric `db:"amount" json:"amount"`
+}
+
+type ReceiptPaymentMethod struct {
+	ID             uuid.UUID      `db:"id" json:"id"`
+	ReceiptID      uuid.UUID      `db:"receipt_id" json:"receipt_id"`
+	MethodType     string         `db:"method_type" json:"method_type"`
+	CashRegisterID pgtype.UUID    `db:"cash_register_id" json:"cash_register_id"`
+	BankAccountID  pgtype.UUID    `db:"bank_account_id" json:"bank_account_id"`
+	Amount         pgtype.Numeric `db:"amount" json:"amount"`
+	Currency       *string        `db:"currency" json:"currency"`
+	CheckNumber    *string        `db:"check_number" json:"check_number"`
+	CheckDate      pgtype.Date    `db:"check_date" json:"check_date"`
+}
+
+type RecurringPayment struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	CompanyID     uuid.UUID          `db:"company_id" json:"company_id"`
+	SupplierID    pgtype.UUID        `db:"supplier_id" json:"supplier_id"`
+	Description   string             `db:"description" json:"description"`
+	Amount        pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency      *string            `db:"currency" json:"currency"`
+	Frequency     string             `db:"frequency" json:"frequency"`
+	DueDay        *int16             `db:"due_day" json:"due_day"`
+	NextDueDate   pgtype.Date        `db:"next_due_date" json:"next_due_date"`
+	PaymentMethod *string            `db:"payment_method" json:"payment_method"`
+	CategoryID    pgtype.UUID        `db:"category_id" json:"category_id"`
+	Status        string             `db:"status" json:"status"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
 type Role struct {
 	ID          uuid.UUID          `db:"id" json:"id"`
 	CompanyID   uuid.UUID          `db:"company_id" json:"company_id"`
@@ -387,6 +705,14 @@ type RolePermission struct {
 	RoleID          uuid.UUID `db:"role_id" json:"role_id"`
 	PermissionID    uuid.UUID `db:"permission_id" json:"permission_id"`
 	RestrictedToOwn bool      `db:"restricted_to_own" json:"restricted_to_own"`
+}
+
+type SequenceNumber struct {
+	ID           uuid.UUID `db:"id" json:"id"`
+	CompanyID    uuid.UUID `db:"company_id" json:"company_id"`
+	DocumentType string    `db:"document_type" json:"document_type"`
+	SalePoint    int16     `db:"sale_point" json:"sale_point"`
+	LastNumber   int32     `db:"last_number" json:"last_number"`
 }
 
 type Session struct {
@@ -520,4 +846,13 @@ type UserCostRate struct {
 type UserRole struct {
 	UserID uuid.UUID `db:"user_id" json:"user_id"`
 	RoleID uuid.UUID `db:"role_id" json:"role_id"`
+}
+
+type VatRate struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	RatePct   pgtype.Numeric     `db:"rate_pct" json:"rate_pct"`
+	IsActive  bool               `db:"is_active" json:"is_active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }

@@ -85,3 +85,11 @@ func PtrDate(t *time.Time) pgtype.Date {
 	}
 	return pgtype.Date{Time: *t, Valid: true}
 }
+
+// PtrTimestamptz converts a *time.Time to a pgtype.Timestamptz.
+func PtrTimestamptz(t *time.Time) pgtype.Timestamptz {
+	if t == nil {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: *t, Valid: true}
+}
