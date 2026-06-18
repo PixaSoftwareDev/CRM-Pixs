@@ -7,6 +7,7 @@ import {
   DollarSign,
   Zap,
   Settings,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -128,6 +129,13 @@ export const navItems: NavItem[] = [
     path: '/leads',
     icon: Zap,
     permission: { module: 'leads', action: 'view' },
+  },
+  {
+    key: 'vault',
+    label: 'Vault',
+    path: '/vault',
+    icon: Shield,
+    permission: { module: 'vault', action: 'view' },
   },
   { key: 'ajustes', label: 'Ajustes', path: '/ajustes', icon: Settings },
 ]

@@ -33,6 +33,7 @@ import (
 	svcsales "pixs/internal/service/sales"
 	svctask "pixs/internal/service/task"
 	svctimetracking "pixs/internal/service/timetracking"
+	svcvault "pixs/internal/service/vault"
 	"pixs/internal/transport/http/handler"
 	mw "pixs/internal/transport/http/middleware"
 	"pixs/internal/transport/http/validator"
@@ -200,7 +201,9 @@ func run() error {
 		orchestrator: svclead.NewScrapingOrchestrator(db, riverClient, svclead.ScrapingConfig{DailyQuota: cfg.ScrapingDailyQuota}, logger),
 	}
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, logger)
+	vaultSvc := svcvault.New(db, cipher, logger)
+
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, vaultSvc, logger)
 
 	// --- SPA static serving (must come after all API routes) ---
 	// The compiled frontend lives at web/dist relative to the working directory
@@ -248,6 +251,7 @@ func registerRoutes(
 	spt *salesProjectTaskServices,
 	fin *financeServices,
 	leads *leadServices,
+	vaultSvc *svcvault.VaultService,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -302,6 +306,7 @@ func registerRoutes(
 	registerSalesProjectTaskRoutes(e, authMiddleware, policy, spt)
 	registerFinanceRoutes(e, authMiddleware, policy, fin)
 	registerLeadRoutes(e, authMiddleware, policy, leads)
+	registerVaultRoutes(e, authMiddleware, policy, vaultSvc)
 }
 
 // leadServices bundles the services for the leads + scraping bounded context.
@@ -736,6 +741,25 @@ func healthHandler(db *pgxpool.Pool, rdb *redis.Client) echo.HandlerFunc {
 
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	}
+}
+
+func registerVaultRoutes(
+	e *echo.Echo,
+	authMiddleware echo.MiddlewareFunc,
+	policy *rbac.Policy,
+	vaultSvc *svcvault.VaultService,
+) {
+	vaultH := handler.NewVaultHandler(vaultSvc)
+	api := e.Group("/api/v1", authMiddleware)
+	vault := api.Group("/vault")
+	canView := mw.RequirePermission(policy, "vault", "view")
+	canManage := mw.RequirePermission(policy, "vault", "manage")
+
+	vault.GET("", vaultH.ListVaultEntries, canView)
+	vault.POST("", vaultH.CreateVaultEntry, canManage)
+	vault.GET("/:id", vaultH.GetVaultEntry, canManage) // manage = can decrypt
+	vault.PUT("/:id", vaultH.UpdateVaultEntry, canManage)
+	vault.DELETE("/:id", vaultH.DeleteVaultEntry, canManage)
 }
 
 func buildLogger(level string) *slog.Logger {

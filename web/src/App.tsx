@@ -14,6 +14,7 @@ import { QuoteFormPage } from './pages/sales/QuoteFormPage'
 import { ProjectsPage } from './pages/projects/ProjectsPage'
 import { ProjectDetailPage } from './pages/projects/ProjectDetailPage'
 import { TasksPage } from './pages/tasks/TasksPage'
+import { VaultPage } from './pages/vault/VaultPage'
 import { ToastContainer } from './components/ui/Toast'
 import { useTheme } from './hooks/useTheme'
 
@@ -65,6 +66,7 @@ export default function App() {
                         path="/finanzas/flujo"
                         element={<PlaceholderPage title="Flujo de caja" />}
                       />
+                      <Route path="/vault" element={<VaultPage />} />
                       <Route path="/ajustes" element={<PlaceholderPage title="Ajustes" />} />
                       <Route path="/ajustes/sesiones" element={<SessionsPage />} />
                       <Route path="*" element={<Navigate to="/" replace />} />

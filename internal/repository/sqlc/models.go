@@ -939,3 +939,19 @@ type VatRate struct {
 	IsActive  bool               `db:"is_active" json:"is_active"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
+
+type VaultEntry struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	CreatedBy uuid.UUID          `db:"created_by" json:"created_by"`
+	Category  string             `db:"category" json:"category"`
+	Label     string             `db:"label" json:"label"`
+	Username  *string            `db:"username" json:"username"`
+	Secret    []byte             `db:"secret" json:"secret"`
+	Url       *string            `db:"url" json:"url"`
+	Notes     *string            `db:"notes" json:"notes"`
+	Tags      []string           `db:"tags" json:"tags"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}

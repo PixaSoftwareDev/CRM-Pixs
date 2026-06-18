@@ -106,6 +106,7 @@ type Querier interface {
 	CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams) (TimeEntry, error)
 	// ─── Users ─────────────────────────────────────────────────────────────────────
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateVaultEntry(ctx context.Context, arg CreateVaultEntryParams) (VaultEntry, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteInvoiceItems(ctx context.Context, invoiceID uuid.UUID) error
 	DeleteInvoiceTaxes(ctx context.Context, invoiceID uuid.UUID) error
@@ -201,6 +202,7 @@ type Querier interface {
 	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]GetUserRolesRow, error)
 	GetUtilizationStats(ctx context.Context, arg GetUtilizationStatsParams) (GetUtilizationStatsRow, error)
 	GetVATRateByID(ctx context.Context, arg GetVATRateByIDParams) (VatRate, error)
+	GetVaultEntry(ctx context.Context, arg GetVaultEntryParams) (VaultEntry, error)
 	GetWinStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
 	// ─── Audit Logs ────────────────────────────────────────────────────────────────
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
@@ -262,6 +264,7 @@ type Querier interface {
 	ListUsers(ctx context.Context, companyID uuid.UUID) ([]User, error)
 	// ─── Catalogs ──────────────────────────────────────────────────────────────────
 	ListVATRates(ctx context.Context, companyID uuid.UUID) ([]VatRate, error)
+	ListVaultEntries(ctx context.Context, arg ListVaultEntriesParams) ([]VaultEntry, error)
 	LoseOpportunity(ctx context.Context, arg LoseOpportunityParams) (Opportunity, error)
 	MarkLeadExtractionFailed(ctx context.Context, arg MarkLeadExtractionFailedParams) error
 	MarkObligationPaid(ctx context.Context, arg MarkObligationPaidParams) (PaymentObligation, error)
@@ -301,6 +304,7 @@ type Querier interface {
 	SoftDeleteRecurringPayment(ctx context.Context, arg SoftDeleteRecurringPaymentParams) error
 	SoftDeleteTask(ctx context.Context, arg SoftDeleteTaskParams) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
+	SoftDeleteVaultEntry(ctx context.Context, arg SoftDeleteVaultEntryParams) error
 	StartTaskTimer(ctx context.Context, arg StartTaskTimerParams) (TaskTimeEntry, error)
 	StopTaskTimer(ctx context.Context, arg StopTaskTimerParams) (TaskTimeEntry, error)
 	UpdateBankAccountBalance(ctx context.Context, arg UpdateBankAccountBalanceParams) (BankAccountsFinance, error)
@@ -334,6 +338,7 @@ type Querier interface {
 	UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserTOTP(ctx context.Context, arg UpdateUserTOTPParams) error
+	UpdateVaultEntry(ctx context.Context, arg UpdateVaultEntryParams) (VaultEntry, error)
 	UpsertContactBalance(ctx context.Context, arg UpsertContactBalanceParams) error
 	UpsertFinanceContactBalance(ctx context.Context, arg UpsertFinanceContactBalanceParams) error
 	UpsertRolePermission(ctx context.Context, arg UpsertRolePermissionParams) error
