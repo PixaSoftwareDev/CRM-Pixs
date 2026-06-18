@@ -69,6 +69,13 @@ func NewScrapingWorker(db *pgxpool.Pool, headless bool, logger *slog.Logger) *Sc
 	}
 }
 
+// Timeout overrides River's default 60-second job timeout.
+// Scraping jobs can take several minutes: one Chrome navigation per URL,
+// plus contact sub-pages and popup dismissal on each one.
+func (w *ScrapingWorker) Timeout(*river.Job[ScrapingJobArgs]) time.Duration {
+	return 30 * time.Minute
+}
+
 // Work is the River entry point.
 func (w *ScrapingWorker) Work(ctx context.Context, job *river.Job[ScrapingJobArgs]) error {
 	return w.RunPipeline(ctx, job.Args)

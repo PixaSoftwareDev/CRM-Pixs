@@ -1,15 +1,20 @@
 // Package browser provides browser-based web scraping via chromedp.
 //
 // Anti-detection strategy:
-//   - Uses Brave (user's default) before falling back to Chrome
-//   - Removes all automation flags from the browser
-//   - Injects stealth JS before every page so navigator.webdriver is always hidden
+//   - Uses Chrome (separate from the user's active Brave instance)
+//   - Removes all automation flags
+//   - Injects stealth JS before every page so navigator.webdriver is hidden
 //   - Human-like typing with random per-character delays
-//   - Persistent scraper profile so the browser accumulates trust over time
+//   - Persistent scraper profile so the browser builds trust over time
 //
-// Tab lifecycle per site:
-//   - FetchSite opens ONE tab, navigates through all subpages in that same tab,
-//     then closes it via defer. No extra tabs.
+// Per-site lifecycle:
+//  1. Open ONE tab for the whole site
+//  2. Dismiss any popup/cookie banner
+//  3. Scroll to reveal lazy-loaded content
+//  4. Extract contact data directly from the DOM (mailto:, tel:, wa.me)
+//  5. Discover real contact/about links by reading the actual page HTML
+//  6. Visit each discovered page in the same tab, repeating steps 2–4
+//  7. Close the tab (via defer cancel)
 package browser
 
 import (
@@ -27,61 +32,44 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// stealthJS runs before every page load and hides all Chrome automation markers.
+// ─── Stealth ─────────────────────────────────────────────────────────────────
+
 const stealthJS = `
 (function() {
-	Object.defineProperty(navigator, 'webdriver', { get: () => undefined, configurable: true });
-
-	const fakePlugins = [
+	Object.defineProperty(navigator,'webdriver',{get:()=>undefined,configurable:true});
+	const fp=[
 		{name:'Chrome PDF Plugin',  filename:'internal-pdf-viewer',             description:'Portable Document Format'},
 		{name:'Chrome PDF Viewer',  filename:'mhjfbmdgcfjbbpaeojofohoefgiehjai', description:''},
 		{name:'Native Client',      filename:'internal-nacl-plugin',             description:''},
 	];
-	Object.defineProperty(navigator, 'plugins', {
-		get: () => Object.assign(fakePlugins, {
-			item:      (i) => fakePlugins[i],
-			namedItem: (n) => fakePlugins.find(p => p.name === n),
-			refresh:   () => {},
-		}),
-		configurable: true,
-	});
-
-	Object.defineProperty(navigator, 'languages', { get: () => ['es-AR','es','en-US','en'], configurable: true });
-
-	if (!window.chrome) {
-		window.chrome = {
-			app:       { isInstalled: false },
-			runtime:   {},
-			loadTimes: function() { return {}; },
-			csi:       function() { return {}; },
-		};
-	}
-
-	if (navigator.permissions) {
-		const _q = navigator.permissions.query.bind(navigator.permissions);
-		navigator.permissions.query = (p) =>
-			p.name === 'notifications'
-				? Promise.resolve({ state: 'default', onchange: null })
-				: _q(p);
-	}
-
-	Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8, configurable: true });
-	Object.defineProperty(navigator, 'deviceMemory',        { get: () => 8, configurable: true });
-
-	const _getParam = WebGLRenderingContext.prototype.getParameter;
-	WebGLRenderingContext.prototype.getParameter = function(p) {
-		if (p === 37445) return 'Intel Inc.';
-		if (p === 37446) return 'Intel Iris OpenGL Engine';
-		return _getParam.call(this, p);
-	};
+	Object.defineProperty(navigator,'plugins',{get:()=>Object.assign(fp,{item:i=>fp[i],namedItem:n=>fp.find(p=>p.name===n),refresh:()=>{}}),configurable:true});
+	Object.defineProperty(navigator,'languages',{get:()=>['es-AR','es','en-US','en'],configurable:true});
+	if(!window.chrome){window.chrome={app:{isInstalled:false},runtime:{},loadTimes:()=>({}),csi:()=>({})};}
+	if(navigator.permissions){const _q=navigator.permissions.query.bind(navigator.permissions);navigator.permissions.query=p=>p.name==='notifications'?Promise.resolve({state:'default',onchange:null}):_q(p);}
+	Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>8,configurable:true});
+	Object.defineProperty(navigator,'deviceMemory',{get:()=>8,configurable:true});
+	const _g=WebGLRenderingContext.prototype.getParameter;
+	WebGLRenderingContext.prototype.getParameter=function(p){if(p===37445)return'Intel Inc.';if(p===37446)return'Intel Iris OpenGL Engine';return _g.call(this,p);};
 })();
 `
 
-// extractLinksJS returns unique origin URLs from the current page, excluding
-// aggregators, directories, social networks, and other non-lead noise domains.
+// ─── Search JS ───────────────────────────────────────────────────────────────
+
+// acceptConsentJS clicks the Google cookie consent button using any known selector.
+const acceptConsentJS = `
+(() => {
+	for(const s of['#L2AGLb','#W0wltc']){const e=document.querySelector(s);if(e){e.click();return'id:'+s;}}
+	for(const s of['button[aria-label="Accept all"]','button[aria-label="Aceptar todo"]','button[aria-label="Acepta todo"]','button[jsname="higCR"]','button[jsname="b3VHJd"]']){const e=document.querySelector(s);if(e){e.click();return'attr:'+s;}}
+	for(const b of document.querySelectorAll('button,[role="button"]')){const t=b.textContent.trim().toLowerCase();if(['accept all','aceptar todo','acepta todo','i agree','acepto todo'].includes(t)){b.click();return'text:'+b.textContent.trim();}}
+	return '';
+})()
+`
+
+// extractLinksJS returns unique origin URLs from a search results page,
+// filtering out aggregators, social networks, news, and other non-lead noise.
 const extractLinksJS = `
 (() => {
-	const noise = [
+	const noise=[
 		'google.','gstatic.','googleapis.','youtube.com',
 		'facebook.com','twitter.com','x.com','instagram.com','tiktok.com',
 		'wikipedia.org','wikimedia.org',
@@ -90,87 +78,140 @@ const extractLinksJS = `
 		'mercadolibre.','amazon.','ebay.','aliexpress.',
 		'rae.es','wordreference.','dictionary.','thefreedictionary.',
 		'cloudflare.com','w3.org','mozilla.org','github.com','stackoverflow.',
-		'infobae.com','lanacion.','clarin.com','pagina12.','perfil.com',
-		'cronista.com','ambito.com','telam.com','agencianova.',
 		'reddit.com','quora.com','pinterest.','tumblr.com',
 		'blogspot.','wordpress.com','medium.com','substack.',
+		'infobae.com','lanacion.','clarin.com','pagina12.','perfil.com',
+		'cronista.com','ambito.com','telam.com','agencianova.',
 	];
-	const seen = new Set();
-	const out  = [];
-	for (const a of document.querySelectorAll('a[href]')) {
-		try {
-			const u    = new URL(a.href);
-			if (u.protocol !== 'http:' && u.protocol !== 'https:') continue;
-			const host = u.hostname.toLowerCase();
-			if (noise.some(n => host.includes(n)) || host === window.location.hostname) continue;
-			if (!seen.has(u.origin)) { seen.add(u.origin); out.push(u.origin); }
-		} catch {}
+	const seen=new Set(),out=[];
+	for(const a of document.querySelectorAll('a[href]')){
+		try{
+			const u=new URL(a.href);
+			if(u.protocol!=='http:'&&u.protocol!=='https:')continue;
+			const h=u.hostname.toLowerCase();
+			if(noise.some(n=>h.includes(n))||h===window.location.hostname)continue;
+			if(!seen.has(u.origin)){seen.add(u.origin);out.push(u.origin);}
+		}catch{}
 	}
 	return out;
 })()
 `
 
-// findContactLinksJS scans the current page for links that lead to contact,
-// about-us, or "quiénes somos" pages — by matching link text and URL paths.
-// Returns at most 4 full URLs on the same domain.
-const findContactLinksJS = `
+// ─── Site scraping JS ────────────────────────────────────────────────────────
+
+// dismissPopupsJS closes cookie banners, GDPR dialogs, newsletter modals, and
+// any other overlay that could hide page content. Runs after every page load.
+const dismissPopupsJS = `
 (() => {
-	const kw = [
-		'contact','contacto','contactar','contactanos','contactenos','contactarnos',
-		'quienes-somos','quienes_somos','quienes somos','quiénes somos',
-		'nosotros','about','about-us','about_us','empresa','la-empresa',
-		'la empresa','equipo','team','conocenos','conócenos',
+	const visible = el => el && el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden';
+	// 1. Known selectors for major consent/cookie libraries
+	const known = [
+		'#onetrust-accept-btn-handler',
+		'#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+		'.fc-cta-consent','#fc-button-accept',
+		'.cc-accept','.cc-btn.cc-allow',
+		'#accept-cookies','#cookie-accept','#cookie_accept',
+		'.cookie-accept','[data-accept-cookies]',
+		'#gdpr-accept','.gdpr-accept',
+		'[id*="cookieAccept"]','[class*="cookieAccept"]',
+		'[id*="cookie-banner"] button','[class*="cookie-banner"] button',
+		'#newsletter-popup .close','#newsletter-modal .close',
+		'.modal .close','[class*="modal"] [class*="close"]',
+		'.popup-close','[class*="popup"] [class*="close"]',
+		'.fancybox-close','.mfp-close',
 	];
-	const base = window.location.origin;
-	const seen = new Set();
-	const out  = [];
-
-	for (const a of document.querySelectorAll('a[href]')) {
-		try {
-			const u    = new URL(a.href, base);
-			if (u.origin !== base) continue;            // only same-domain
-			if (u.pathname === '/' || u.pathname === '') continue;
-			const text = (a.textContent || '').toLowerCase().trim();
-			const path = u.pathname.toLowerCase();
-			const hit  = kw.some(k => text.includes(k) || path.includes(k));
-			if (hit && !seen.has(u.href)) {
-				seen.add(u.href);
-				out.push(u.href);
-			}
-		} catch {}
-	}
-	return out.slice(0, 4);  // visit at most 4 relevant pages
-})()
-`
-
-// acceptConsentJS clicks the first "Accept all" consent button it finds, using
-// multiple strategies so it works regardless of which IDs Google uses today.
-const acceptConsentJS = `
-(() => {
-	for (const sel of ['#L2AGLb','#W0wltc']) {
-		const el = document.querySelector(sel);
-		if (el) { el.click(); return 'id:'+sel; }
-	}
-	for (const sel of [
-		'button[aria-label="Accept all"]','button[aria-label="Aceptar todo"]',
-		'button[aria-label="Acepta todo"]','button[jsname="higCR"]',
-		'button[jsname="b3VHJd"]','button[jsname="tHlp8d"]',
-	]) {
-		const el = document.querySelector(sel);
-		if (el) { el.click(); return 'attr:'+sel; }
-	}
-	for (const b of document.querySelectorAll('button,[role="button"]')) {
-		const t = b.textContent.trim().toLowerCase();
-		if (['accept all','aceptar todo','acepta todo','i agree','acepto todo'].includes(t)) {
-			b.click(); return 'text:'+b.textContent.trim();
+	for(const s of known){const e=document.querySelector(s);if(visible(e)){e.click();return'known:'+s;}}
+	// 2. Text-based matching for any unlisted library
+	const words=['aceptar todo','accept all','acepto','aceptar','accept','allow all',
+	             'permitir todo','entendido','ok','agree','cerrar','close','dismiss','got it','entendido'];
+	for(const el of document.querySelectorAll('button,[role="button"]')){
+		if(words.includes(el.textContent.trim().toLowerCase())&&visible(el)){
+			el.click();return'text:'+el.textContent.trim();
 		}
 	}
 	return '';
 })()
 `
 
+// extractDirectLinksJS extracts contact data that lives in href attributes
+// (not in visible text). Returns newline-separated values that the Go extractor
+// can process with its existing email/phone regexes.
+//
+// Why this matters: many sites use <a href="tel:+54..."> buttons with icons
+// where the phone number is ONLY in the href, not in the page text.
+const extractDirectLinksJS = `
+(() => {
+	const lines = [];
+	// tel: → phone numbers (picked up by phone regex in extractor)
+	for(const a of document.querySelectorAll('a[href^="tel:"]')){
+		const v = a.href.replace(/^tel:/,'').replace(/\s/g,'').trim();
+		if(v.length >= 7) lines.push(v);
+	}
+	// mailto: → email addresses (picked up by email regex)
+	for(const a of document.querySelectorAll('a[href^="mailto:"]')){
+		const v = a.href.replace(/^mailto:/,'').split('?')[0].trim();
+		if(v.includes('@')) lines.push(v);
+	}
+	// WhatsApp wa.me → normalize to +NNNN
+	for(const a of document.querySelectorAll('a[href*="wa.me/"],a[href*="whatsapp.com/send"]')){
+		const m = a.href.match(/(?:wa\.me\/|phone=)(\d{7,15})/);
+		if(m) lines.push('+'+m[1]);
+	}
+	return lines.join('\n');
+})()
+`
+
+// findContactLinksJS discovers real contact/about links from the page by
+// scoring each link's text and URL path against a keyword list.
+// Footer links are boosted because sites almost always put contact info there.
+// Returns up to 5 unique URLs on the same domain, highest-scored first.
+const findContactLinksJS = `
+(() => {
+	const kw = [
+		'contact','contacto','contactar','contactanos','contactenos','contactarnos',
+		'quienes somos','quiénes somos','nosotros','sobre nosotros','sobre-nosotros',
+		'about','about us','about-us','empresa','la empresa','la-empresa',
+		'equipo','team','quienes','quiénes','conocenos','conócenos',
+		'support','soporte','ayuda','help',
+	];
+	const norm = s => s.toLowerCase().replace(/\s+/g,'-');
+	const base = window.location.origin;
+	const seen = new Set();
+	const scored = [];
+
+	for(const a of document.querySelectorAll('a[href]')){
+		try{
+			const u = new URL(a.href, base);
+			if(u.origin !== base) continue;
+			const path = u.pathname;
+			if(!path || path === '/') continue;
+			// Avoid anchors on the current page and file downloads
+			if(/\.(pdf|doc|jpg|png|zip)$/i.test(path)) continue;
+
+			const text = (a.textContent||'').toLowerCase().trim();
+			const lp   = path.toLowerCase();
+			let score  = 0;
+			for(const k of kw){
+				if(text.includes(k)) score += 2;       // text match is strongest signal
+				if(lp.includes(norm(k))) score += 1;   // URL match
+			}
+			if(score > 0 && !seen.has(u.href)){
+				const inFooter = !!a.closest('footer,[class*="footer"],[id*="footer"],[class*="bottom"],[id*="bottom"]');
+				seen.add(u.href);
+				scored.push({url: u.href, score: score + (inFooter ? 3 : 0)});
+			}
+		}catch{}
+	}
+
+	scored.sort((a,b) => b.score - a.score);
+	return scored.slice(0,5).map(x => x.url);
+})()
+`
+
+// ─── Config / types ──────────────────────────────────────────────────────────
+
 // profileDir holds the persistent scraper profile. Reusing it lets the browser
-// accumulate cookies and history so search engines trust it more over time.
+// accumulate cookies so search engines trust it more over time.
 var profileDir = filepath.Join(os.Getenv("HOME"), ".config", "pixs-scraper-profile")
 
 // Scraper manages one browser instance for the lifetime of a scraping job.
@@ -181,12 +222,12 @@ type Scraper struct {
 	logger        *slog.Logger
 }
 
-// findBrowserExec returns the path to the best available Chromium-based browser.
-// Chrome is preferred over Brave because Brave is usually the user's active daily
-// browser — launching a second Brave process while one is already running causes
-// the new process to hand off to the existing instance and exit, which breaks the
-// CDP connection that chromedp needs.
-// Set PIXS_SCRAPING_BROWSER_PATH to override.
+// ─── Browser lifecycle ───────────────────────────────────────────────────────
+
+// findBrowserExec returns the best available Chromium-based browser.
+// Chrome is preferred because Brave runs in single-instance mode — launching
+// a second Brave process hands off to the running instance and exits, which
+// breaks the CDP connection that chromedp needs.
 func findBrowserExec() string {
 	if env := os.Getenv("PIXS_SCRAPING_BROWSER_PATH"); env != "" {
 		return env
@@ -197,13 +238,12 @@ func findBrowserExec() string {
 		"/usr/bin/chromium-browser",
 		"/opt/brave.com/brave/brave",
 		"/usr/bin/brave-browser",
-		"/snap/bin/brave",
 	} {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
-	return "" // let chromedp find its default
+	return ""
 }
 
 // New starts the browser with anti-detection settings.
@@ -215,8 +255,8 @@ func New(headless bool, logger *slog.Logger) (*Scraper, error) {
 
 	_ = os.MkdirAll(profileDir, 0o755)
 
-	// Remove stale singleton lock files so the browser can open the profile even
-	// if a previous run was killed without graceful shutdown.
+	// Remove stale singleton lock files so the profile can be reused even when
+	// the previous browser run was killed without graceful shutdown.
 	for _, name := range []string{"lockfile", "SingletonLock", "SingletonSocket", "SingletonCookie"} {
 		_ = os.Remove(filepath.Join(profileDir, name))
 	}
@@ -230,19 +270,14 @@ func New(headless bool, logger *slog.Logger) (*Scraper, error) {
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.UserDataDir(profileDir),
 		chromedp.WindowSize(1366, 768),
-
-		// Core anti-detection flags.
 		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 		chromedp.Flag("exclude-switches", "enable-automation"),
 		chromedp.Flag("disable-infobars", true),
-
-		// Realistic environment.
 		chromedp.Flag("lang", "es-AR"),
 		chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
 		chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"),
 	}
-
 	if exec != "" {
 		opts = append(opts, chromedp.ExecPath(exec))
 	}
@@ -275,13 +310,10 @@ func (s *Scraper) Close() {
 }
 
 // IsDead returns true when the browser process has exited or crashed.
-// A dead browser must be replaced — all subsequent operations will fail.
 func (s *Scraper) IsDead() bool {
 	return s.browserCtx.Err() != nil
 }
 
-// injectStealth registers the stealth script to run before every page load in
-// the given tab context. Must be called once per new tab, before any Navigate.
 func injectStealth(ctx context.Context) error {
 	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		_, err := page.AddScriptToEvaluateOnNewDocument(stealthJS).Do(ctx)
@@ -289,7 +321,6 @@ func injectStealth(ctx context.Context) error {
 	}))
 }
 
-// humanDelay returns a chromedp action that sleeps a random duration in [min,max] ms.
 func humanDelay(min, max int) chromedp.Action {
 	return chromedp.Sleep(time.Duration(min+rand.IntN(max-min)) * time.Millisecond)
 }
@@ -297,16 +328,11 @@ func humanDelay(min, max int) chromedp.Action {
 // ─── Search ──────────────────────────────────────────────────────────────────
 
 // Search runs a keyword search and returns unique site URLs.
-// Tries Google first; falls back to Bing automatically if Google shows a
-// consent/CAPTCHA page or returns no results.
+// Tries Google first; falls back to Bing if Google shows consent/CAPTCHA.
 func (s *Scraper) Search(ctx context.Context, query string, limit int) ([]string, error) {
 	urls, err := s.searchGoogle(ctx, query, limit)
-	if err != nil {
-		s.logger.Warn("google failed, trying bing", "err", err)
-		return s.searchBing(ctx, query, limit)
-	}
-	if len(urls) == 0 {
-		s.logger.Warn("google returned 0 results, trying bing")
+	if err != nil || len(urls) == 0 {
+		s.logger.Warn("google failed or empty, trying bing", "err", err)
 		return s.searchBing(ctx, query, limit)
 	}
 	return urls, nil
@@ -315,14 +341,12 @@ func (s *Scraper) Search(ctx context.Context, query string, limit int) ([]string
 func (s *Scraper) searchGoogle(ctx context.Context, query string, limit int) ([]string, error) {
 	tabCtx, cancel := chromedp.NewContext(s.browserCtx)
 	defer cancel()
-
 	tCtx, cancelT := context.WithTimeout(tabCtx, 120*time.Second)
 	defer cancelT()
 
 	if err := injectStealth(tCtx); err != nil {
 		s.logger.Warn("stealth inject failed on google tab", "err", err)
 	}
-
 	s.logger.Info("searching google", "query", query)
 
 	if err := chromedp.Run(tCtx,
@@ -332,23 +356,19 @@ func (s *Scraper) searchGoogle(ctx context.Context, query string, limit int) ([]
 		return nil, fmt.Errorf("navigate google: %w", err)
 	}
 
-	// Accept cookie consent via JS — handles any ID Google might use.
-	var consentResult string
-	_ = chromedp.Run(tCtx, chromedp.Evaluate(acceptConsentJS, &consentResult))
-	if consentResult != "" {
-		s.logger.Info("google consent accepted", "method", consentResult)
+	var consent string
+	_ = chromedp.Run(tCtx, chromedp.Evaluate(acceptConsentJS, &consent))
+	if consent != "" {
+		s.logger.Info("google consent accepted", "method", consent)
 		_ = chromedp.Run(tCtx, humanDelay(1000, 1800))
 	}
 
-	// Wait up to 12 s for the search box. If it doesn't appear, the page is
-	// still a consent/CAPTCHA — fail fast and let the caller fall back to Bing.
 	searchBox := `textarea[name="q"], input[name="q"]`
 	boxCtx, cancelBox := context.WithTimeout(tCtx, 12*time.Second)
 	err := chromedp.Run(boxCtx, chromedp.WaitVisible(searchBox, chromedp.ByQuery))
 	cancelBox()
 	if err != nil {
-		// One retry after a second consent attempt.
-		_ = chromedp.Run(tCtx, humanDelay(800, 1200), chromedp.Evaluate(acceptConsentJS, &consentResult))
+		_ = chromedp.Run(tCtx, humanDelay(800, 1200), chromedp.Evaluate(acceptConsentJS, &consent))
 		boxCtx2, cancelBox2 := context.WithTimeout(tCtx, 8*time.Second)
 		err2 := chromedp.Run(boxCtx2, chromedp.WaitVisible(searchBox, chromedp.ByQuery))
 		cancelBox2()
@@ -360,17 +380,16 @@ func (s *Scraper) searchGoogle(ctx context.Context, query string, limit int) ([]
 	if err := chromedp.Run(tCtx,
 		chromedp.Click(searchBox, chromedp.ByQuery),
 		humanDelay(300, 600),
-		// Clear any text that may be in the box before typing.
+		// Clear any pre-existing text before typing.
 		chromedp.Evaluate(`(() => {
 			const el = document.querySelector('textarea[name="q"],input[name="q"]');
-			if (el) { el.focus(); el.value = ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
+			if(el){el.focus();el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}
 		})()`, nil),
 		humanDelay(150, 300),
 	); err != nil {
 		return nil, fmt.Errorf("clicking google search box: %w", err)
 	}
 
-	// Type query character by character with random delays — indistinguishable from a human.
 	for _, ch := range query {
 		if err := chromedp.Run(tCtx,
 			chromedp.SendKeys(searchBox, string(ch), chromedp.ByQuery),
@@ -399,21 +418,19 @@ func (s *Scraper) searchGoogle(ctx context.Context, query string, limit int) ([]
 	if len(hrefs) > limit {
 		hrefs = hrefs[:limit]
 	}
-	s.logger.Info("google search done", "found", len(hrefs))
+	s.logger.Info("google search done", "found", len(hrefs), "urls", hrefs)
 	return hrefs, nil
 }
 
 func (s *Scraper) searchBing(ctx context.Context, query string, limit int) ([]string, error) {
 	tabCtx, cancel := chromedp.NewContext(s.browserCtx)
 	defer cancel()
-
 	tCtx, cancelT := context.WithTimeout(tabCtx, 90*time.Second)
 	defer cancelT()
 
 	if err := injectStealth(tCtx); err != nil {
 		s.logger.Warn("stealth inject failed on bing tab", "err", err)
 	}
-
 	s.logger.Info("searching bing", "query", query)
 
 	if err := chromedp.Run(tCtx,
@@ -460,28 +477,25 @@ func (s *Scraper) searchBing(ctx context.Context, query string, limit int) ([]st
 	if len(hrefs) > limit {
 		hrefs = hrefs[:limit]
 	}
-	s.logger.Info("bing search done", "found", len(hrefs))
+	s.logger.Info("bing search done", "found", len(hrefs), "urls", hrefs)
 	return hrefs, nil
 }
 
-// ─── FetchSite ───────────────────────────────────────────────────────────────
+// ─── Site fetching ───────────────────────────────────────────────────────────
 
-// FetchSite opens ONE browser tab, loads the main page, then finds real
-// contact/about links by parsing the HTML (instead of guessing URLs), visits
-// those pages in the same tab, and closes the tab when done.
-//
-// Design: one tab per site, closed by defer. No extra tabs are opened.
-// Max 4 contact-related subpages are visited (found via JS, not hardcoded paths).
+// FetchSite opens ONE browser tab, exhaustively extracts contact data from the
+// main page, then discovers and visits real contact/about pages found in the HTML.
+// The tab is closed automatically when the function returns.
 func (s *Scraper) FetchSite(ctx context.Context, siteURL string) ([]string, error) {
 	if s.IsDead() {
 		return nil, fmt.Errorf("browser is not running")
 	}
 
-	// ONE tab for the entire site — opened here, closed by defer cancel().
+	// ONE tab per site — closed by defer cancel().
 	tabCtx, cancel := chromedp.NewContext(s.browserCtx)
 	defer cancel()
 
-	tCtx, cancelT := context.WithTimeout(tabCtx, 60*time.Second)
+	tCtx, cancelT := context.WithTimeout(tabCtx, 90*time.Second)
 	defer cancelT()
 
 	if err := injectStealth(tCtx); err != nil {
@@ -490,7 +504,6 @@ func (s *Scraper) FetchSite(ctx context.Context, siteURL string) ([]string, erro
 
 	s.logger.Info("→ opening site", "url", siteURL)
 
-	// Load the main page.
 	if err := chromedp.Run(tCtx,
 		chromedp.Navigate(siteURL),
 		chromedp.WaitReady("body", chromedp.ByQuery),
@@ -499,24 +512,23 @@ func (s *Scraper) FetchSite(ctx context.Context, siteURL string) ([]string, erro
 		return nil, fmt.Errorf("navigate %s: %w", siteURL, err)
 	}
 
-	// Reject immediate redirects to foreign domains (ad networks, parked pages, etc.)
+	// Reject redirects to completely different domains.
 	var finalURL string
 	_ = chromedp.Run(tCtx, chromedp.Location(&finalURL))
 	if finalURL != "" && !isSameDomain(siteURL, finalURL) {
 		return nil, fmt.Errorf("redirected to different domain: %s → %s", siteURL, finalURL)
 	}
 
-	var mainHTML string
-	_ = chromedp.Run(tCtx, chromedp.OuterHTML("html", &mainHTML, chromedp.ByQuery))
-	pages := []string{mainHTML}
+	// Extract everything from the main page.
+	mainPages := s.extractFromCurrentPage(tCtx, siteURL)
+	allPages := mainPages
 
-	// Discover real contact/about links by reading the actual page HTML.
-	// This is far more reliable than guessing URL paths.
+	// Discover contact/about links by analyzing the real page HTML.
 	var contactLinks []string
 	_ = chromedp.Run(tCtx, chromedp.Evaluate(findContactLinksJS, &contactLinks))
-	s.logger.Debug("contact links found", "url", siteURL, "links", contactLinks)
+	s.logger.Debug("contact links found", "url", siteURL, "count", len(contactLinks), "links", contactLinks)
 
-	// Visit each discovered contact page in the SAME tab (no new tabs).
+	// Visit each discovered contact page in THE SAME TAB.
 	for _, link := range contactLinks {
 		if tCtx.Err() != nil {
 			break
@@ -527,48 +539,93 @@ func (s *Scraper) FetchSite(ctx context.Context, siteURL string) ([]string, erro
 			chromedp.WaitReady("body", chromedp.ByQuery),
 			humanDelay(600, 1100),
 		); err != nil {
+			s.logger.Debug("contact page load failed", "url", link, "err", err)
 			continue
 		}
 
-		// Guard against off-domain redirects on individual subpages too.
+		// Skip if navigation took us off the target domain.
 		var loc string
 		_ = chromedp.Run(tCtx, chromedp.Location(&loc))
 		if !isSameDomain(siteURL, loc) {
-			s.logger.Debug("contact link redirected away", "link", link, "got", loc)
+			s.logger.Debug("contact link redirected away", "expected", link, "got", loc)
 			continue
 		}
 
-		var html string
-		_ = chromedp.Run(tCtx, chromedp.OuterHTML("html", &html, chromedp.ByQuery))
-		if strings.TrimSpace(html) != "" {
-			pages = append(pages, html)
-			s.logger.Debug("fetched contact page", "url", link)
-		}
+		subPages := s.extractFromCurrentPage(tCtx, link)
+		allPages = append(allPages, subPages...)
 	}
 
-	s.logger.Info("← site done", "url", siteURL, "pages_fetched", len(pages))
-	return pages, nil
+	s.logger.Info("← site done", "url", siteURL, "pages_visited", 1+len(contactLinks), "data_chunks", len(allPages))
+	return allPages, nil
+}
+
+// extractFromCurrentPage performs the full extraction sequence on whatever page
+// is currently loaded in ctx:
+//  1. Dismiss any popup/cookie banner (two passes: before and after scroll)
+//  2. Scroll to reveal lazy-loaded content
+//  3. Collect the full outerHTML
+//  4. Extract direct contact links (tel:, mailto:, wa.me) as plain text
+//
+// Both the HTML and the direct-links text are returned as separate strings so
+// the extractor can process them independently.
+func (s *Scraper) extractFromCurrentPage(ctx context.Context, pageURL string) []string {
+	// Pass 1: dismiss popup immediately after load.
+	var dismissed string
+	_ = chromedp.Run(ctx, chromedp.Evaluate(dismissPopupsJS, &dismissed))
+	if dismissed != "" {
+		s.logger.Debug("popup dismissed (pass 1)", "url", pageURL, "method", dismissed)
+		_ = chromedp.Run(ctx, humanDelay(300, 600))
+	}
+
+	// Scroll to trigger lazy loading: 40% → 100% → back to top.
+	_ = chromedp.Run(ctx,
+		chromedp.Evaluate(`window.scrollTo({top: Math.floor(document.body.scrollHeight*0.4), behavior:'instant'})`, nil),
+		humanDelay(400, 700),
+		chromedp.Evaluate(`window.scrollTo({top: document.body.scrollHeight, behavior:'instant'})`, nil),
+		humanDelay(500, 800),
+		chromedp.Evaluate(`window.scrollTo(0, 0)`, nil),
+		humanDelay(200, 400),
+	)
+
+	// Pass 2: some sites show popups on scroll (newsletter triggers, etc.).
+	_ = chromedp.Run(ctx, chromedp.Evaluate(dismissPopupsJS, &dismissed))
+	if dismissed != "" {
+		s.logger.Debug("popup dismissed (pass 2)", "url", pageURL, "method", dismissed)
+		_ = chromedp.Run(ctx, humanDelay(200, 400))
+	}
+
+	// Collect full page HTML (includes everything rendered by JS).
+	var html string
+	_ = chromedp.Run(ctx, chromedp.OuterHTML("html", &html, chromedp.ByQuery))
+
+	// Extract direct contact data from DOM attributes (tel:, mailto:, wa.me).
+	// These are separate from the HTML because they live in href attributes
+	// that htmlToText strips out — the extractor phone regex would miss them.
+	var directLinks string
+	_ = chromedp.Run(ctx, chromedp.Evaluate(extractDirectLinksJS, &directLinks))
+
+	result := []string{}
+	if strings.TrimSpace(html) != "" {
+		result = append(result, html)
+	}
+	if strings.TrimSpace(directLinks) != "" {
+		result = append(result, directLinks)
+	}
+	return result
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// isSameDomain returns true when a and b share the same registered hostname
-// (ignoring www prefix and subdomain differences like "shop.example.com" vs "example.com").
+// isSameDomain returns true when a and b share the same registered hostname,
+// ignoring www prefix and subdomain differences.
 func isSameDomain(a, b string) bool {
 	ua, err1 := url.Parse(a)
 	ub, err2 := url.Parse(b)
 	if err1 != nil || err2 != nil {
-		return true // can't parse → don't skip
+		return true
 	}
 	ha := strings.TrimPrefix(strings.ToLower(ua.Hostname()), "www.")
 	hb := strings.TrimPrefix(strings.ToLower(ub.Hostname()), "www.")
 	return ha == hb || strings.HasSuffix(ha, "."+hb) || strings.HasSuffix(hb, "."+ha)
 }
 
-func baseURL(raw string) (string, error) {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", err
-	}
-	return u.Scheme + "://" + u.Host, nil
-}
