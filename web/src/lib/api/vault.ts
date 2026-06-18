@@ -56,16 +56,16 @@ export const VAULT_CATEGORY_LABELS: Record<VaultCategory, string> = {
 export const vaultApi = {
   list: (category?: VaultCategory): Promise<VaultEntry[]> => {
     const params = category ? `?category=${category}` : ''
-    return api.get<VaultEntry[]>(`/api/v1/vault${params}`)
+    return api.get<VaultEntry[]>(`/vault${params}`)
   },
 
-  get: (id: string): Promise<VaultEntry> => api.get<VaultEntry>(`/api/v1/vault/${id}`),
+  get: (id: string): Promise<VaultEntry> => api.get<VaultEntry>(`/vault/${id}`),
 
   create: (input: CreateVaultEntryInput): Promise<VaultEntry> =>
-    api.post<VaultEntry>('/api/v1/vault', input),
+    api.post<VaultEntry>('/vault', input),
 
   update: (id: string, input: UpdateVaultEntryInput): Promise<VaultEntry> =>
-    api.put<VaultEntry>(`/api/v1/vault/${id}`, input),
+    api.put<VaultEntry>(`/vault/${id}`, input),
 
-  delete: (id: string): Promise<unknown> => api.delete(`/api/v1/vault/${id}`),
+  delete: (id: string): Promise<unknown> => api.delete(`/vault/${id}`),
 }

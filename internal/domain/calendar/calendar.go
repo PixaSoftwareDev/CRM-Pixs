@@ -10,34 +10,34 @@ import (
 
 // CalendarEventType is an extensible catalog of event categories (e.g. "cobranza").
 type CalendarEventType struct {
-	ID        uuid.UUID
-	CompanyID uuid.UUID
-	Name      string
-	Color     string
-	Icon      *string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	CompanyID uuid.UUID `json:"company_id"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	Icon      *string   `json:"icon"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // CalendarEvent is a scheduled activity that may be linked to a contact,
 // a pipeline opportunity, a project, or a task.
 type CalendarEvent struct {
-	ID                   uuid.UUID
-	CompanyID            uuid.UUID
-	Title                string
-	EventTypeID          *uuid.UUID
-	ContactID            *uuid.UUID
-	AssignedUserID       uuid.UUID
-	StartsAt             time.Time
-	EndsAt               *time.Time
-	AllDay               bool
-	Status               EventStatus
-	Notes                *string
-	RelatedTaskID        *uuid.UUID
-	RelatedOpportunityID *uuid.UUID
-	RelatedProjectID     *uuid.UUID
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	DeletedAt            *time.Time
+	ID                   uuid.UUID   `json:"id"`
+	CompanyID            uuid.UUID   `json:"company_id"`
+	Title                string      `json:"title"`
+	EventTypeID          *uuid.UUID  `json:"event_type_id"`
+	ContactID            *uuid.UUID  `json:"contact_id"`
+	AssignedUserID       uuid.UUID   `json:"assigned_user_id"`
+	StartsAt             time.Time   `json:"starts_at"`
+	EndsAt               *time.Time  `json:"ends_at"`
+	AllDay               bool        `json:"all_day"`
+	Status               EventStatus `json:"status"`
+	Notes                *string     `json:"notes"`
+	RelatedTaskID        *uuid.UUID  `json:"related_task_id"`
+	RelatedOpportunityID *uuid.UUID  `json:"related_opportunity_id"`
+	RelatedProjectID     *uuid.UUID  `json:"related_project_id"`
+	CreatedAt            time.Time   `json:"created_at"`
+	UpdatedAt            time.Time   `json:"updated_at"`
+	DeletedAt            *time.Time  `json:"deleted_at,omitempty"`
 }
 
 // EventStatus represents the current state of a calendar event.

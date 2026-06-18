@@ -29,9 +29,11 @@ const kindFilterOptions = [
 export function ContactsPage() {
   const navigate = useNavigate()
   const can = useAuthStore((s) => s.can)
+  const selfId = useAuthStore((s) => s.user?.user_id)
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
   const [kind, setKind] = useState('')
+  const [onlyMine, setOnlyMine] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
 
   useEffect(() => {
@@ -40,8 +42,13 @@ export function ContactsPage() {
   }, [search])
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['contacts', { q: debounced, kind }],
-    queryFn: () => contactsApi.list({ q: debounced || undefined, kind: kind || undefined }),
+    queryKey: ['contacts', { q: debounced, kind, onlyMine }],
+    queryFn: () =>
+      contactsApi.list({
+        q: debounced || undefined,
+        kind: kind || undefined,
+        assigned_user_id: onlyMine ? selfId : undefined,
+      }),
   })
 
   const columns: Column<Contact>[] = [
@@ -108,6 +115,15 @@ export function ContactsPage() {
             aria-label="Filtrar por tipo"
           />
         </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-text whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={onlyMine}
+            onChange={(e) => setOnlyMine(e.target.checked)}
+            className="h-4 w-4 rounded border-border accent-brand"
+          />
+          Solo mis contactos
+        </label>
       </div>
 
       {isError ? (

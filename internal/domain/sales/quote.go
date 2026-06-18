@@ -37,43 +37,43 @@ func (s QuoteStatus) ShouldVersion() bool {
 
 // Quote is a sales quote (presupuesto) with line items and totals.
 type Quote struct {
-	ID            uuid.UUID
-	CompanyID     uuid.UUID
-	Number        string
-	ContactID     uuid.UUID
-	OpportunityID *uuid.UUID
-	UserID        uuid.UUID
-	Date          time.Time
-	ValidUntil    *time.Time
-	Currency      string
-	ExchangeRate  decimal.Decimal
-	Status        QuoteStatus
-	Version       int16
-	ParentID      *uuid.UUID
-	Notes         *string
-	Subtotal      decimal.Decimal
-	TaxTotal      decimal.Decimal
-	Total         decimal.Decimal
-	Items         []*QuoteItem
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+	ID            uuid.UUID        `json:"id"`
+	CompanyID     uuid.UUID        `json:"company_id"`
+	Number        string           `json:"number"`
+	ContactID     uuid.UUID        `json:"contact_id"`
+	OpportunityID *uuid.UUID       `json:"opportunity_id"`
+	UserID        uuid.UUID        `json:"user_id"`
+	Date          time.Time        `json:"date"`
+	ValidUntil    *time.Time       `json:"valid_until"`
+	Currency      string           `json:"currency"`
+	ExchangeRate  decimal.Decimal  `json:"exchange_rate"`
+	Status        QuoteStatus      `json:"status"`
+	Version       int16            `json:"version"`
+	ParentID      *uuid.UUID       `json:"parent_id"`
+	Notes         *string          `json:"notes"`
+	Subtotal      decimal.Decimal  `json:"subtotal"`
+	TaxTotal      decimal.Decimal  `json:"tax_total"`
+	Total         decimal.Decimal  `json:"total"`
+	Items         []*QuoteItem     `json:"items"`
+	CreatedAt     time.Time        `json:"created_at"`
+	UpdatedAt     time.Time        `json:"updated_at"`
+	DeletedAt     *time.Time       `json:"deleted_at,omitempty"`
 }
 
 // QuoteItem is a single line on a quote.
 type QuoteItem struct {
-	ID           uuid.UUID
-	QuoteID      uuid.UUID
-	ProductID    *uuid.UUID
-	Description  string
-	Quantity     decimal.Decimal
-	UnitPrice    decimal.Decimal
-	DiscountPct  decimal.Decimal
-	VATRatePct   decimal.Decimal
-	LineSubtotal decimal.Decimal
-	LineTax      decimal.Decimal
-	LineTotal    decimal.Decimal
-	OrderPos     *int16
+	ID           uuid.UUID       `json:"id"`
+	QuoteID      uuid.UUID       `json:"quote_id"`
+	ProductID    *uuid.UUID      `json:"product_id"`
+	Description  string          `json:"description"`
+	Quantity     decimal.Decimal `json:"quantity"`
+	UnitPrice    decimal.Decimal `json:"unit_price"`
+	DiscountPct  decimal.Decimal `json:"discount_pct"`
+	VATRatePct   decimal.Decimal `json:"vat_rate_pct"`
+	LineSubtotal decimal.Decimal `json:"line_subtotal"`
+	LineTax      decimal.Decimal `json:"line_tax"`
+	LineTotal    decimal.Decimal `json:"line_total"`
+	OrderPos     *int16          `json:"order_pos"`
 }
 
 // QuoteTotals is the computed result of CalculateTotals.

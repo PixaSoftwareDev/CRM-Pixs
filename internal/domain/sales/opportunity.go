@@ -9,44 +9,44 @@ import (
 
 // Opportunity is a sales opportunity moving through the pipeline.
 type Opportunity struct {
-	ID                uuid.UUID
-	CompanyID         uuid.UUID
-	ContactID         uuid.UUID
-	StageID           uuid.UUID
-	Title             string
-	Amount            *decimal.Decimal
-	Currency          string
-	ProbabilityPct    *decimal.Decimal
-	ExpectedCloseDate *time.Time
-	AssignedUserID    *uuid.UUID
-	Source            *string
-	LostReasonID      *uuid.UUID
-	LostNotes         *string
-	LeadID            *uuid.UUID
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         *time.Time
+	ID                uuid.UUID        `json:"id"`
+	CompanyID         uuid.UUID        `json:"company_id"`
+	ContactID         uuid.UUID        `json:"contact_id"`
+	StageID           uuid.UUID        `json:"stage_id"`
+	Title             string           `json:"title"`
+	Amount            *decimal.Decimal `json:"amount"`
+	Currency          string           `json:"currency"`
+	ProbabilityPct    *decimal.Decimal `json:"probability_pct"`
+	ExpectedCloseDate *time.Time       `json:"expected_close_date"`
+	AssignedUserID    *uuid.UUID       `json:"assigned_user_id"`
+	Source            *string          `json:"source"`
+	LostReasonID      *uuid.UUID       `json:"lost_reason_id"`
+	LostNotes         *string          `json:"lost_notes"`
+	LeadID            *uuid.UUID       `json:"lead_id"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+	DeletedAt         *time.Time       `json:"deleted_at,omitempty"`
 }
 
 // PipelineStage is a column in the sales pipeline.
 type PipelineStage struct {
-	ID        uuid.UUID
-	CompanyID uuid.UUID
-	Name      string
-	OrderPos  int16
-	Color     string
-	IsWin     bool
-	IsLoss    bool
-	IsDefault bool
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	CompanyID uuid.UUID `json:"company_id"`
+	Name      string    `json:"name"`
+	OrderPos  int16     `json:"order_pos"`
+	Color     string    `json:"color"`
+	IsWin     bool      `json:"is_win"`
+	IsLoss    bool      `json:"is_loss"`
+	IsDefault bool      `json:"is_default"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // LostReason is a configurable reason for losing an opportunity.
 type LostReason struct {
-	ID        uuid.UUID
-	CompanyID uuid.UUID
-	Name      string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	CompanyID uuid.UUID `json:"company_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Forecast returns the sum of each opportunity's amount weighted by its probability.

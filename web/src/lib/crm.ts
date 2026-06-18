@@ -149,7 +149,7 @@ export const taskPriorityDot: Record<string, string> = {
 export const eventStatusOptions = [
   { value: 'pending', label: 'Pendiente' },
   { value: 'done', label: 'Realizado' },
-  { value: 'reprogrammed', label: 'Reprogramado' },
+  { value: 'rescheduled', label: 'Reprogramado' },
   { value: 'cancelled', label: 'Cancelado' },
 ]
 

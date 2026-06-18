@@ -14,6 +14,7 @@ import { formatDate, cn } from '../../lib/utils'
 import { taskStatusColor, taskStatusLabel, taskPriorityLabel, taskPriorityDot } from '../../lib/crm'
 import { tasksApi, type Task } from '../../lib/api/tasks'
 import { projectsApi } from '../../lib/api/projects'
+import { ContactPicker } from '../../components/ui/ContactPicker'
 import { TaskForm } from './TaskForm'
 import { TaskDetail } from './TaskDetail'
 
@@ -43,6 +44,7 @@ export function TasksPage() {
   const [status, setStatus] = useState('')
   const [onlyMine, setOnlyMine] = useState(false)
   const [projectId, setProjectId] = useState('')
+  const [contactId, setContactId] = useState('')
   const [dueBefore, setDueBefore] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -50,12 +52,13 @@ export function TasksPage() {
   const projectsQ = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() })
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['tasks', { status, onlyMine, projectId, dueBefore }],
+    queryKey: ['tasks', { status, onlyMine, projectId, contactId, dueBefore }],
     queryFn: () =>
       tasksApi.list({
         status: status || undefined,
         assignee_id: onlyMine ? selfId : undefined,
         project_id: projectId || undefined,
+        contact_id: contactId || undefined,
         due_before: dueBefore || undefined,
       }),
   })
@@ -135,6 +138,9 @@ export function TasksPage() {
         </div>
         <div className="w-44">
           <Input type="date" value={dueBefore} onChange={(e) => setDueBefore(e.target.value)} aria-label="Vence antes de" />
+        </div>
+        <div className="w-52">
+          <ContactPicker value={contactId} onChange={(id) => setContactId(id)} label="Contacto" />
         </div>
         <label className="flex h-10 items-center gap-2 text-sm text-text">
           <input

@@ -132,3 +132,12 @@ export const contactsApi = {
       api.delete<void>(`/contacts/${contactId}/tags/${tagId}`),
   },
 }
+
+export const tagsApi = {
+  list: (area?: string) => {
+    const q = area ? `?area=${encodeURIComponent(area)}` : ''
+    return api.get<ContactTag[]>(`/tags${q}`)
+  },
+  create: (name: string, color?: string, area?: string) =>
+    api.post<ContactTag>('/tags', { name, color, area }),
+}

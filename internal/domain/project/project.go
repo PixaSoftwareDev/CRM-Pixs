@@ -42,48 +42,48 @@ const (
 
 // Project is a unit of delivered work for a client.
 type Project struct {
-	ID               uuid.UUID
-	CompanyID        uuid.UUID
-	ClientID         uuid.UUID
-	Name             string
-	Description      *string
-	StartDate        *time.Time
-	EstimatedEndDate *time.Time
-	ActualEndDate    *time.Time
-	Status           ProjectStatus
-	ResponsibleID    *uuid.UUID
-	BudgetHours      *decimal.Decimal
-	BudgetAmount     *decimal.Decimal
-	Currency         string
-	OpportunityID    *uuid.UUID
-	QuoteID          *uuid.UUID
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
+	ID               uuid.UUID        `json:"id"`
+	CompanyID        uuid.UUID        `json:"company_id"`
+	ClientID         uuid.UUID        `json:"client_id"`
+	Name             string           `json:"name"`
+	Description      *string          `json:"description"`
+	StartDate        *time.Time       `json:"start_date"`
+	EstimatedEndDate *time.Time       `json:"estimated_end_date"`
+	ActualEndDate    *time.Time       `json:"actual_end_date"`
+	Status           ProjectStatus    `json:"status"`
+	ResponsibleID    *uuid.UUID       `json:"responsible_id"`
+	BudgetHours      *decimal.Decimal `json:"budget_hours"`
+	BudgetAmount     *decimal.Decimal `json:"budget_amount"`
+	Currency         string           `json:"currency"`
+	OpportunityID    *uuid.UUID       `json:"opportunity_id"`
+	QuoteID          *uuid.UUID       `json:"quote_id"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
+	DeletedAt        *time.Time       `json:"deleted_at,omitempty"`
 }
 
 // Milestone is a deliverable checkpoint within a project.
 type Milestone struct {
-	ID            uuid.UUID
-	ProjectID     uuid.UUID
-	Name          string
-	Description   *string
-	Deliverables  *string
-	CommittedDate *time.Time
-	Status        MilestoneStatus
-	OrderPos      *int16
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+	ID            uuid.UUID       `json:"id"`
+	ProjectID     uuid.UUID       `json:"project_id"`
+	Name          string          `json:"name"`
+	Description   *string         `json:"description"`
+	Deliverables  *string         `json:"deliverables"`
+	CommittedDate *time.Time      `json:"committed_date"`
+	Status        MilestoneStatus `json:"status"`
+	OrderPos      *int16          `json:"order_pos"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	DeletedAt     *time.Time      `json:"deleted_at,omitempty"`
 }
 
 // ProjectMember is a user assigned to a project.
 type ProjectMember struct {
-	ProjectID     uuid.UUID
-	UserID        uuid.UUID
-	RoleInProject *string
-	FullName      string
-	Email         string
+	ProjectID     uuid.UUID `json:"project_id"`
+	UserID        uuid.UUID `json:"user_id"`
+	RoleInProject *string   `json:"role_in_project"`
+	FullName      string    `json:"full_name"`
+	Email         string    `json:"email"`
 }
 
 // ProfitabilityReport summarizes time and budget figures for a project.

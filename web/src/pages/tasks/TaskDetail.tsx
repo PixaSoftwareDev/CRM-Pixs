@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Play, Square } from 'lucide-react'
+import { Play, Square, UserCheck } from 'lucide-react'
 import { SlideOver } from '../../components/ui/SlideOver'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { ErrorState } from '../../components/ui/ErrorState'
+import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
 import { formatRelativeTime, formatDate } from '../../lib/utils'
 import {
@@ -28,6 +29,8 @@ function elapsed(fromIso: string): string {
 export function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
+  const can = useAuthStore((s) => s.can)
+  const selfId = useAuthStore((s) => s.user?.user_id)
   const activeTimer = useUIStore((s) => s.activeTimer)
   const setActiveTimer = useUIStore((s) => s.setActiveTimer)
 
@@ -63,6 +66,20 @@ export function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () =>
     },
     onError: () => toast.error('No se pudo detener el cronómetro'),
   })
+
+  const reassign = useMutation({
+    mutationFn: (userId: string) => tasksApi.assign(taskId, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task', taskId] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Tarea reasignada')
+      setReassignOpen(false)
+    },
+    onError: () => toast.error('No se pudo reasignar'),
+  })
+
+  const [reassignOpen, setReassignOpen] = useState(false)
+  const [newAssignee, setNewAssignee] = useState('')
 
   // Tick every second when this task's timer is active.
   const [, setTick] = useState(0)
@@ -152,6 +169,49 @@ export function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () =>
                   </Button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Reassign */}
+          {can('tasks', 'assign') && (
+            <div>
+              <p className="mb-2 text-sm font-medium text-text">Asignado a</p>
+              <div className="flex items-center gap-2">
+                <span className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text">
+                  {task.assignee_id
+                    ? task.assignee_id === selfId
+                      ? 'Vos'
+                      : task.assignee_id
+                    : 'Sin asignar'}
+                </span>
+                {!reassignOpen && (
+                  <Button variant="ghost" size="sm" onClick={() => { setNewAssignee(task.assignee_id ?? selfId ?? ''); setReassignOpen(true) }}>
+                    <UserCheck size={14} /> Reasignar
+                  </Button>
+                )}
+              </div>
+              {reassignOpen && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={newAssignee}
+                    onChange={(e) => setNewAssignee(e.target.value)}
+                    placeholder="ID de usuario"
+                    className="flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text placeholder:text-text-tertiary focus:border-brand focus:outline-none"
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={reassign.isPending}
+                    disabled={!newAssignee.trim()}
+                    onClick={() => reassign.mutate(newAssignee.trim())}
+                  >
+                    Guardar
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setReassignOpen(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus, MoreVertical } from 'lucide-react'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { Button } from '../../components/ui/Button'
@@ -13,6 +13,8 @@ import { useUIStore } from '../../stores/ui'
 import { formatMoney, formatDate } from '../../lib/utils'
 import { quoteStatusColor, quoteStatusLabel } from '../../lib/crm'
 import { quotesApi, type Quote } from '../../lib/api/sales'
+import { contactsApi } from '../../lib/api/contacts'
+import { ContactPicker } from '../../components/ui/ContactPicker'
 
 const statusFilter = [
   { value: '', label: 'Todos los estados' },
@@ -45,11 +47,26 @@ export function QuotesPage() {
   const can = useAuthStore((s) => s.can)
   const toast = useUIStore((s) => s.toast)
   const [status, setStatus] = useState('')
+  const [contactId, setContactId] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['quotes', status],
-    queryFn: () => quotesApi.list({ status: status || undefined }),
+    queryKey: ['quotes', status, contactId],
+    queryFn: () => quotesApi.list({ status: status || undefined, contact_id: contactId || undefined }),
+  })
+
+  // Resolve unique contact names.
+  const contactIds = [...new Set((data ?? []).map((q) => q.contact_id))]
+  const contactQueries = useQueries({
+    queries: contactIds.map((cid) => ({
+      queryKey: ['contact', cid],
+      queryFn: () => contactsApi.get(cid),
+      enabled: !!cid,
+    })),
+  })
+  const contactName: Record<string, string> = {}
+  contactQueries.forEach((q) => {
+    if (q.data) contactName[q.data.id] = q.data.fantasy_name
   })
 
   const setStatusM = useMutation({
@@ -74,6 +91,7 @@ export function QuotesPage() {
         </span>
       ),
     },
+    { key: 'contact', header: 'Contacto', render: (q) => contactName[q.contact_id] ?? '…' },
     { key: 'date', header: 'Fecha', render: (q) => formatDate(q.date) },
     { key: 'valid', header: 'Válido hasta', render: (q) => (q.valid_until ? formatDate(q.valid_until) : '—') },
     {
@@ -141,13 +159,22 @@ export function QuotesPage() {
         )}
       </div>
 
-      <div className="w-56">
-        <Select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          options={statusFilter}
-          aria-label="Filtrar por estado"
-        />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-52">
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            options={statusFilter}
+            aria-label="Filtrar por estado"
+          />
+        </div>
+        <div className="w-56">
+          <ContactPicker
+            label="Contacto"
+            value={contactId}
+            onChange={(id) => setContactId(id)}
+          />
+        </div>
       </div>
 
       {isError ? (

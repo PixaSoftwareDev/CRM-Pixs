@@ -25,7 +25,9 @@ import { useUIStore } from '../../stores/ui'
 import { formatRelativeTime, formatDate, cn } from '../../lib/utils'
 import {
   contactsApi,
+  tagsApi,
   type ContactPerson,
+  type ContactTag,
   type PersonInput,
   type BankAccountInput,
   type TimelineEntry,
@@ -39,7 +41,7 @@ import {
 } from '../../lib/crm'
 import { ContactForm } from './ContactForm'
 
-type Tab = 'personas' | 'cuentas' | 'notas' | 'timeline'
+type Tab = 'personas' | 'cuentas' | 'notas' | 'timeline' | 'etiquetas'
 
 export function ContactDetailPage() {
   const { id = '' } = useParams()
@@ -91,6 +93,7 @@ export function ContactDetailPage() {
     { key: 'cuentas', label: 'Cuentas bancarias' },
     { key: 'notas', label: 'Notas' },
     { key: 'timeline', label: 'Timeline' },
+    { key: 'etiquetas', label: 'Etiquetas' },
   ]
 
   return (
@@ -163,6 +166,7 @@ export function ContactDetailPage() {
       {tab === 'cuentas' && <BankAccountsTab contactId={id} canEdit={canEdit} />}
       {tab === 'notas' && <NotesTab contactId={id} canEdit={canEdit} />}
       {tab === 'timeline' && <TimelineTab contactId={id} />}
+      {tab === 'etiquetas' && <TagsTab contactId={id} canEdit={canEdit} />}
 
       {editOpen && <ContactForm open={editOpen} onClose={() => setEditOpen(false)} contact={contact} />}
       <ConfirmModal
@@ -600,5 +604,160 @@ function TimelineTab({ contactId }: { contactId: string }) {
         )
       })}
     </ul>
+  )
+}
+
+// ---------------- Tags ----------------
+
+const TAG_COLORS = [
+  '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
+  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
+]
+
+function TagsTab({ contactId, canEdit }: { contactId: string; canEdit: boolean }) {
+  const qc = useQueryClient()
+  const toast = useUIStore((s) => s.toast)
+  const [newTag, setNewTag] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const { data: assigned, isLoading } = useQuery({
+    queryKey: ['contact', contactId, 'tags'],
+    queryFn: () => contactsApi.tags.list(contactId),
+  })
+
+  const { data: allTags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => tagsApi.list(),
+  })
+
+  const add = useMutation({
+    mutationFn: (tagId: string) => contactsApi.tags.add(contactId, tagId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact', contactId, 'tags'] })
+      toast.success('Etiqueta agregada')
+    },
+    onError: () => toast.error('No se pudo agregar la etiqueta'),
+  })
+
+  const remove = useMutation({
+    mutationFn: (tagId: string) => contactsApi.tags.remove(contactId, tagId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact', contactId, 'tags'] })
+      toast.success('Etiqueta quitada')
+    },
+    onError: () => toast.error('No se pudo quitar la etiqueta'),
+  })
+
+  const createAndAdd = useMutation({
+    mutationFn: async (name: string) => {
+      const color = TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]
+      const tag = await tagsApi.create(name, color)
+      await contactsApi.tags.add(contactId, tag.id)
+      return tag
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact', contactId, 'tags'] })
+      qc.invalidateQueries({ queryKey: ['tags'] })
+      setNewTag('')
+      setCreating(false)
+      toast.success('Etiqueta creada y asignada')
+    },
+    onError: () => toast.error('No se pudo crear la etiqueta'),
+  })
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />
+
+  const assignedIds = new Set((assigned ?? []).map((t: ContactTag) => t.id))
+  const unassigned = (allTags ?? []).filter((t: ContactTag) => !assignedIds.has(t.id))
+
+  return (
+    <div className="space-y-4">
+      {/* Assigned tags */}
+      <div>
+        <p className="mb-2 text-sm font-medium text-text">Etiquetas asignadas</p>
+        {(assigned ?? []).length === 0 ? (
+          <p className="text-sm text-text-secondary">Sin etiquetas.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {(assigned ?? []).map((t: ContactTag) => (
+              <span
+                key={t.id}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-white"
+                style={{ backgroundColor: t.color ?? '#6366f1' }}
+              >
+                {t.name}
+                {canEdit && (
+                  <button
+                    onClick={() => remove.mutate(t.id)}
+                    className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
+                    title="Quitar etiqueta"
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {canEdit && (
+        <>
+          {/* Add existing tags */}
+          {unassigned.length > 0 && (
+            <div>
+              <p className="mb-2 text-sm font-medium text-text">Agregar etiqueta existente</p>
+              <div className="flex flex-wrap gap-2">
+                {unassigned.map((t: ContactTag) => (
+                  <button
+                    key={t.id}
+                    onClick={() => add.mutate(t.id)}
+                    className="flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 text-sm font-medium transition-colors hover:opacity-80"
+                    style={{ borderColor: t.color ?? '#6366f1', color: t.color ?? '#6366f1' }}
+                  >
+                    + {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Create new tag */}
+          <div>
+            {creating ? (
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newTag.trim()) createAndAdd.mutate(newTag.trim())
+                    if (e.key === 'Escape') { setCreating(false); setNewTag('') }
+                  }}
+                  placeholder="Nombre de la etiqueta"
+                  className="flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text placeholder:text-text-tertiary focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={createAndAdd.isPending}
+                  disabled={!newTag.trim()}
+                  onClick={() => createAndAdd.mutate(newTag.trim())}
+                >
+                  Crear
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setCreating(false); setNewTag('') }}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+                <Plus size={14} /> Nueva etiqueta
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

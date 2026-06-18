@@ -297,17 +297,35 @@ function OpportunityCard({
           </div>
         )}
       </div>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-text">
           {formatMoney(opportunity.amount ?? '0', opportunity.currency)}
         </span>
-        {opportunity.probability_pct != null && (
-          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs text-text-secondary">
-            {opportunity.probability_pct}%
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {opportunity.probability_pct != null && (
+            <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs text-text-secondary">
+              {opportunity.probability_pct}%
+            </span>
+          )}
+          {opportunity.assigned_user_id && (
+            <SellerAvatar userId={opportunity.assigned_user_id} />
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function SellerAvatar({ userId }: { userId: string }) {
+  const selfId = useAuthStore((s) => s.user?.user_id)
+  const label = userId === selfId ? 'Yo' : userId.slice(0, 4).toUpperCase()
+  return (
+    <span
+      title={userId === selfId ? 'Asignado a vos' : `Vendedor: ${userId}`}
+      className="flex h-5 w-5 items-center justify-center rounded-full bg-brand/20 text-[9px] font-semibold text-brand"
+    >
+      {label.slice(0, 2)}
+    </span>
   )
 }
 

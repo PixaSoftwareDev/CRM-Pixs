@@ -53,58 +53,58 @@ const (
 
 // Task is a unit of work or a client ticket.
 type Task struct {
-	ID             uuid.UUID
-	CompanyID      uuid.UUID
-	Type           TaskType
-	Title          string
-	Description    *string
-	ContactID      *uuid.UUID
-	ProjectID      *uuid.UUID
-	AssigneeID     *uuid.UUID
-	ReporterID     uuid.UUID
-	Origin         *string
-	Status         TaskStatus
-	Priority       TaskPriority
-	DueDate        *time.Time
-	ParentID       *uuid.UUID
-	IsRecurring    bool
-	RecurrenceRule *string
-	ResolvedAt     *time.Time
-	ClosedAt       *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
+	ID             uuid.UUID    `json:"id"`
+	CompanyID      uuid.UUID    `json:"company_id"`
+	Type           TaskType     `json:"type"`
+	Title          string       `json:"title"`
+	Description    *string      `json:"description"`
+	ContactID      *uuid.UUID   `json:"contact_id"`
+	ProjectID      *uuid.UUID   `json:"project_id"`
+	AssigneeID     *uuid.UUID   `json:"assignee_id"`
+	ReporterID     uuid.UUID    `json:"reporter_id"`
+	Origin         *string      `json:"origin"`
+	Status         TaskStatus   `json:"status"`
+	Priority       TaskPriority `json:"priority"`
+	DueDate        *time.Time   `json:"due_date"`
+	ParentID       *uuid.UUID   `json:"parent_id"`
+	IsRecurring    bool         `json:"is_recurring"`
+	RecurrenceRule *string      `json:"recurrence_rule"`
+	ResolvedAt     *time.Time   `json:"resolved_at"`
+	ClosedAt       *time.Time   `json:"closed_at"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
+	DeletedAt      *time.Time   `json:"deleted_at,omitempty"`
 }
 
 // TaskComment is an immutable comment on a task.
 type TaskComment struct {
-	ID        uuid.UUID
-	TaskID    uuid.UUID
-	UserID    uuid.UUID
-	Body      string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	TaskID    uuid.UUID `json:"task_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // TaskStatusHistoryEntry records a status or assignee change.
 type TaskStatusHistoryEntry struct {
-	ID           uuid.UUID
-	TaskID       uuid.UUID
-	UserID       uuid.UUID
-	FromStatus   *string
-	ToStatus     *string
-	FromAssignee *uuid.UUID
-	ToAssignee   *uuid.UUID
-	CreatedAt    time.Time
+	ID           uuid.UUID  `json:"id"`
+	TaskID       uuid.UUID  `json:"task_id"`
+	UserID       uuid.UUID  `json:"user_id"`
+	FromStatus   *string    `json:"from_status"`
+	ToStatus     *string    `json:"to_status"`
+	FromAssignee *uuid.UUID `json:"from_assignee"`
+	ToAssignee   *uuid.UUID `json:"to_assignee"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // TaskTimeEntry is a start/stop timer entry attached to a task.
 type TaskTimeEntry struct {
-	ID              uuid.UUID
-	TaskID          uuid.UUID
-	UserID          uuid.UUID
-	StartedAt       time.Time
-	EndedAt         *time.Time
-	DurationMinutes *int32
-	Note            *string
-	CreatedAt       time.Time
+	ID              uuid.UUID  `json:"id"`
+	TaskID          uuid.UUID  `json:"task_id"`
+	UserID          uuid.UUID  `json:"user_id"`
+	StartedAt       time.Time  `json:"started_at"`
+	EndedAt         *time.Time `json:"ended_at"`
+	DurationMinutes *int32     `json:"duration_minutes"`
+	Note            *string    `json:"note"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
