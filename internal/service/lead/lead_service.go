@@ -153,7 +153,9 @@ func (s *LeadService) ListLeads(ctx context.Context, companyID, callerID uuid.UU
 	}
 	out := make([]*domain.Lead, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, leadFromRow(r))
+		l := leadFromRow(r)
+		s.hydrate(ctx, l)
+		out = append(out, l)
 	}
 	return out, nil
 }

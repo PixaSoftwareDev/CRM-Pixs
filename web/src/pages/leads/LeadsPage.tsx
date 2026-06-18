@@ -26,6 +26,8 @@ import {
   Instagram,
   ExternalLink,
   ChevronRight,
+  Youtube,
+  MessageCircle,
 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -79,6 +81,8 @@ const SOCIAL_ICONS: Record<string, typeof Linkedin> = {
   linkedin: Linkedin,
   twitter: Twitter,
   instagram: Instagram,
+  youtube: Youtube,
+  whatsapp: MessageCircle,
 }
 
 // ─── Lead form schema ─────────────────────────────────────────────────────────
@@ -95,8 +99,6 @@ const leadSchema = z.object({
 })
 type LeadFormValues = z.infer<typeof leadSchema>
 
-// ─── Status change form ───────────────────────────────────────────────────────
-
 const statusSchema = z.object({
   status: z.string().min(1),
   rejection_reason: z.string().optional(),
@@ -104,13 +106,41 @@ const statusSchema = z.object({
 })
 type StatusFormValues = z.infer<typeof statusSchema>
 
-// ─── DnD Kanban Card ─────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function ContactChips({ lead }: { lead: Lead }) {
+  const emails = lead.emails ?? []
+  const phones = lead.phones ?? []
+  if (emails.length === 0 && phones.length === 0) return <span className="text-text-tertiary text-xs">—</span>
+  return (
+    <div className="flex items-center gap-2">
+      {emails.length > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+          <Mail className="w-3.5 h-3.5" />
+          {emails.length}
+        </span>
+      )}
+      {phones.length > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+          <Phone className="w-3.5 h-3.5" />
+          {phones.length}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ─── DnD Kanban ───────────────────────────────────────────────────────────────
 
 function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
   const style = transform
     ? { transform: `translate3d(${transform.x}px,${transform.y}px,0)`, opacity: isDragging ? 0.4 : 1 }
     : undefined
+  const emails = lead.emails ?? []
+  const phones = lead.phones ?? []
+  const hasContact = emails.length > 0 || phones.length > 0
+
   return (
     <div
       ref={setNodeRef}
@@ -118,26 +148,27 @@ function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="rounded-xl border border-border bg-surface p-3 cursor-grab active:cursor-grabbing hover:border-brand/40 transition-colors shadow-sm"
+      className="rounded-xl border border-border bg-surface p-3 cursor-grab active:cursor-grabbing hover:border-brand/40 transition-colors shadow-sm select-none"
     >
       <p className="font-medium text-sm text-text truncate">{lead.company_name}</p>
-      {lead.what_they_do && (
-        <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{lead.what_they_do}</p>
+      {lead.website && (
+        <p className="text-xs text-text-tertiary mt-0.5 truncate">{lead.website.replace(/^https?:\/\//, '')}</p>
       )}
-      <div className="flex gap-1.5 mt-2 flex-wrap">
-        {lead.industry && (
-          <span className="text-xs bg-surface-raised border border-border px-1.5 py-0.5 rounded-md text-text-secondary">
-            {lead.industry}
-          </span>
-        )}
-        {lead.city && (
-          <span className="text-xs text-text-tertiary">{lead.city}</span>
-        )}
-      </div>
-      {((lead.emails ?? []).length > 0 || (lead.phones ?? []).length > 0) && (
-        <div className="flex gap-2 mt-2">
-          {(lead.emails ?? []).length > 0 && <Mail className="w-3.5 h-3.5 text-text-tertiary" />}
-          {(lead.phones ?? []).length > 0 && <Phone className="w-3.5 h-3.5 text-text-tertiary" />}
+      {lead.what_they_do && (
+        <p className="text-xs text-text-secondary mt-1 line-clamp-2">{lead.what_they_do}</p>
+      )}
+      {hasContact && (
+        <div className="flex gap-3 mt-2 pt-2 border-t border-border/50">
+          {emails.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-text-tertiary">
+              <Mail className="w-3 h-3" /> {emails.length}
+            </span>
+          )}
+          {phones.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-text-tertiary">
+              <Phone className="w-3 h-3" /> {phones.length}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -157,21 +188,23 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col gap-2 min-w-[220px] max-w-[260px] rounded-xl border p-3 transition-colors ${
+      className={`flex flex-col gap-2 w-[240px] flex-shrink-0 rounded-xl border p-3 transition-colors h-full overflow-y-auto ${
         isOver ? 'border-brand/50 bg-brand/5' : 'border-border bg-surface-subtle'
       }`}
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1 sticky top-0 bg-inherit py-0.5">
         <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {STATUS_LABELS[status]}
         </span>
-        <span className="text-xs text-text-tertiary">{leads.length}</span>
+        <span className="text-xs bg-surface-raised border border-border px-1.5 py-0.5 rounded-md text-text-tertiary">
+          {leads.length}
+        </span>
       </div>
       {leads.map((l) => (
         <KanbanCard key={l.id} lead={l} onClick={() => onCardClick(l)} />
       ))}
       {leads.length === 0 && (
-        <div className="text-center text-xs text-text-tertiary py-4">Sin leads</div>
+        <div className="text-center text-xs text-text-tertiary py-6">Sin leads</div>
       )}
     </div>
   )
@@ -230,8 +263,7 @@ function LeadDetail({
   })
 
   const markWaiting = useMutation({
-    mutationFn: () =>
-      leadsApi.leads.changeStatus(lead.id, 'waiting'),
+    mutationFn: () => leadsApi.leads.changeStatus(lead.id, 'waiting'),
     onSuccess: () => {
       toast.success('Lead en espera')
       qc.invalidateQueries({ queryKey: ['leads'] })
@@ -243,10 +275,14 @@ function LeadDetail({
   const isTerminal = lead.status === 'converted' || lead.status === 'rejected'
   const canConvert = lead.status === 'qualified'
 
+  const emails = lead.emails ?? []
+  const phones = lead.phones ?? []
+  const socials = lead.socials ?? []
+
   return (
     <SlideOver open onClose={onClose} title={lead.company_name} size="lg">
       <div className="flex flex-col gap-5">
-        {/* Status badge */}
+        {/* Status + meta */}
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge label={STATUS_LABELS[lead.status]} color={STATUS_COLOR[lead.status]} />
           {lead.industry && (
@@ -254,59 +290,98 @@ function LeadDetail({
               {lead.industry}
             </span>
           )}
-          {lead.city && <span className="text-xs text-text-tertiary">{lead.city}, {lead.country}</span>}
+          {lead.city && (
+            <span className="text-xs text-text-tertiary">
+              {lead.city}{lead.country ? `, ${lead.country}` : ''}
+            </span>
+          )}
         </div>
+
+        {/* Website */}
+        {lead.website && (
+          <a
+            href={lead.website}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-sm text-brand hover:underline"
+          >
+            <ExternalLink className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">{lead.website}</span>
+          </a>
+        )}
 
         {/* Description */}
         {lead.what_they_do && (
-          <div>
-            <p className="text-sm text-text-secondary font-medium mb-1">Qué hacen</p>
+          <div className="rounded-lg bg-surface-subtle border border-border p-3">
+            <p className="text-xs font-medium text-text-secondary mb-1">Qué hacen</p>
             <p className="text-sm text-text">{lead.what_they_do}</p>
           </div>
         )}
 
-        {/* Contact data */}
-        {(lead.emails ?? []).length > 0 && (
+        {/* Emails */}
+        {emails.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-text-secondary mb-2">Emails</p>
-            <div className="flex flex-col gap-1">
-              {(lead.emails ?? []).map((e) => (
-                <div key={e.id} className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-2">
+              Emails ({emails.length})
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {emails.map((e) => (
+                <div key={e.id} className="flex items-center gap-2 rounded-lg bg-surface-subtle border border-border px-3 py-2">
                   <Mail className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                  <a href={`mailto:${e.email}`} className="text-sm text-brand hover:underline">{e.email}</a>
-                  {e.context && <span className="text-xs text-text-tertiary">({e.context})</span>}
+                  <a href={`mailto:${e.email}`} className="text-sm text-brand hover:underline flex-1 min-w-0 truncate">
+                    {e.email}
+                  </a>
+                  {e.context && (
+                    <span className="text-xs text-text-tertiary flex-shrink-0">({e.context})</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {(lead.phones ?? []).length > 0 && (
+        {/* Phones */}
+        {phones.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-text-secondary mb-2">Teléfonos</p>
-            <div className="flex flex-col gap-1">
-              {(lead.phones ?? []).map((p) => (
-                <div key={p.id} className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-2">
+              Teléfonos ({phones.length})
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {phones.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 rounded-lg bg-surface-subtle border border-border px-3 py-2">
                   <Phone className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                  <a href={`tel:${p.phone}`} className="text-sm text-text">{p.phone}</a>
-                  {p.context && <span className="text-xs text-text-tertiary">({p.context})</span>}
+                  <a href={`tel:${p.phone}`} className="text-sm text-text flex-1">
+                    {p.phone}
+                  </a>
+                  {p.type && p.type !== 'unknown' && (
+                    <span className="text-xs text-text-tertiary flex-shrink-0 capitalize">{p.type}</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {(lead.socials ?? []).length > 0 && (
+        {/* Socials */}
+        {socials.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-text-secondary mb-2">Redes sociales</p>
-            <div className="flex flex-col gap-1">
-              {(lead.socials ?? []).map((s) => {
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-2">
+              Redes sociales ({socials.length})
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {socials.map((s) => {
                 const Icon = SOCIAL_ICONS[s.platform.toLowerCase()] ?? Globe
                 return (
-                  <div key={s.id} className="flex items-center gap-2">
-                    <Icon className="w-4 h-4 text-text-tertiary" />
+                  <div key={s.id} className="flex items-center gap-2 rounded-lg bg-surface-subtle border border-border px-3 py-2">
+                    <Icon className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                    <span className="text-xs text-text-tertiary capitalize w-20 flex-shrink-0">{s.platform}</span>
                     {s.url ? (
-                      <a href={s.url} target="_blank" rel="noreferrer" className="text-sm text-brand hover:underline">
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-brand hover:underline flex-1 min-w-0 truncate"
+                      >
                         {s.handle ?? s.url}
                       </a>
                     ) : (
@@ -319,55 +394,33 @@ function LeadDetail({
           </div>
         )}
 
-        {lead.website && (
-          <a
-            href={lead.website}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-sm text-brand hover:underline"
-          >
-            <ExternalLink className="w-4 h-4" />
-            {lead.website}
-          </a>
+        {/* Empty state if no contact data */}
+        {emails.length === 0 && phones.length === 0 && socials.length === 0 && (
+          <div className="rounded-lg border border-dashed border-border p-4 text-center">
+            <p className="text-sm text-text-tertiary">Sin datos de contacto</p>
+          </div>
         )}
 
         {/* Actions */}
         {!isTerminal && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-text-secondary">Acciones</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Acciones</p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowStatusForm(true)}
-              >
+              <Button variant="secondary" size="sm" onClick={() => setShowStatusForm(true)}>
                 Cambiar estado
               </Button>
               {canConvert && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setConfirmConvert(true)}
-                >
+                <Button variant="primary" size="sm" onClick={() => setConfirmConvert(true)}>
                   Convertir a cliente
                 </Button>
               )}
               {lead.status !== 'waiting' && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={markWaiting.isPending}
-                  onClick={() => markWaiting.mutate()}
-                >
+                <Button variant="secondary" size="sm" loading={markWaiting.isPending} onClick={() => markWaiting.mutate()}>
                   Poner en espera
                 </Button>
               )}
               {lead.status !== 'rejected' && (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setConfirmReject(true)}
-                >
+                <Button variant="danger" size="sm" onClick={() => setConfirmReject(true)}>
                   Rechazar
                 </Button>
               )}
@@ -375,7 +428,6 @@ function LeadDetail({
           </div>
         )}
 
-        {/* Status form */}
         {showStatusForm && (
           <StatusChangeForm
             lead={lead}
@@ -387,14 +439,14 @@ function LeadDetail({
 
         {/* Activity timeline */}
         <div>
-          <p className="text-sm font-medium text-text-secondary mb-2">Actividad</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-3">Actividad</p>
           {loadingActs ? (
             <div className="flex flex-col gap-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <div className="flex flex-col gap-2 border-l-2 border-border pl-3">
+            <div className="flex flex-col gap-1 border-l-2 border-border pl-3">
               {(activities ?? []).length === 0 && (
                 <p className="text-xs text-text-tertiary">Sin actividad registrada</p>
               )}
@@ -441,7 +493,7 @@ function ActivityItem({ activity }: { activity: LeadActivity }) {
     converted: 'Convertido',
   }
   return (
-    <div className="py-1">
+    <div className="py-1.5">
       <p className="text-xs font-medium text-text">{typeLabel[activity.activity_type] ?? activity.activity_type}</p>
       {activity.detail && <p className="text-xs text-text-secondary mt-0.5">{activity.detail}</p>}
       <p className="text-xs text-text-tertiary mt-0.5">
@@ -478,7 +530,10 @@ function StatusChangeForm({
   const status = watch('status')
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="border border-border rounded-xl p-4 flex flex-col gap-3 bg-surface-subtle">
+    <form
+      onSubmit={handleSubmit(onSave)}
+      className="border border-border rounded-xl p-4 flex flex-col gap-3 bg-surface-subtle"
+    >
       <p className="text-sm font-medium text-text">Cambiar estado</p>
       <Select label="Nuevo estado" {...register('status')} options={STATUS_OPTIONS} />
       {status === 'rejected' && (
@@ -534,7 +589,7 @@ export function LeadsPage() {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
 
-  const [view, setView] = useState<'table' | 'kanban'>('kanban')
+  const [view, setView] = useState<'table' | 'kanban'>('table')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null)
@@ -599,19 +654,30 @@ export function LeadsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6 h-full">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4 p-4 md:p-6 h-full min-h-0">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
         <h1 className="text-2xl font-semibold text-text">Leads</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setView('table')}
-            className={`p-2 rounded-lg border transition-colors ${view === 'table' ? 'border-brand bg-brand/10 text-brand' : 'border-border text-text-secondary hover:text-text'}`}
+            title="Vista lista"
+            className={`p-2 rounded-lg border transition-colors ${
+              view === 'table'
+                ? 'border-brand bg-brand/10 text-brand'
+                : 'border-border text-text-secondary hover:text-text'
+            }`}
           >
             <LayoutList className="w-4 h-4" />
           </button>
           <button
             onClick={() => setView('kanban')}
-            className={`p-2 rounded-lg border transition-colors ${view === 'kanban' ? 'border-brand bg-brand/10 text-brand' : 'border-border text-text-secondary hover:text-text'}`}
+            title="Vista kanban"
+            className={`p-2 rounded-lg border transition-colors ${
+              view === 'kanban'
+                ? 'border-brand bg-brand/10 text-brand'
+                : 'border-border text-text-secondary hover:text-text'
+            }`}
           >
             <Columns className="w-4 h-4" />
           </button>
@@ -624,7 +690,7 @@ export function LeadsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 flex-shrink-0">
         <div className="w-44">
           <Select
             value={filterStatus}
@@ -644,90 +710,108 @@ export function LeadsPage() {
         </div>
       </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <div className="flex gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 w-56" />)}
-        </div>
-      ) : isError ? (
-        <ErrorState message="No se pudieron cargar los leads." onRetry={() => refetch()} />
-      ) : (leads ?? []).length === 0 ? (
-        <EmptyState
-          title="Sin leads todavía"
-          description="Creá uno manualmente o lanzá un scraping para encontrar prospectos."
-          action={can('leads', 'create') ? { label: 'Nuevo lead', onClick: () => setShowCreate(true) } : undefined}
-        />
-      ) : view === 'kanban' ? (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {KANBAN_COLUMNS.map((col) => (
-              <KanbanColumn
-                key={col}
-                status={col}
-                leads={grouped[col] ?? []}
-                onCardClick={setSelectedLead}
-              />
-            ))}
+      {/* Content — flex-1 min-h-0 so it fills remaining space without overflow */}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {isLoading ? (
+          <div className="flex gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 w-56" />)}
           </div>
-          <DragOverlay>
-            {activeDragLead && (
-              <div className="rounded-xl border border-brand bg-surface p-3 shadow-lg w-56 opacity-90">
-                <p className="font-medium text-sm text-text">{activeDragLead.company_name}</p>
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-subtle border-b border-border">
-              <tr>
-                {['Empresa', 'Industria', 'Ciudad', 'Emails/Teléfonos', 'Estado', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(leads ?? []).map((lead) => (
-                <tr
-                  key={lead.id}
-                  onClick={() => setSelectedLead(lead)}
-                  className="hover:bg-surface-subtle cursor-pointer transition-colors"
-                >
-                  <td className="px-4 py-3 font-medium text-text">{lead.company_name}</td>
-                  <td className="px-4 py-3 text-text-secondary">{lead.industry ?? '—'}</td>
-                  <td className="px-4 py-3 text-text-secondary">{lead.city ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      {(lead.emails ?? []).length > 0 && (
-                        <span className="flex items-center gap-1 text-text-secondary">
-                          <Mail className="w-3.5 h-3.5" />{(lead.emails ?? []).length}
-                        </span>
-                      )}
-                      {(lead.phones ?? []).length > 0 && (
-                        <span className="flex items-center gap-1 text-text-secondary">
-                          <Phone className="w-3.5 h-3.5" />{(lead.phones ?? []).length}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge label={STATUS_LABELS[lead.status]} color={STATUS_COLOR[lead.status]} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <ChevronRight className="w-4 h-4 text-text-tertiary" />
-                  </td>
-                </tr>
+        ) : isError ? (
+          <ErrorState message="No se pudieron cargar los leads." onRetry={() => refetch()} />
+        ) : (leads ?? []).length === 0 ? (
+          <EmptyState
+            title="Sin leads todavía"
+            description="Creá uno manualmente o lanzá un scraping para encontrar prospectos."
+            action={can('leads', 'create') ? { label: 'Nuevo lead', onClick: () => setShowCreate(true) } : undefined}
+          />
+        ) : view === 'kanban' ? (
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0">
+              {KANBAN_COLUMNS.map((col) => (
+                <KanbanColumn
+                  key={col}
+                  status={col}
+                  leads={grouped[col] ?? []}
+                  onCardClick={setSelectedLead}
+                />
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+            <DragOverlay>
+              {activeDragLead && (
+                <div className="rounded-xl border border-brand bg-surface p-3 shadow-lg w-56 opacity-90">
+                  <p className="font-medium text-sm text-text">{activeDragLead.company_name}</p>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          /* Table — scrollable, fills full remaining height */
+          <div className="rounded-xl border border-border bg-surface overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-subtle border-b border-border sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                      Empresa
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                      Sitio web
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                      Contacto
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                      Estado
+                    </th>
+                    <th className="w-8" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(leads ?? []).map((lead) => (
+                    <tr
+                      key={lead.id}
+                      onClick={() => setSelectedLead(lead)}
+                      className="hover:bg-surface-subtle cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-text max-w-[200px]">
+                        <span className="truncate block">{lead.company_name}</span>
+                        {lead.what_they_do && (
+                          <span className="text-xs text-text-tertiary truncate block mt-0.5">
+                            {lead.what_they_do}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary max-w-[180px]">
+                        {lead.website ? (
+                          <span className="text-xs truncate block text-text-secondary">
+                            {lead.website.replace(/^https?:\/\//, '')}
+                          </span>
+                        ) : (
+                          <span className="text-text-tertiary">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <ContactChips lead={lead} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge label={STATUS_LABELS[lead.status]} color={STATUS_COLOR[lead.status]} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Metrics section */}
-      <MetricsSection />
+      {/* Metrics — always below, never competing for content height */}
+      <div className="flex-shrink-0">
+        <MetricsSection />
+      </div>
 
       {/* Modals */}
       {showCreate && (
