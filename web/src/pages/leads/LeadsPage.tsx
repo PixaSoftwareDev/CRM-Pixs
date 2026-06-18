@@ -188,7 +188,7 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col gap-2 w-[240px] flex-shrink-0 rounded-xl border p-3 transition-colors h-full overflow-y-auto ${
+      className={`flex flex-col gap-2 w-[240px] flex-shrink-0 rounded-xl border p-3 transition-colors ${
         isOver ? 'border-brand/50 bg-brand/5' : 'border-border bg-surface-subtle'
       }`}
     >
@@ -654,7 +654,7 @@ export function LeadsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6 h-full min-h-0">
+    <div className="flex flex-col gap-4 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
         <h1 className="text-2xl font-semibold text-text">Leads</h1>
@@ -710,8 +710,8 @@ export function LeadsPage() {
         </div>
       </div>
 
-      {/* Content — flex-1 min-h-0 so it fills remaining space without overflow */}
-      <div className="flex-1 min-h-0 flex flex-col">
+      {/* Content */}
+      <div>
         {isLoading ? (
           <div className="flex gap-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 w-56" />)}
@@ -726,7 +726,7 @@ export function LeadsPage() {
           />
         ) : view === 'kanban' ? (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0">
+            <div className="flex gap-4 overflow-x-auto pb-1">
               {KANBAN_COLUMNS.map((col) => (
                 <KanbanColumn
                   key={col}
@@ -745,11 +745,10 @@ export function LeadsPage() {
             </DragOverlay>
           </DndContext>
         ) : (
-          /* Table — scrollable, fills full remaining height */
-          <div className="rounded-xl border border-border bg-surface overflow-hidden flex flex-col flex-1 min-h-0">
-            <div className="overflow-y-auto flex-1">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-subtle border-b border-border sticky top-0 z-10">
+          /* Table */
+          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+            <table className="w-full text-sm">
+                <thead className="bg-surface-subtle border-b border-border">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">
                       Empresa
@@ -803,15 +802,11 @@ export function LeadsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
           </div>
         )}
       </div>
 
-      {/* Metrics — always below, never competing for content height */}
-      <div className="flex-shrink-0">
-        <MetricsSection />
-      </div>
+      <MetricsSection />
 
       {/* Modals */}
       {showCreate && (
