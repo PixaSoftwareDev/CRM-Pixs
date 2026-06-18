@@ -124,14 +124,29 @@ func (o *ScrapingOrchestrator) EnqueueJob(ctx context.Context, companyID, userID
 }
 
 // DeleteJob removes a scraping job from the history.
+// Leads created by the job are kept — only their scraping_job_id reference is
+// cleared so the FK constraint does not block the delete.
 func (o *ScrapingOrchestrator) DeleteJob(ctx context.Context, companyID, id uuid.UUID) error {
-	if err := o.q.DeleteScrapingJob(ctx, sqlcgen.DeleteScrapingJobParams{
-		ID:        id,
-		CompanyID: companyID,
-	}); err != nil {
+	tx, err := o.db.Begin(ctx)
+	if err != nil {
+		return errors.Wrap(err, "begin tx")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Detach any leads that reference this job before deleting it.
+	if _, err := tx.Exec(ctx,
+		`UPDATE leads SET scraping_job_id = NULL WHERE scraping_job_id = $1`, id,
+	); err != nil {
+		return errors.Wrap(err, "detaching leads")
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM scraping_jobs WHERE id = $1 AND company_id = $2`, id, companyID,
+	); err != nil {
 		return errors.Wrap(err, "deleting scraping job")
 	}
-	return nil
+
+	return errors.Wrap(tx.Commit(ctx), "commit delete job")
 }
 
 // GetJob returns a scraping job for polling progress.

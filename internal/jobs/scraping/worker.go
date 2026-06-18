@@ -20,6 +20,17 @@ import (
 	"pixs/internal/scraping/extractor"
 )
 
+// alreadyScraped returns true if a lead with this exact website URL already
+// exists for this company. Checked before visiting so we avoid wasting time
+// re-opening sites we have already processed.
+func alreadyScraped(ctx context.Context, db *pgxpool.Pool, companyID uuid.UUID, siteURL string) bool {
+	var count int
+	_ = db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM leads WHERE company_id = $1 AND website = $2 AND deleted_at IS NULL`,
+		companyID, siteURL).Scan(&count)
+	return count > 0
+}
+
 // ScrapingJobArgs is the River job payload.
 // Either Query or URLs must be set.
 type ScrapingJobArgs struct {
@@ -92,7 +103,9 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		w.failJob(ctx, jobID, companyID, started, 0, 0, summary)
 		return errors.Wrap(err, "starting browser")
 	}
-	defer chrome.Close()
+	// Use a closure so the defer always closes whichever browser instance is
+	// current — even if chrome was replaced after a crash.
+	defer func() { chrome.Close() }()
 
 	// Resolve the list of URLs to scrape.
 	var targetURLs []string
@@ -102,7 +115,7 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		if limit <= 0 {
 			limit = 10
 		}
-		targetURLs, err = chrome.SearchGoogle(ctx, args.Query, limit)
+		targetURLs, err = chrome.Search(ctx, args.Query, limit)
 		if err != nil {
 			w.failJob(ctx, jobID, companyID, started, 0, 0, "búsqueda fallida: "+err.Error())
 			return errors.Wrap(err, "google search")
@@ -119,13 +132,30 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 	leadsFound := 0
 	urlsProcessed := 0
 
-	for _, rawURL := range targetURLs {
+	for i, rawURL := range targetURLs {
 		if ctx.Err() != nil {
 			break
 		}
-		urlsProcessed++
 
-		// Update progress bar after each URL.
+		// Skip if we already have this site in the database.
+		if alreadyScraped(ctx, w.db, companyID, rawURL) {
+			w.logger.Info("skipping duplicate", "url", rawURL, "index", i+1, "total", len(targetURLs))
+			urlsProcessed++
+			_, _ = w.q.UpdateScrapingJobStatus(ctx, sqlcgen.UpdateScrapingJobStatusParams{
+				ID:            jobID,
+				CompanyID:     companyID,
+				Status:        "running",
+				StartedAt:     pgtype.Timestamptz{Time: started, Valid: true},
+				UrlsProcessed: int32(urlsProcessed),
+				LeadsFound:    int32(leadsFound),
+			})
+			continue
+		}
+
+		urlsProcessed++
+		w.logger.Info("scraping site", "url", rawURL, "index", urlsProcessed, "total", len(targetURLs))
+
+		// Update progress before fetch so the UI shows the current URL.
 		_, _ = w.q.UpdateScrapingJobStatus(ctx, sqlcgen.UpdateScrapingJobStatusParams{
 			ID:            jobID,
 			CompanyID:     companyID,
@@ -135,7 +165,16 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 			LeadsFound:    int32(leadsFound),
 		})
 
-		w.logger.Info("fetching site", "url", rawURL, "index", urlsProcessed, "total", len(targetURLs))
+		// Recover from a browser crash: recreate Chrome and keep going.
+		if chrome.IsDead() {
+			w.logger.Warn("browser crashed, recreating", "url", rawURL)
+			chrome.Close()
+			chrome, err = browser.New(w.headless, w.logger)
+			if err != nil {
+				w.logger.Error("could not recreate browser, stopping job", "err", err)
+				break
+			}
+		}
 
 		htmlPages, fetchErr := chrome.FetchSite(ctx, rawURL)
 		if fetchErr != nil {
@@ -144,6 +183,10 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		}
 
 		extracted := extractor.Extract(ctx, htmlPages, args.Country)
+		w.logger.Info("extracted data", "url", rawURL,
+			"emails", len(extracted.Emails),
+			"phones", len(extracted.Phones),
+			"socials", len(extracted.Socials))
 
 		created, persistErr := w.persistLead(ctx, companyID, jobID, rawURL, extracted)
 		if persistErr != nil {
@@ -152,6 +195,7 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		}
 		if created {
 			leadsFound++
+			w.logger.Info("lead saved", "url", rawURL, "total_leads", leadsFound)
 		}
 	}
 
