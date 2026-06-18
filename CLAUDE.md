@@ -141,6 +141,23 @@ go vet ./...        # Limpio
 make test           # Tests con -race
 ```
 
+## Deploy del frontend
+
+`web/dist/` está en `.gitignore` — no se versiona. Es un artefacto de build.
+
+Para deployar en el VPS:
+```bash
+make web-build   # Compila la SPA → web/dist/
+make build       # Compila los binarios Go (cmd/api ya sirve web/dist/ del disco)
+```
+
+El binario `bin/api` sirve los archivos estáticos desde `./web/dist` relativo al
+directorio de trabajo. El servicio systemd debe tener `WorkingDirectory` apuntando
+a la raíz del proyecto (donde está la carpeta `web/`).
+
+En CI/CD: buildear el frontend primero, luego el backend. El binario no embebe los
+assets — los lee del disco en runtime.
+
 ## Cómo agregar un River job
 
 River (cola de jobs sobre Postgres) maneja el trabajo en background. Sus tablas
