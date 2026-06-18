@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,8 +18,6 @@ import (
 	"pixs/internal/config"
 	"pixs/internal/jobs"
 	scrapingjobs "pixs/internal/jobs/scraping"
-	"pixs/internal/scraping/llm"
-	"pixs/internal/scraping/search"
 )
 
 func main() {
@@ -43,34 +42,22 @@ func run() error {
 	}
 	defer pool.Close()
 
-	// River owns its own migration system, separate from Atlas. Apply it at
-	// startup so the river_* tables exist before the client starts.
+	// River owns its own migration system, separate from Atlas.
 	if err := runRiverMigrations(context.Background(), pool); err != nil {
 		return fmt.Errorf("river migrate: %w", err)
 	}
 	slog.Info("river migrations applied")
 
-	// Build the search provider.
-	var searchProvider search.Provider
-	if cfg.SerperAPIKey != "" {
-		searchProvider = search.NewSerperProvider(cfg.SerperAPIKey)
-	} else {
-		slog.Warn("PIXS_SERPER_API_KEY not set; scraping jobs will fail at the search step")
-		searchProvider = &search.MockProvider{}
-	}
-
-	// Build the LLM extractor.
-	var llmExt llm.Extractor
-	if cfg.AnthropicAPIKey != "" {
-		llmExt = llm.NewAnthropicExtractor(cfg.AnthropicAPIKey)
-	} else {
-		slog.Warn("PIXS_ANTHROPIC_API_KEY not set; LLM extraction will be skipped")
-		llmExt = &llm.MockExtractor{}
+	// PIXS_SCRAPING_HEADLESS=true hides the browser window (for servers).
+	// Default: false — show the browser so the operator can watch the scraping.
+	headless := false
+	if v := os.Getenv("PIXS_SCRAPING_HEADLESS"); v != "" {
+		headless, _ = strconv.ParseBool(v)
 	}
 
 	// Register workers.
 	workers := river.NewWorkers()
-	river.AddWorker(workers, scrapingjobs.NewScrapingWorker(pool, searchProvider, llmExt, logger))
+	river.AddWorker(workers, scrapingjobs.NewScrapingWorker(pool, headless, logger))
 
 	client, err := jobs.NewWorkerClient(pool, workers)
 	if err != nil {
@@ -83,7 +70,7 @@ func run() error {
 	if err := client.Start(ctx); err != nil {
 		return fmt.Errorf("starting river: %w", err)
 	}
-	slog.Info("worker started")
+	slog.Info("worker started", "headless", headless)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -96,7 +83,6 @@ func run() error {
 	return nil
 }
 
-// runRiverMigrations applies River's own schema migrations to the pool.
 func runRiverMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
 	if err != nil {

@@ -113,6 +113,7 @@ type Querier interface {
 	DeleteQuoteItems(ctx context.Context, quoteID uuid.UUID) error
 	DeleteRole(ctx context.Context, arg DeleteRoleParams) error
 	DeleteRolePermission(ctx context.Context, arg DeleteRolePermissionParams) error
+	DeleteScrapingJob(ctx context.Context, arg DeleteScrapingJobParams) error
 	DeleteUserTOTPBackupCodes(ctx context.Context, userID uuid.UUID) error
 	GetArPayables(ctx context.Context, arg GetArPayablesParams) ([]GetArPayablesRow, error)
 	// ─── Accounts receivable (CtaCte / cash flow) ──────────────────────────────────

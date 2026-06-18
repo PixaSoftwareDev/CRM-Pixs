@@ -81,6 +81,20 @@ func (q *Queries) CreateScrapingJob(ctx context.Context, arg CreateScrapingJobPa
 	return i, err
 }
 
+const deleteScrapingJob = `-- name: DeleteScrapingJob :exec
+DELETE FROM scraping_jobs WHERE id = $1 AND company_id = $2
+`
+
+type DeleteScrapingJobParams struct {
+	ID        uuid.UUID `db:"id" json:"id"`
+	CompanyID uuid.UUID `db:"company_id" json:"company_id"`
+}
+
+func (q *Queries) DeleteScrapingJob(ctx context.Context, arg DeleteScrapingJobParams) error {
+	_, err := q.db.Exec(ctx, deleteScrapingJob, arg.ID, arg.CompanyID)
+	return err
+}
+
 const getScrapingJobByID = `-- name: GetScrapingJobByID :one
 SELECT id, company_id, user_id, query, result_count_requested, country, language, status, started_at, finished_at, search_api_cost_usd, llm_tokens_input, llm_tokens_output, llm_cost_usd, total_cost_usd, urls_processed, leads_found, error_summary, created_at FROM scraping_jobs WHERE id = $1 AND company_id = $2
 `

@@ -69,6 +69,8 @@ export function TasksPage() {
     ...(projectsQ.data ?? []).map((p) => ({ value: p.id, label: p.name })),
   ]
 
+  const projectMap = new Map((projectsQ.data ?? []).map((p) => [p.id, p.name]))
+
   const columns: Column<Task>[] = [
     {
       key: 'title',
@@ -83,6 +85,13 @@ export function TasksPage() {
           <span className="font-medium text-text">{t.title}</span>
         </div>
       ),
+    },
+    {
+      key: 'project',
+      header: 'Proyecto',
+      render: (t) => t.project_id ? (
+        <span className="text-sm text-text-secondary">{projectMap.get(t.project_id) ?? '—'}</span>
+      ) : <span className="text-text-tertiary">—</span>,
     },
     {
       key: 'status',
@@ -202,8 +211,8 @@ export function TasksPage() {
                         />
                         <span className="truncate text-sm font-medium text-text">{t.title}</span>
                       </div>
-                      {t.assignee_id && (
-                        <p className="mt-1 truncate text-xs text-text-tertiary">{t.assignee_id}</p>
+                      {t.project_id && (
+                        <p className="mt-1 truncate text-xs text-brand/80">{projectMap.get(t.project_id)}</p>
                       )}
                     </button>
                   ))}

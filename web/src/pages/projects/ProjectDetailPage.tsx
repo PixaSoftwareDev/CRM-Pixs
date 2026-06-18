@@ -3,9 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
-import { SlideOver } from '../../components/ui/SlideOver'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { KPICard } from '../../components/ui/KPICard'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -13,17 +11,21 @@ import { ErrorState } from '../../components/ui/ErrorState'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
-import { formatDate } from '../../lib/utils'
+import { formatDate, formatMoney } from '../../lib/utils'
 import {
   projectStatusColor,
   projectStatusLabel,
-  milestoneStatusColor,
-  milestoneStatusLabel,
-  milestoneStatusOptions,
+  taskStatusLabel,
+  taskStatusColor,
+  taskPriorityLabel,
+  taskPriorityDot,
 } from '../../lib/crm'
-import { projectsApi, type Milestone, type MilestoneInput } from '../../lib/api/projects'
+import { projectsApi } from '../../lib/api/projects'
 import { contactsApi } from '../../lib/api/contacts'
+import { adminApi } from '../../lib/api/admin'
+import { tasksApi, type Task } from '../../lib/api/tasks'
 import { ProjectForm } from './ProjectForm'
+import { TaskForm } from '../tasks/TaskForm'
 
 export function ProjectDetailPage() {
   const { id = '' } = useParams()
@@ -93,9 +95,9 @@ export function ProjectDetailPage() {
         </p>
       )}
 
-      <MilestonesSection projectId={id} canEdit={canEdit} />
+      <TasksSection projectId={id} projectName={project.name} canEdit={canEdit} />
       <MembersSection projectId={id} canEdit={canEdit} />
-      <ProfitabilitySection projectId={id} />
+      <ProfitabilitySection projectId={id} currency={project.currency} />
 
       {editOpen && <ProjectForm open={editOpen} onClose={() => setEditOpen(false)} project={project} />}
     </div>
@@ -114,42 +116,42 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   )
 }
 
-// ---------- Milestones ----------
+// ---------- Tasks ----------
 
-function MilestonesSection({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
-  const qc = useQueryClient()
-  const toast = useUIStore((s) => s.toast)
+function TasksSection({
+  projectId,
+  projectName,
+  canEdit,
+}: {
+  projectId: string
+  projectName: string
+  canEdit: boolean
+}) {
   const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState<Milestone | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+
+  const { data: projectsAll } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+  })
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['project', projectId, 'milestones'],
-    queryFn: () => projectsApi.milestones.list(projectId),
+    queryKey: ['tasks', { project_id: projectId }],
+    queryFn: () => tasksApi.list({ project_id: projectId }),
   })
 
-  const del = useMutation({
-    mutationFn: (mid: string) => projectsApi.milestones.delete(projectId, mid),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project', projectId, 'milestones'] })
-      toast.success('Hito eliminado')
-    },
-    onError: () => toast.error('No se pudo eliminar'),
-  })
+  const openNew = () => {
+    setEditingTask(null)
+    setFormOpen(true)
+  }
 
   return (
     <Section
-      title="Hitos"
+      title="Tareas"
       action={
         canEdit && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setEditing(null)
-              setFormOpen(true)
-            }}
-          >
-            <Plus size={14} /> Agregar hito
+          <Button variant="secondary" size="sm" onClick={openNew}>
+            <Plus size={14} /> Nueva tarea
           </Button>
         )
       }
@@ -159,111 +161,46 @@ function MilestonesSection({ projectId, canEdit }: { projectId: string; canEdit:
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
       ) : (data?.length ?? 0) === 0 ? (
-        <EmptyState title="Sin hitos" description="Definí los entregables clave del proyecto." />
+        <EmptyState title="Sin tareas" description="Creá la primera tarea para este proyecto." />
       ) : (
         <ul className="space-y-2">
-          {data!.map((m) => (
+          {data!.map((t) => (
             <li
-              key={m.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4"
+              key={t.id}
+              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 cursor-pointer hover:bg-surface-raised"
+              onClick={() => { setEditingTask(t); setFormOpen(true) }}
             >
-              <div>
-                <p className="font-medium text-text">{m.name}</p>
-                <p className="text-sm text-text-secondary">
-                  {m.committed_date ? formatDate(m.committed_date) : 'Sin fecha'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge
-                  label={milestoneStatusLabel[m.status] ?? m.status}
-                  color={milestoneStatusColor[m.status] ?? 'neutral'}
+              <div className="flex items-center gap-3 min-w-0">
+                <span
+                  className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: taskPriorityDot[t.priority] ?? '#9ca3af' }}
                 />
-                {canEdit && (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => { setEditing(m); setFormOpen(true) }}>
-                      <Pencil size={14} />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => del.mutate(m.id)}>
-                      <Trash2 size={14} />
-                    </Button>
-                  </>
-                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-text">{t.title}</p>
+                  <p className="text-xs text-text-secondary">
+                    {taskPriorityLabel[t.priority] ?? t.priority}
+                    {t.due_date ? ` · Vence ${formatDate(t.due_date)}` : ''}
+                  </p>
+                </div>
               </div>
+              <StatusBadge
+                label={taskStatusLabel[t.status] ?? t.status}
+                color={taskStatusColor[t.status] ?? 'neutral'}
+              />
             </li>
           ))}
         </ul>
       )}
       {formOpen && (
-        <MilestoneForm projectId={projectId} milestone={editing} onClose={() => setFormOpen(false)} />
+        <TaskForm
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          task={editingTask}
+          projects={projectsAll ?? [{ id: projectId, name: projectName }]}
+          initialProjectId={projectId}
+        />
       )}
     </Section>
-  )
-}
-
-function MilestoneForm({
-  projectId,
-  milestone,
-  onClose,
-}: {
-  projectId: string
-  milestone: Milestone | null
-  onClose: () => void
-}) {
-  const qc = useQueryClient()
-  const toast = useUIStore((s) => s.toast)
-  const [form, setForm] = useState<MilestoneInput>({
-    name: milestone?.name ?? '',
-    committed_date: milestone?.committed_date?.slice(0, 10) ?? '',
-    status: milestone?.status ?? 'pending',
-    description: milestone?.description ?? '',
-  })
-
-  const save = useMutation({
-    mutationFn: (body: MilestoneInput) =>
-      milestone
-        ? projectsApi.milestones.update(projectId, milestone.id, body)
-        : projectsApi.milestones.create(projectId, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project', projectId, 'milestones'] })
-      toast.success(milestone ? 'Hito actualizado' : 'Hito agregado')
-      onClose()
-    },
-    onError: () => toast.error('No se pudo guardar'),
-  })
-
-  return (
-    <SlideOver open onClose={onClose} title={milestone ? 'Editar hito' : 'Agregar hito'}>
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!form.name.trim()) return
-          save.mutate({ ...form, committed_date: form.committed_date || undefined, description: form.description || undefined })
-        }}
-      >
-        <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <Input
-          label="Fecha comprometida"
-          type="date"
-          value={form.committed_date ?? ''}
-          onChange={(e) => setForm({ ...form, committed_date: e.target.value })}
-        />
-        <Select
-          label="Estado"
-          value={form.status}
-          onChange={(e) => setForm({ ...form, status: e.target.value })}
-          options={milestoneStatusOptions}
-        />
-        <div className="mt-2 flex justify-end gap-3">
-          <Button type="button" variant="secondary" size="md" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" variant="primary" size="md" loading={save.isPending}>
-            Guardar
-          </Button>
-        </div>
-      </form>
-    </SlideOver>
   )
 }
 
@@ -272,18 +209,27 @@ function MilestoneForm({
 function MembersSection({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
-  const [userId, setUserId] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState('')
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data: members, isLoading, isError, refetch } = useQuery({
     queryKey: ['project', projectId, 'members'],
     queryFn: () => projectsApi.members.list(projectId),
   })
+
+  const { data: allUsers } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: () => adminApi.users.list(),
+    enabled: canEdit,
+  })
+
+  const memberIds = new Set(members?.map((m) => m.user_id) ?? [])
+  const availableUsers = (allUsers ?? []).filter((u) => !memberIds.has(u.id))
 
   const add = useMutation({
     mutationFn: (uid: string) => projectsApi.members.add(projectId, uid),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project', projectId, 'members'] })
-      setUserId('')
+      setSelectedUserId('')
       toast.success('Miembro agregado')
     },
     onError: () => toast.error('No se pudo agregar'),
@@ -305,16 +251,19 @@ function MembersSection({ projectId, canEdit }: { projectId: string; canEdit: bo
         <ErrorState onRetry={() => refetch()} />
       ) : (
         <div className="space-y-3">
-          {(data?.length ?? 0) === 0 ? (
+          {(members?.length ?? 0) === 0 ? (
             <p className="text-sm text-text-secondary">Sin miembros asignados.</p>
           ) : (
             <ul className="space-y-2">
-              {data!.map((m) => (
+              {members!.map((m) => (
                 <li
                   key={m.user_id}
                   className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
                 >
-                  <span className="text-sm text-text">{m.full_name || m.email || m.user_id}</span>
+                  <div>
+                    <p className="text-sm font-medium text-text">{m.full_name || m.email}</p>
+                    {m.full_name && <p className="text-xs text-text-secondary">{m.email}</p>}
+                  </div>
                   {canEdit && (
                     <Button variant="ghost" size="sm" onClick={() => remove.mutate(m.user_id)}>
                       <Trash2 size={14} />
@@ -324,27 +273,33 @@ function MembersSection({ projectId, canEdit }: { projectId: string; canEdit: bo
               ))}
             </ul>
           )}
-          {canEdit && (
+          {canEdit && availableUsers.length > 0 && (
             <div className="flex items-end gap-2">
               <div className="flex-1">
-                <Input
+                <Select
                   label="Agregar miembro"
-                  placeholder="ID del usuario"
-                  hint="ID del usuario"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
+                  placeholder="Seleccioná un usuario"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  options={availableUsers.map((u) => ({
+                    value: u.id,
+                    label: u.full_name || u.email,
+                  }))}
                 />
               </div>
               <Button
                 variant="secondary"
                 size="md"
-                disabled={!userId.trim()}
+                disabled={!selectedUserId}
                 loading={add.isPending}
-                onClick={() => add.mutate(userId.trim())}
+                onClick={() => add.mutate(selectedUserId)}
               >
                 Agregar
               </Button>
             </div>
+          )}
+          {canEdit && availableUsers.length === 0 && (members?.length ?? 0) > 0 && (
+            <p className="text-xs text-text-tertiary">Todos los usuarios ya son miembros.</p>
           )}
         </div>
       )}
@@ -354,11 +309,41 @@ function MembersSection({ projectId, canEdit }: { projectId: string; canEdit: bo
 
 // ---------- Profitability ----------
 
-function ProfitabilitySection({ projectId }: { projectId: string }) {
+const profitabilityLabels: Record<string, string> = {
+  BudgetHours: 'Horas presupuestadas',
+  TotalHours: 'Horas registradas',
+  BillableHours: 'Horas facturables',
+  BudgetAmount: 'Presupuesto',
+  LaborCost: 'Costo mano de obra',
+  TotalMinutes: 'Minutos totales',
+  BilledMinutes: 'Minutos facturados',
+}
+
+function ProfitabilitySection({ projectId, currency }: { projectId: string; currency: string }) {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['project', projectId, 'profitability'],
     queryFn: () => projectsApi.profitability(projectId),
   })
+
+  const formatProfitValue = (key: string, v: unknown): string => {
+    if (v == null) return '—'
+    const s = String(v)
+    if (key === 'BudgetAmount' || key === 'LaborCost') return formatMoney(s, currency)
+    if (key === 'BudgetHours' || key === 'TotalHours' || key === 'BillableHours') {
+      const n = parseFloat(s)
+      return isNaN(n) ? '—' : `${n.toFixed(1)} hs`
+    }
+    if (key === 'TotalMinutes' || key === 'BilledMinutes') {
+      const n = Number(v)
+      if (isNaN(n)) return '—'
+      const h = Math.floor(n / 60)
+      const m = n % 60
+      return h > 0 ? `${h}h ${m}m` : `${m}m`
+    }
+    return s
+  }
+
+  const visibleKeys = Object.keys(profitabilityLabels)
 
   return (
     <Section title="Rentabilidad">
@@ -366,24 +351,23 @@ function ProfitabilitySection({ projectId }: { projectId: string }) {
         <Skeleton className="h-24 w-full" />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
-      ) : !data || Object.keys(data).length === 0 ? (
+      ) : !data ? (
         <p className="text-sm text-text-secondary">Sin datos de rentabilidad todavía.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {Object.entries(data).map(([k, v]) => (
-            <KPICard key={k} label={prettyKey(k)} value={formatValue(v)} />
-          ))}
+          {visibleKeys.map((k) => {
+            const v = (data as Record<string, unknown>)[k]
+            if (v == null) return null
+            return (
+              <KPICard
+                key={k}
+                label={profitabilityLabels[k]}
+                value={formatProfitValue(k, v)}
+              />
+            )
+          })}
         </div>
       )}
     </Section>
   )
-}
-
-function prettyKey(k: string): string {
-  return k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-function formatValue(v: unknown): string {
-  if (v == null) return '—'
-  if (typeof v === 'number') return String(v)
-  return String(v)
 }

@@ -4,26 +4,12 @@ import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
 import { navItems, type NavItem, type NavChild } from './nav'
+// NavPermission type removed — single admin role has access to everything
 import { cn } from '../../lib/utils'
 
 function useVisibleNav() {
-  const can = useAuthStore((s) => s.can)
-  const canAny = useAuthStore((s) => s.canAny)
-
-  const childVisible = (child: NavChild) =>
-    !child.permission || can(child.permission.module, child.permission.action)
-
-  const itemVisible = (item: NavItem): boolean => {
-    if (item.key === 'ajustes') {
-      return canAny('settings', ['manage']) || canAny('users', ['manage'])
-    }
-    if (item.children) {
-      return item.children.some(childVisible)
-    }
-    if (!item.permission) return true
-    return can(item.permission.module, item.permission.action)
-  }
-
+  const itemVisible = (_item: NavItem) => true
+  const childVisible = (_child: NavChild) => true
   return { itemVisible, childVisible }
 }
 

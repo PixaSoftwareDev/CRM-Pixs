@@ -127,8 +127,8 @@ func (f *Fetcher) fetchOne(ctx context.Context, rawURL string) FetchResult {
 	if err != nil {
 		return FetchResult{URL: rawURL, Error: err}
 	}
-	req.Header.Set("User-Agent", "PIXS-Scraper/1.0 (+https://pixs.app/bot)")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "es-AR,es;q=0.9,en;q=0.8")
 
 	resp, err := f.client.Do(req)

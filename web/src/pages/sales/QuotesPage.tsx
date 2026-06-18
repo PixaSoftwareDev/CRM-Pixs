@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
-import { FileText, Plus, MoreVertical } from 'lucide-react'
+import { FileText, Plus, MoreVertical, FolderOpen } from 'lucide-react'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Select'
@@ -15,6 +15,7 @@ import { quoteStatusColor, quoteStatusLabel } from '../../lib/crm'
 import { quotesApi, type Quote } from '../../lib/api/sales'
 import { contactsApi } from '../../lib/api/contacts'
 import { ContactPicker } from '../../components/ui/ContactPicker'
+import { ProjectForm } from '../projects/ProjectForm'
 
 const statusFilter = [
   { value: '', label: 'Todos los estados' },
@@ -49,6 +50,7 @@ export function QuotesPage() {
   const [status, setStatus] = useState('')
   const [contactId, setContactId] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [convertQuote, setConvertQuote] = useState<Quote | null>(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['quotes', status, contactId],
@@ -113,32 +115,46 @@ export function QuotesPage() {
       align: 'right',
       render: (q) => {
         const actions = statusActions[q.status] ?? []
-        if (!canEdit || actions.length === 0) return null
+        const canConvert = q.status === 'accepted'
+        if (!canEdit && !canConvert) return null
         return (
-          <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setMenuFor(menuFor === q.id ? null : q.id)}
-              className="text-text-tertiary hover:text-text"
-              aria-label="Acciones"
-            >
-              <MoreVertical size={16} />
-            </button>
-            {menuFor === q.id && (
-              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-surface-overlay py-1 shadow-overlay">
-                {actions.map((a) => (
-                  <button
-                    key={a.status}
-                    type="button"
-                    onClick={() => {
-                      setMenuFor(null)
-                      setStatusM.mutate({ id: q.id, s: a.status })
-                    }}
-                    className="block w-full px-3 py-1.5 text-left text-sm text-text hover:bg-surface-raised"
-                  >
-                    {a.label}
-                  </button>
-                ))}
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            {canConvert && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setConvertQuote(q)}
+              >
+                <FolderOpen size={14} /> Crear proyecto
+              </Button>
+            )}
+            {canEdit && actions.length > 0 && (
+              <div className="relative inline-block">
+                <button
+                  type="button"
+                  onClick={() => setMenuFor(menuFor === q.id ? null : q.id)}
+                  className="text-text-tertiary hover:text-text"
+                  aria-label="Acciones"
+                >
+                  <MoreVertical size={16} />
+                </button>
+                {menuFor === q.id && (
+                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-border bg-surface-overlay py-1 shadow-overlay">
+                    {actions.map((a) => (
+                      <button
+                        key={a.status}
+                        type="button"
+                        onClick={() => {
+                          setMenuFor(null)
+                          setStatusM.mutate({ id: q.id, s: a.status })
+                        }}
+                        className="block w-full px-3 py-1.5 text-left text-sm text-text hover:bg-surface-raised"
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -198,6 +214,15 @@ export function QuotesPage() {
               }
             />
           }
+        />
+      )}
+
+      {convertQuote && (
+        <ProjectForm
+          open={!!convertQuote}
+          onClose={() => setConvertQuote(null)}
+          initialClientId={convertQuote.contact_id}
+          initialName={contactName[convertQuote.contact_id] ?? ''}
         />
       )}
     </div>

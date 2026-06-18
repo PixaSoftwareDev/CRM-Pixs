@@ -11,16 +11,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-export interface NavPermission {
-  module: string
-  action: string
-}
-
 export interface NavChild {
   key: string
   label: string
   path: string
-  permission?: NavPermission
 }
 
 export interface NavItem {
@@ -28,114 +22,59 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   path?: string
-  permission?: NavPermission
   children?: NavChild[]
 }
 
 export const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  {
-    key: 'contacts',
-    label: 'Contactos',
-    path: '/contactos',
-    icon: Users,
-    permission: { module: 'contacts', action: 'view' },
-  },
+  { key: 'contacts', label: 'Contactos', path: '/contactos', icon: Users },
   {
     key: 'ventas',
     label: 'Ventas',
     icon: TrendingUp,
     children: [
-      {
-        key: 'pipeline',
-        label: 'Pipeline',
-        path: '/ventas/pipeline',
-        permission: { module: 'opportunities', action: 'view' },
-      },
-      {
-        key: 'presupuestos',
-        label: 'Presupuestos',
-        path: '/ventas/presupuestos',
-        permission: { module: 'quotes', action: 'view' },
-      },
-      {
-        key: 'agenda',
-        label: 'Agenda',
-        path: '/agenda',
-        permission: { module: 'calendar', action: 'view' },
-      },
+      { key: 'pipeline',      label: 'Pipeline',      path: '/ventas/pipeline' },
+      { key: 'presupuestos',  label: 'Presupuestos',  path: '/ventas/presupuestos' },
+      { key: 'agenda',        label: 'Agenda',        path: '/agenda' },
     ],
   },
-  {
-    key: 'proyectos',
-    label: 'Proyectos',
-    path: '/proyectos',
-    icon: FolderOpen,
-    permission: { module: 'projects', action: 'view' },
-  },
-  {
-    key: 'tareas',
-    label: 'Tareas',
-    path: '/tareas',
-    icon: CheckSquare,
-    permission: { module: 'tasks', action: 'view' },
-  },
+  { key: 'proyectos', label: 'Proyectos', path: '/proyectos', icon: FolderOpen },
+  { key: 'tareas',    label: 'Tareas',    path: '/tareas',    icon: CheckSquare },
   {
     key: 'finanzas',
     label: 'Finanzas',
     icon: DollarSign,
     children: [
-      {
-        key: 'facturacion',
-        label: 'Facturación',
-        path: '/finanzas/facturacion',
-        permission: { module: 'invoices', action: 'view' },
-      },
-      {
-        key: 'cobros',
-        label: 'Cobros',
-        path: '/finanzas/cobros',
-        permission: { module: 'receipts', action: 'view' },
-      },
-      {
-        key: 'cajas',
-        label: 'Cajas',
-        path: '/finanzas/cajas',
-        permission: { module: 'cash_registers', action: 'view' },
-      },
-      {
-        key: 'bancos',
-        label: 'Bancos',
-        path: '/finanzas/bancos',
-        permission: { module: 'banks', action: 'view' },
-      },
-      {
-        key: 'gastos',
-        label: 'Gastos',
-        path: '/finanzas/gastos',
-        permission: { module: 'expenses', action: 'view' },
-      },
-      {
-        key: 'flujo',
-        label: 'Flujo de caja',
-        path: '/finanzas/flujo',
-        permission: { module: 'cash_flow', action: 'view' },
-      },
+      { key: 'facturacion', label: 'Facturación',      path: '/finanzas/facturacion' },
+      { key: 'cobros',      label: 'Cobros',            path: '/finanzas/cobros' },
+      { key: 'cajas',       label: 'Cajas',             path: '/finanzas/cajas' },
+      { key: 'bancos',      label: 'Bancos',            path: '/finanzas/bancos' },
+      { key: 'gastos',      label: 'Gastos',            path: '/finanzas/gastos' },
+      { key: 'recurrentes', label: 'Pagos recurrentes', path: '/finanzas/recurrentes' },
+      { key: 'flujo',       label: 'Flujo de caja',     path: '/finanzas/flujo' },
     ],
   },
   {
     key: 'leads',
     label: 'Leads',
-    path: '/leads',
     icon: Zap,
-    permission: { module: 'leads', action: 'view' },
+    children: [
+      { key: 'leads-gestion',  label: 'Gestión',  path: '/leads' },
+      { key: 'leads-scraping', label: 'Scraping', path: '/leads/scraping' },
+    ],
   },
+  { key: 'vault', label: 'Vault', path: '/vault', icon: Shield },
   {
-    key: 'vault',
-    label: 'Vault',
-    path: '/vault',
-    icon: Shield,
-    permission: { module: 'vault', action: 'view' },
+    key: 'ajustes',
+    label: 'Ajustes',
+    icon: Settings,
+    children: [
+      { key: 'ajustes-perfil',       label: 'Mi perfil',   path: '/ajustes/perfil' },
+      { key: 'ajustes-usuarios',     label: 'Usuarios',    path: '/ajustes/usuarios' },
+      { key: 'ajustes-empresa',      label: 'Empresa',     path: '/ajustes/empresa' },
+      { key: 'ajustes-catalogos',    label: 'Catálogos',   path: '/ajustes/catalogos' },
+      { key: 'ajustes-cotizaciones', label: 'Cotizaciones',path: '/ajustes/cotizaciones' },
+      { key: 'ajustes-auditoria',    label: 'Auditoría',   path: '/ajustes/auditoria' },
+    ],
   },
-  { key: 'ajustes', label: 'Ajustes', path: '/ajustes', icon: Settings },
 ]

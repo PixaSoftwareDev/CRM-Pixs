@@ -25,8 +25,7 @@ export interface ForecastStage {
 }
 
 export interface Forecast {
-  total_weighted: string
-  by_stage: ForecastStage[]
+  forecast: string
 }
 
 export interface Opportunity {

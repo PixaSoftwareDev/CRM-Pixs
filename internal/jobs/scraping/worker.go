@@ -1,11 +1,11 @@
 // Package scrapingjobs implements the River worker that runs the scraping
-// pipeline: search → fetch → deterministic extract → LLM extract → persist.
+// pipeline: Chrome search → Chrome fetch → deterministic extract → persist leads.
 package scrapingjobs
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,72 +14,56 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
-	"github.com/shopspring/decimal"
 
 	sqlcgen "pixs/internal/repository/sqlc"
+	"pixs/internal/scraping/browser"
 	"pixs/internal/scraping/extractor"
-	"pixs/internal/scraping/fetcher"
-	"pixs/internal/scraping/llm"
-	"pixs/internal/scraping/search"
 )
 
-// decimalToNumeric converts a decimal.Decimal to a valid pgtype.Numeric.
-func decimalToNumeric(d decimal.Decimal) pgtype.Numeric {
-	var n pgtype.Numeric
-	_ = n.Scan(d.String())
-	return n
-}
-
-// ScrapingJobArgs is the River job payload for a scraping run.
+// ScrapingJobArgs is the River job payload.
+// Either Query or URLs must be set.
 type ScrapingJobArgs struct {
-	CompanyID   string `json:"company_id"`
-	UserID      string `json:"user_id"`
-	JobID       string `json:"job_id"`
-	Query       string `json:"query"`
-	Country     string `json:"country"`
-	Language    string `json:"language"`
-	ResultCount int    `json:"result_count"`
+	CompanyID   string   `json:"company_id"`
+	UserID      string   `json:"user_id"`
+	JobID       string   `json:"job_id"`
+	Query       string   `json:"query,omitempty"`        // keyword search mode
+	URLs        []string `json:"urls,omitempty"`         // manual URL mode
+	Country     string   `json:"country,omitempty"`
+	ResultCount int      `json:"result_count,omitempty"` // how many results to fetch
 }
 
 // Kind identifies the job type for River.
 func (ScrapingJobArgs) Kind() string { return "scraping_job" }
 
-// ScrapingWorker executes the scraping pipeline.
+// ScrapingWorker executes the scraping pipeline using a real Chrome browser.
 type ScrapingWorker struct {
 	river.WorkerDefaults[ScrapingJobArgs]
-	db           *pgxpool.Pool
-	q            *sqlcgen.Queries
-	search       search.Provider
-	llmExtractor llm.Extractor
-	fetcher      *fetcher.Fetcher
-	logger       *slog.Logger
+	db       *pgxpool.Pool
+	q        *sqlcgen.Queries
+	headless bool
+	logger   *slog.Logger
 }
 
-// NewScrapingWorker constructs a ScrapingWorker with the default fetcher config.
-func NewScrapingWorker(db *pgxpool.Pool, searchProvider search.Provider, llmExt llm.Extractor, logger *slog.Logger) *ScrapingWorker {
+// NewScrapingWorker constructs a ScrapingWorker.
+// headless=false shows the Chrome window while scraping (useful for debugging).
+func NewScrapingWorker(db *pgxpool.Pool, headless bool, logger *slog.Logger) *ScrapingWorker {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &ScrapingWorker{
-		db:           db,
-		q:            sqlcgen.New(db),
-		search:       searchProvider,
-		llmExtractor: llmExt,
-		fetcher:      fetcher.New(fetcher.DefaultConfig(), logger),
-		logger:       logger,
+		db:       db,
+		q:        sqlcgen.New(db),
+		headless: headless,
+		logger:   logger,
 	}
 }
-
-// SetFetcher overrides the fetcher (used by tests to lower rate limits and crawl depth).
-func (w *ScrapingWorker) SetFetcher(f *fetcher.Fetcher) { w.fetcher = f }
 
 // Work is the River entry point.
 func (w *ScrapingWorker) Work(ctx context.Context, job *river.Job[ScrapingJobArgs]) error {
 	return w.RunPipeline(ctx, job.Args)
 }
 
-// RunPipeline executes the full scraping pipeline. Exported so integration
-// tests can drive it directly without going through River's queue.
+// RunPipeline: open Chrome → search Google (if query) → visit each site → extract → persist.
 func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) error {
 	companyID, err := uuid.Parse(args.CompanyID)
 	if err != nil {
@@ -92,7 +76,6 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 
 	started := time.Now()
 
-	// 1. Mark the job running.
 	if _, err := w.q.UpdateScrapingJobStatus(ctx, sqlcgen.UpdateScrapingJobStatusParams{
 		ID:        jobID,
 		CompanyID: companyID,
@@ -102,62 +85,69 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		return errors.Wrap(err, "marking job running")
 	}
 
-	// 2. Search for candidate URLs.
-	results, searchCost, err := w.search.Search(ctx, args.Query, args.Country, args.Language, args.ResultCount)
+	// Start a Chrome browser for this job.
+	chrome, err := browser.New(w.headless, w.logger)
 	if err != nil {
-		w.failJob(ctx, jobID, companyID, started, 0, 0, fmt.Sprintf("búsqueda fallida: %v", err))
-		return errors.Wrap(err, "search step")
+		summary := "no se pudo iniciar Chrome: " + err.Error()
+		w.failJob(ctx, jobID, companyID, started, 0, 0, summary)
+		return errors.Wrap(err, "starting browser")
 	}
-	if len(results) > args.ResultCount && args.ResultCount > 0 {
-		results = results[:args.ResultCount]
+	defer chrome.Close()
+
+	// Resolve the list of URLs to scrape.
+	var targetURLs []string
+
+	if args.Query != "" {
+		limit := args.ResultCount
+		if limit <= 0 {
+			limit = 10
+		}
+		targetURLs, err = chrome.SearchGoogle(ctx, args.Query, limit)
+		if err != nil {
+			w.failJob(ctx, jobID, companyID, started, 0, 0, "búsqueda fallida: "+err.Error())
+			return errors.Wrap(err, "google search")
+		}
+		if len(targetURLs) == 0 {
+			w.failJob(ctx, jobID, companyID, started, 0, 0, "la búsqueda no devolvió resultados — intentá con otras palabras clave")
+			return nil
+		}
+		w.logger.Info("urls to scrape", "count", len(targetURLs), "urls", targetURLs)
+	} else {
+		targetURLs = args.URLs
 	}
 
-	var llmTokensIn, llmTokensOut int
-	llmCost := decimal.Zero
 	leadsFound := 0
 	urlsProcessed := 0
 
-	// 3-6. Process each URL.
-	for _, res := range results {
-		urlsProcessed++
-		if err := ctx.Err(); err != nil {
+	for _, rawURL := range targetURLs {
+		if ctx.Err() != nil {
 			break
 		}
+		urlsProcessed++
 
-		pages := w.fetcher.FetchAll(ctx, []string{res.URL})
-		htmlPages := make([]string, 0, len(pages))
-		for _, p := range pages {
-			if p.Error == nil && p.HTML != "" {
-				htmlPages = append(htmlPages, p.HTML)
-			}
+		// Update progress bar after each URL.
+		_, _ = w.q.UpdateScrapingJobStatus(ctx, sqlcgen.UpdateScrapingJobStatusParams{
+			ID:            jobID,
+			CompanyID:     companyID,
+			Status:        "running",
+			StartedAt:     pgtype.Timestamptz{Time: started, Valid: true},
+			UrlsProcessed: int32(urlsProcessed - 1),
+			LeadsFound:    int32(leadsFound),
+		})
+
+		w.logger.Info("fetching site", "url", rawURL, "index", urlsProcessed, "total", len(targetURLs))
+
+		htmlPages, fetchErr := chrome.FetchSite(ctx, rawURL)
+		if fetchErr != nil {
+			w.logger.Warn("fetch site failed", "url", rawURL, "err", fetchErr)
+			continue
 		}
 
-		// Deterministic extraction (emails, phones, socials).
 		extracted := extractor.Extract(ctx, htmlPages, args.Country)
 
-		// LLM extraction (best-effort, with one retry).
-		var company *llm.ExtractedCompany
-		llmFailed := false
-		if len(htmlPages) > 0 {
-			combined := strings.Join(htmlPages, "\n")
-			c, usage, lerr := w.llmExtractor.ExtractCompanyInfo(ctx, combined, res.URL)
-			if lerr != nil {
-				c, usage, lerr = w.llmExtractor.ExtractCompanyInfo(ctx, combined, res.URL)
-			}
-			if lerr != nil || c == nil {
-				llmFailed = true
-				w.logger.Warn("llm extraction failed", "url", res.URL, "err", lerr)
-			} else {
-				company = c
-				llmTokensIn += usage.InputTokens
-				llmTokensOut += usage.OutputTokens
-				llmCost = llmCost.Add(decimal.NewFromFloat(usage.CostUSD))
-			}
-		}
-
-		created, err := w.persistLead(ctx, companyID, jobID, res, extracted, company, llmFailed)
-		if err != nil {
-			w.logger.Warn("persisting lead failed", "url", res.URL, "err", err)
+		created, persistErr := w.persistLead(ctx, companyID, jobID, rawURL, extracted)
+		if persistErr != nil {
+			w.logger.Warn("persisting lead failed", "url", rawURL, "err", persistErr)
 			continue
 		}
 		if created {
@@ -165,24 +155,6 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 		}
 	}
 
-	// 7. Record costs.
-	searchCostDec := decimal.NewFromFloat(searchCost)
-	totalCost := searchCostDec.Add(llmCost)
-	tokIn := int32(llmTokensIn)
-	tokOut := int32(llmTokensOut)
-	if _, err := w.q.UpdateScrapingJobCosts(ctx, sqlcgen.UpdateScrapingJobCostsParams{
-		ID:               jobID,
-		CompanyID:        companyID,
-		SearchApiCostUsd: decimalToNumeric(searchCostDec),
-		LlmTokensInput:   &tokIn,
-		LlmTokensOutput:  &tokOut,
-		LlmCostUsd:       decimalToNumeric(llmCost),
-		TotalCostUsd:     decimalToNumeric(totalCost),
-	}); err != nil {
-		w.logger.Warn("recording job costs failed", "err", err)
-	}
-
-	// Mark completed.
 	if _, err := w.q.UpdateScrapingJobStatus(ctx, sqlcgen.UpdateScrapingJobStatusParams{
 		ID:            jobID,
 		CompanyID:     companyID,
@@ -196,41 +168,41 @@ func (w *ScrapingWorker) RunPipeline(ctx context.Context, args ScrapingJobArgs) 
 	}
 
 	w.logger.Info("scraping job completed",
-		"job_id", jobID, "urls_processed", urlsProcessed, "leads_found", leadsFound,
-		"total_cost_usd", totalCost.String())
+		"job_id", jobID,
+		"urls_processed", urlsProcessed,
+		"leads_found", leadsFound,
+	)
 	return nil
 }
 
-// persistLead inserts a lead and its child rows in a transaction.
-// Returns false (without error) when the lead is a duplicate.
 func (w *ScrapingWorker) persistLead(
 	ctx context.Context,
 	companyID, jobID uuid.UUID,
-	res search.Result,
+	rawURL string,
 	extracted extractor.Result,
-	company *llm.ExtractedCompany,
-	llmFailed bool,
 ) (bool, error) {
-	companyName := res.Title
-	if company != nil && company.CompanyName != "" {
-		companyName = company.CompanyName
-	}
-	if extracted.SchemaOrg != nil && extracted.SchemaOrg.Name != "" && companyName == "" {
+	companyName := ""
+	if extracted.SchemaOrg != nil && extracted.SchemaOrg.Name != "" {
 		companyName = extracted.SchemaOrg.Name
 	}
+	if companyName == "" {
+		if u, err := url.Parse(rawURL); err == nil {
+			companyName = strings.TrimPrefix(u.Host, "www.")
+		}
+	}
 	if strings.TrimSpace(companyName) == "" {
-		companyName = res.URL
+		companyName = rawURL
 	}
 
-	website := res.URL
+	website := rawURL
 
-	// Duplicate check (website or name).
+	// Skip duplicates.
 	if _, err := w.q.CheckLeadDuplicate(ctx, sqlcgen.CheckLeadDuplicateParams{
 		CompanyID: companyID,
 		Website:   &website,
 		Lower:     companyName,
 	}); err == nil {
-		return false, nil // duplicate exists
+		return false, nil
 	}
 
 	tx, err := w.db.Begin(ctx)
@@ -241,20 +213,15 @@ func (w *ScrapingWorker) persistLead(
 	qtx := w.q.WithTx(tx)
 
 	params := sqlcgen.CreateLeadParams{
-		CompanyID:           companyID,
-		CompanyName:         companyName,
-		SourceUrl:           &res.URL,
-		Website:             &website,
-		Status:              "new",
-		ScrapingJobID:       pgtype.UUID{Bytes: jobID, Valid: true},
-		LlmExtractionFailed: llmFailed,
+		CompanyID:     companyID,
+		CompanyName:   companyName,
+		SourceUrl:     &rawURL,
+		Website:       &website,
+		Status:        "new",
+		ScrapingJobID: pgtype.UUID{Bytes: jobID, Valid: true},
 	}
-	if company != nil {
-		params.Description = strPtr(company.ShortDescription)
-		params.WhatTheyDo = strPtr(company.WhatTheyDo)
-		params.Industry = strPtr(company.Industry)
-		params.ApproximateSize = strPtr(company.ApproximateSize)
-		params.Language = isoCode(company.SiteLanguage, 5)
+	if extracted.SchemaOrg != nil {
+		params.Description = strPtr(extracted.SchemaOrg.Description)
 	}
 
 	lead, err := qtx.CreateLead(ctx, params)
@@ -318,7 +285,6 @@ func strPtr(s string) *string {
 	return &s
 }
 
-// isoCode returns a pointer to s truncated to maxLen chars, or nil if empty.
 func isoCode(s string, maxLen int) *string {
 	s = strings.TrimSpace(s)
 	if s == "" {

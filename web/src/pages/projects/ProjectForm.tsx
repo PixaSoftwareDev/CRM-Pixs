@@ -14,18 +14,22 @@ export function ProjectForm({
   open,
   onClose,
   project,
+  initialClientId,
+  initialName,
 }: {
   open: boolean
   onClose: () => void
   project?: Project | null
+  initialClientId?: string
+  initialName?: string
 }) {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
   const selfId = useAuthStore((s) => s.user?.user_id)
 
   const [form, setForm] = useState<CreateProjectInput>({
-    client_id: project?.client_id ?? '',
-    name: project?.name ?? '',
+    client_id: project?.client_id ?? initialClientId ?? '',
+    name: project?.name ?? initialName ?? '',
     description: project?.description ?? '',
     start_date: project?.start_date?.slice(0, 10) ?? '',
     estimated_end_date: project?.estimated_end_date?.slice(0, 10) ?? '',

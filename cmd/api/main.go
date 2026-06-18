@@ -307,6 +307,65 @@ func registerRoutes(
 	registerFinanceRoutes(e, authMiddleware, policy, fin)
 	registerLeadRoutes(e, authMiddleware, policy, leads)
 	registerVaultRoutes(e, authMiddleware, policy, vaultSvc)
+	registerAdminRoutes(e, authMiddleware, policy, q)
+}
+
+func registerAdminRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc, policy *rbac.Policy, q *sqlcgen.Queries) {
+	h := handler.NewAdminHandler(q)
+
+	canManageUsers := mw.RequirePermission(policy, "users", "manage")
+	canViewUsers   := canManageUsers // users/view is not seeded; manage implies view
+	canManageRoles := mw.RequirePermission(policy, "settings", "manage") // roles/manage not seeded; settings/manage covers it
+
+	admin := e.Group("/api/v1/admin", authMiddleware)
+
+	// Users
+	admin.GET("/users", h.ListUsers, canViewUsers)
+	admin.POST("/users", h.CreateUser, canManageUsers)
+	admin.PATCH("/users/:id", h.UpdateUser, canManageUsers)
+	admin.PATCH("/users/:id/active", h.ToggleUserActive, canManageUsers)
+	admin.GET("/users/:id/roles", h.GetUserRoles, canViewUsers)
+	admin.POST("/users/:id/roles", h.AssignRole, canManageUsers)
+	admin.DELETE("/users/:id/roles/:role_id", h.RemoveRole, canManageUsers)
+
+	// Roles & Permissions
+	admin.GET("/roles", h.ListRoles, canViewUsers)
+	admin.GET("/permissions", h.ListPermissions, canViewUsers)
+	admin.GET("/roles/:id/permissions", h.GetRolePermissions, canViewUsers)
+	admin.PUT("/roles/:id/permissions/:perm_id", h.UpsertRolePermission, canManageRoles)
+	admin.DELETE("/roles/:id/permissions/:perm_id", h.DeleteRolePermission, canManageRoles)
+
+	// Company
+	admin.GET("/company", h.GetCompany, canViewUsers)
+	admin.PUT("/company", h.UpdateCompany, canManageUsers)
+
+	// Audit log
+	admin.GET("/audit-logs", h.ListAuditLogs, canViewUsers)
+
+	// Exchange rates
+	admin.POST("/exchange-rates", h.CreateExchangeRate, canManageUsers)
+	admin.GET("/exchange-rates/latest", h.GetLatestExchangeRate, canViewUsers)
+
+	// Catalogs — ABM for configurable lookups
+	admin.GET("/catalogs/event-types", h.ListEventTypes, canViewUsers)
+	admin.POST("/catalogs/event-types", h.CreateEventType, canManageUsers)
+	admin.GET("/catalogs/pipeline-stages", h.ListPipelineStages, canViewUsers)
+	admin.POST("/catalogs/pipeline-stages", h.CreatePipelineStage, canManageUsers)
+	admin.GET("/catalogs/lost-reasons", h.ListLostReasons, canViewUsers)
+	admin.POST("/catalogs/lost-reasons", h.CreateLostReason, canManageUsers)
+	admin.GET("/catalogs/tags", h.ListTagsCatalog, canViewUsers)
+	admin.POST("/catalogs/tags", h.CreateTagCatalog, canManageUsers)
+	admin.GET("/catalogs/vat-rates", h.ListVATRates, canViewUsers)
+	admin.GET("/catalogs/payment-conditions", h.ListPaymentConditions, canViewUsers)
+	admin.GET("/catalogs/expense-categories", h.ListExpenseCategories, canViewUsers)
+	admin.GET("/catalogs/currencies", h.ListCurrencies, canViewUsers)
+
+	// Self-service endpoints (all authenticated users)
+	me := e.Group("/api/v1/me", authMiddleware)
+	me.POST("/change-password", h.ChangePassword)
+
+	// Global search (all authenticated users)
+	e.Group("/api/v1", authMiddleware).GET("/search", h.Search)
 }
 
 // leadServices bundles the services for the leads + scraping bounded context.
@@ -355,6 +414,7 @@ func registerLeadRoutes(
 	scraping.POST("", scrapingH.EnqueueScrapingJob, canRun)
 	scraping.GET("", scrapingH.ListScrapingJobs, canViewScraping)
 	scraping.GET("/:id", scrapingH.GetScrapingJob, canViewScraping)
+	scraping.DELETE("/:id", scrapingH.DeleteScrapingJob, canRun)
 }
 
 // financeServices bundles the finance bounded-context services.

@@ -84,32 +84,36 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 }
 
 interface ConfirmModalProps {
-  open: boolean
+  open?: boolean
   onClose: () => void
   onConfirm: () => void
   title: string
-  description: string // literal destructive text
+  description?: string
+  message?: string
   confirmLabel?: string
   loading?: boolean
+  variant?: 'danger' | 'primary'
 }
 
 export function ConfirmModal({
-  open,
+  open = true,
   onClose,
   onConfirm,
   title,
   description,
-  confirmLabel = 'Eliminar',
+  message,
+  confirmLabel = 'Confirmar',
   loading,
+  variant = 'danger',
 }: ConfirmModalProps) {
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm">
-      <p className="text-sm text-text-secondary mb-6">{description}</p>
+      <p className="text-sm text-text-secondary mb-6">{message ?? description}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="secondary" size="md" onClick={onClose} disabled={loading}>
           Cancelar
         </Button>
-        <Button variant="danger" size="md" onClick={onConfirm} loading={loading}>
+        <Button variant={variant} size="md" onClick={onConfirm} loading={loading}>
           {confirmLabel}
         </Button>
       </div>

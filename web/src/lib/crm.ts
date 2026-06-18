@@ -14,42 +14,59 @@ export function validateCUIT(cuit: string): boolean {
 }
 
 // ---- Contact kind ----
-export const contactKinds = ['cliente', 'proveedor', 'prospecto'] as const
+export const contactKinds = ['client', 'supplier', 'prospect'] as const
 export const contactKindLabel: Record<string, string> = {
-  cliente: 'Cliente',
-  proveedor: 'Proveedor',
-  prospecto: 'Prospecto',
+  client: 'Cliente',
+  supplier: 'Proveedor',
+  prospect: 'Prospecto',
+  lead: 'Lead',
 }
 export const contactKindColor: Record<string, BadgeColor> = {
-  cliente: 'success',
-  proveedor: 'info',
-  prospecto: 'warning',
+  client: 'success',
+  supplier: 'info',
+  prospect: 'warning',
+  lead: 'neutral',
 }
 
 // ---- Lifecycle ----
 export const lifecycleOptions = [
-  { value: 'active', label: 'Activo' },
-  { value: 'inactive', label: 'Inactivo' },
-  { value: 'prospect', label: 'Prospecto' },
+  { value: 'active_client', label: 'Cliente activo' },
+  { value: 'prospect',      label: 'Prospecto' },
+  { value: 'opportunity',   label: 'Oportunidad' },
+  { value: 'supplier',      label: 'Proveedor' },
+  { value: 'lost',          label: 'Perdido' },
+  { value: 'lead',          label: 'Lead' },
 ]
 export const lifecycleLabel: Record<string, string> = {
-  active: 'Activo',
-  inactive: 'Inactivo',
-  prospect: 'Prospecto',
+  active_client: 'Cliente activo',
+  prospect:      'Prospecto',
+  opportunity:   'Oportunidad',
+  supplier:      'Proveedor',
+  lost:          'Perdido',
+  lead:          'Lead',
 }
 export const lifecycleColor: Record<string, BadgeColor> = {
-  active: 'success',
-  inactive: 'neutral',
-  prospect: 'warning',
+  active_client: 'success',
+  prospect:      'warning',
+  opportunity:   'info',
+  supplier:      'info',
+  lost:          'danger',
+  lead:          'neutral',
 }
 
 // ---- VAT condition ----
 export const vatConditionOptions = [
-  { value: 'Responsable Inscripto', label: 'Responsable Inscripto' },
-  { value: 'Monotributista', label: 'Monotributista' },
-  { value: 'Exento', label: 'Exento' },
-  { value: 'Consumidor Final', label: 'Consumidor Final' },
+  { value: 'ri', label: 'Responsable Inscripto' },
+  { value: 'monotributo', label: 'Monotributista' },
+  { value: 'exempt', label: 'Exento' },
+  { value: 'final_consumer', label: 'Consumidor Final' },
 ]
+export const vatConditionLabel: Record<string, string> = {
+  ri: 'Responsable Inscripto',
+  monotributo: 'Monotributista',
+  exempt: 'Exento',
+  final_consumer: 'Consumidor Final',
+}
 
 // ---- Quote status ----
 export const quoteStatusLabel: Record<string, string> = {

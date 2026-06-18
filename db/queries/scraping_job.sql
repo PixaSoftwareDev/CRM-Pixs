@@ -22,6 +22,9 @@ UPDATE scraping_jobs SET
 WHERE id = $1 AND company_id = $2
 RETURNING *;
 
+-- name: DeleteScrapingJob :exec
+DELETE FROM scraping_jobs WHERE id = $1 AND company_id = $2;
+
 -- name: CountScrapingJobsToday :one
 SELECT COALESCE(SUM(result_count_requested), 0)::int
 FROM scraping_jobs

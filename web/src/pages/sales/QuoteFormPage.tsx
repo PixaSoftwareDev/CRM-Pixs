@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
@@ -45,8 +45,10 @@ export function QuoteFormPage() {
   const { id } = useParams()
   const isEdit = !!id
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
+  const prefilledContactId: string = (location.state as { contact_id?: string } | null)?.contact_id ?? ''
 
   const existingQ = useQuery({
     queryKey: ['quote', id],
@@ -63,7 +65,7 @@ export function QuoteFormPage() {
   const today = new Date().toISOString().slice(0, 10)
   const existing = existingQ.data
 
-  const [contactId, setContactId] = useState('')
+  const [contactId, setContactId] = useState(prefilledContactId)
   const [date, setDate] = useState(today)
   const [validUntil, setValidUntil] = useState('')
   const [currency, setCurrency] = useState('ARS')

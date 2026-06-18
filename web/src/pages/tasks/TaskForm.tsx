@@ -20,11 +20,13 @@ export function TaskForm({
   onClose,
   task,
   projects,
+  initialProjectId,
 }: {
   open: boolean
   onClose: () => void
   task?: Task | null
   projects: { id: string; name: string }[]
+  initialProjectId?: string
 }) {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
@@ -34,7 +36,7 @@ export function TaskForm({
     title: task?.title ?? '',
     description: task?.description ?? '',
     contact_id: task?.contact_id ?? '',
-    project_id: task?.project_id ?? '',
+    project_id: task?.project_id ?? initialProjectId ?? '',
     assignee_id: task?.assignee_id ?? selfId,
     status: task?.status ?? 'open',
     priority: task?.priority ?? 'medium',

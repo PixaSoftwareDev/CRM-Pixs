@@ -40,6 +40,10 @@ import {
   currencyOptions,
 } from '../../lib/crm'
 import { ContactForm } from './ContactForm'
+import { ProjectForm } from '../projects/ProjectForm'
+import { TaskForm } from '../tasks/TaskForm'
+import { projectsApi } from '../../lib/api/projects'
+import { opportunitiesApi, pipelineApi } from '../../lib/api/sales'
 
 type Tab = 'personas' | 'cuentas' | 'notas' | 'timeline' | 'etiquetas'
 
@@ -52,6 +56,18 @@ export function ContactDetailPage() {
   const [tab, setTab] = useState<Tab>('personas')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [newTaskOpen, setNewTaskOpen] = useState(false)
+
+  const projectsQ = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() })
+  const oppsQ = useQuery({
+    queryKey: ['opportunities', { contact_id: id }],
+    queryFn: () => opportunitiesApi.list({ contact_id: id }),
+    enabled: !!id,
+  })
+  const stagesQ = useQuery({ queryKey: ['pipeline-stages'], queryFn: () => pipelineApi.stages() })
+  const contactOpp = oppsQ.data?.[0] ?? null
+  const contactStage = stagesQ.data?.find((s) => s.id === contactOpp?.stage_id) ?? null
 
   const { data: contact, isLoading, isError, refetch } = useQuery({
     queryKey: ['contact', id],
@@ -116,6 +132,15 @@ export function ContactDetailPage() {
               label={lifecycleLabel[contact.lifecycle_status] ?? contact.lifecycle_status}
               color={lifecycleColor[contact.lifecycle_status] ?? 'neutral'}
             />
+            {contactStage && (
+              <button
+                onClick={() => navigate('/ventas/pipeline')}
+                className="flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand hover:bg-brand/20 transition-colors"
+              >
+                <TrendingUp size={11} />
+                Pipeline: {contactStage.name}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -130,6 +155,47 @@ export function ContactDetailPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Acciones rápidas */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate('/ventas/presupuestos/nuevo', { state: { contact_id: id } })}
+        >
+          <FileText size={15} /> Nuevo presupuesto
+        </Button>
+        {contactOpp ? (
+          <Button variant="secondary" size="sm" onClick={() => navigate('/ventas/pipeline')}>
+            <TrendingUp size={15} /> Ver en pipeline
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              const stages = await pipelineApi.stages()
+              if (!stages[0]) return
+              await opportunitiesApi.create({
+                contact_id: id,
+                stage_id: stages[0].id,
+                title: contact.fantasy_name || contact.legal_name || 'Sin nombre',
+                currency: 'ARS',
+              })
+              oppsQ.refetch()
+              navigate('/ventas/pipeline')
+            }}
+          >
+            <TrendingUp size={15} /> Agregar al pipeline
+          </Button>
+        )}
+        <Button variant="secondary" size="sm" onClick={() => setNewProjectOpen(true)}>
+          <Plus size={15} /> Nuevo proyecto
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setNewTaskOpen(true)}>
+          <Plus size={15} /> Nueva tarea
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-3">
@@ -169,6 +235,20 @@ export function ContactDetailPage() {
       {tab === 'etiquetas' && <TagsTab contactId={id} canEdit={canEdit} />}
 
       {editOpen && <ContactForm open={editOpen} onClose={() => setEditOpen(false)} contact={contact} />}
+      {newProjectOpen && (
+        <ProjectForm
+          open={newProjectOpen}
+          onClose={() => setNewProjectOpen(false)}
+          initialClientId={id}
+        />
+      )}
+      {newTaskOpen && (
+        <TaskForm
+          open={newTaskOpen}
+          onClose={() => setNewTaskOpen(false)}
+          projects={projectsQ.data ?? []}
+        />
+      )}
       <ConfirmModal
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}

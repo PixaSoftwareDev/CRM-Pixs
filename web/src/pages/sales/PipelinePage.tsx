@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core'
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useNavigate } from 'react-router-dom'
 import { Plus, MoreVertical, TrendingUp } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -129,7 +130,7 @@ export function PipelinePage() {
       <div className="grid grid-cols-1 gap-4 sm:max-w-sm">
         <KPICard
           label="Pronóstico ponderado"
-          value={formatMoney(forecastQ.data?.total_weighted ?? '0')}
+          value={formatMoney(forecastQ.data?.forecast ?? '0')}
           icon={<TrendingUp size={18} />}
           loading={forecastQ.isLoading}
         />
@@ -248,6 +249,7 @@ function OpportunityCard({
   onWin: (o: Opportunity) => void
   onLose: (o: Opportunity) => void
 }) {
+  const navigate = useNavigate()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: opportunity.id,
   })
@@ -275,9 +277,10 @@ function OpportunityCard({
           {...attributes}
           {...listeners}
           className="min-w-0 flex-1 cursor-grab active:cursor-grabbing"
+          onClick={() => opportunity.contact_id && navigate(`/contacts/${opportunity.contact_id}`)}
         >
-          <p className="truncate text-sm font-medium text-text">{opportunity.title}</p>
-          {contact && <p className="truncate text-xs text-text-secondary">{contact.fantasy_name}</p>}
+          <p className="truncate text-sm font-medium text-text hover:text-brand cursor-pointer">{opportunity.title}</p>
+          {contact && <p className="truncate text-xs text-text-secondary">{contact.fantasy_name || contact.legal_name}</p>}
         </div>
         {canEdit && (
           <button

@@ -65,4 +65,7 @@ export const authApi = {
     api.post<void>('/auth/2fa/verify', { code, backup_code_hashes }),
 
   disable2fa: (code: string) => api.post<void>('/auth/2fa/disable', { code }),
+
+  changePassword: (current_password: string, new_password: string) =>
+    api.post<void>('/me/change-password', { current_password, new_password }),
 }

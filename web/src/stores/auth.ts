@@ -32,17 +32,9 @@ export const useAuthStore = create<AuthState>()(
 
       setLoading: (v) => set({ isLoading: v }),
 
-      can: (module, action) => {
-        const { permissions } = get()
-        return permissions.some((p) => p.module === module && p.action === action)
-      },
+      can: () => get().isAuthenticated,
 
-      canAny: (module, actions) => {
-        const { permissions } = get()
-        return actions.some((a) =>
-          permissions.some((p) => p.module === module && p.action === a),
-        )
-      },
+      canAny: () => get().isAuthenticated,
     }),
     {
       name: 'pixs-auth',
