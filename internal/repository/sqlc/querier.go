@@ -11,8 +11,28 @@ import (
 )
 
 type Querier interface {
+	// ─── Contact Tags ──────────────────────────────────────────────────────────────
+	AddContactTag(ctx context.Context, arg AddContactTagParams) error
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
+	ClearPrimaryContactPerson(ctx context.Context, contactID uuid.UUID) error
 	CountActiveSessions(ctx context.Context, userID uuid.UUID) (int32, error)
+	// ─── Calendar Events ───────────────────────────────────────────────────────────
+	CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (CalendarEvent, error)
+	// Calendar queries for sqlc generation.
+	// ─── Calendar Event Types ──────────────────────────────────────────────────────
+	CreateCalendarEventType(ctx context.Context, arg CreateCalendarEventTypeParams) (CalendarEventType, error)
+	// Contact queries for sqlc generation.
+	// NOTE: contacts has a generated tsvector column (search_vector). All queries
+	// use explicit column lists to exclude it from result structs where needed,
+	// or rely on the tsvector→string override in sqlc.yaml.
+	// ─── Contacts ─────────────────────────────────────────────────────────────────
+	CreateContact(ctx context.Context, arg CreateContactParams) (CreateContactRow, error)
+	// ─── Contact Bank Accounts ─────────────────────────────────────────────────────
+	CreateContactBankAccount(ctx context.Context, arg CreateContactBankAccountParams) (ContactBankAccount, error)
+	// ─── Contact Notes (append-only) ───────────────────────────────────────────────
+	CreateContactNote(ctx context.Context, arg CreateContactNoteParams) (ContactNote, error)
+	// ─── Contact Persons ────────────────────────────────────────────────────────────
+	CreateContactPerson(ctx context.Context, arg CreateContactPersonParams) (ContactPerson, error)
 	// ─── Password Reset Tokens ─────────────────────────────────────────────────────
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
@@ -20,16 +40,27 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	// ─── TOTP Backup Codes ─────────────────────────────────────────────────────────
 	CreateTOTPBackupCodes(ctx context.Context, arg []CreateTOTPBackupCodesParams) (int64, error)
+	// ─── Tags ─────────────────────────────────────────────────────────────────────
+	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	// ─── Users ─────────────────────────────────────────────────────────────────────
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
 	DeleteRole(ctx context.Context, arg DeleteRoleParams) error
 	DeleteRolePermission(ctx context.Context, arg DeleteRolePermissionParams) error
 	DeleteUserTOTPBackupCodes(ctx context.Context, userID uuid.UUID) error
+	GetCalendarEventByID(ctx context.Context, arg GetCalendarEventByIDParams) (CalendarEvent, error)
+	GetCalendarEventTypeByID(ctx context.Context, arg GetCalendarEventTypeByIDParams) (CalendarEventType, error)
 	// Identity queries for sqlc generation.
 	// All queries filter by company_id to enforce multi-tenancy.
 	// ─── Companies ─────────────────────────────────────────────────────────────────
 	GetCompanyByID(ctx context.Context, id uuid.UUID) (Company, error)
+	// ─── Contact Balances ──────────────────────────────────────────────────────────
+	GetContactBalance(ctx context.Context, arg GetContactBalanceParams) (ContactBalance, error)
+	GetContactBankAccountByID(ctx context.Context, id uuid.UUID) (ContactBankAccount, error)
+	GetContactBankAccountForContact(ctx context.Context, arg GetContactBankAccountForContactParams) (ContactBankAccount, error)
+	GetContactByID(ctx context.Context, arg GetContactByIDParams) (GetContactByIDRow, error)
+	GetContactPersonByID(ctx context.Context, id uuid.UUID) (ContactPerson, error)
+	GetContactPersonForContact(ctx context.Context, arg GetContactPersonForContactParams) (ContactPerson, error)
 	GetOldestActiveSession(ctx context.Context, userID uuid.UUID) (Session, error)
 	GetPasswordResetToken(ctx context.Context, tokenHash string) (PasswordResetToken, error)
 	GetPermissionByModuleAction(ctx context.Context, arg GetPermissionByModuleActionParams) (Permission, error)
@@ -39,6 +70,7 @@ type Querier interface {
 	// ─── Role Permissions ──────────────────────────────────────────────────────────
 	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]GetRolePermissionsRow, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
+	GetTagByID(ctx context.Context, arg GetTagByIDParams) (Tag, error)
 	GetUnusedTOTPBackupCodes(ctx context.Context, userID uuid.UUID) ([]TotpBackupCode, error)
 	GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (User, error)
 	// Used during login before company is known (single-company context).
@@ -55,22 +87,40 @@ type Querier interface {
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	ListActiveSessions(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	ListCalendarEventTypes(ctx context.Context, companyID uuid.UUID) ([]CalendarEventType, error)
+	ListCalendarEvents(ctx context.Context, arg ListCalendarEventsParams) ([]CalendarEvent, error)
+	ListCalendarEventsForContact(ctx context.Context, arg ListCalendarEventsForContactParams) ([]CalendarEvent, error)
+	ListContactBankAccounts(ctx context.Context, contactID uuid.UUID) ([]ContactBankAccount, error)
+	ListContactNotes(ctx context.Context, contactID uuid.UUID) ([]ContactNote, error)
+	ListContactPersons(ctx context.Context, contactID uuid.UUID) ([]ContactPerson, error)
+	ListContactTags(ctx context.Context, contactID uuid.UUID) ([]Tag, error)
+	ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error)
 	// ─── Permissions ───────────────────────────────────────────────────────────────
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRoles(ctx context.Context, companyID uuid.UUID) ([]Role, error)
+	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUsers(ctx context.Context, companyID uuid.UUID) ([]User, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	MarkTOTPBackupCodeUsed(ctx context.Context, id uuid.UUID) error
+	RemoveContactTag(ctx context.Context, arg RemoveContactTagParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	SoftDeleteCalendarEvent(ctx context.Context, arg SoftDeleteCalendarEventParams) error
+	SoftDeleteContact(ctx context.Context, arg SoftDeleteContactParams) error
+	SoftDeleteContactBankAccount(ctx context.Context, id uuid.UUID) error
+	SoftDeleteContactPerson(ctx context.Context, id uuid.UUID) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
+	UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEventParams) (CalendarEvent, error)
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (Company, error)
+	UpdateContact(ctx context.Context, arg UpdateContactParams) (UpdateContactRow, error)
+	UpdateContactPerson(ctx context.Context, arg UpdateContactPersonParams) (ContactPerson, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateUserIsActive(ctx context.Context, arg UpdateUserIsActiveParams) error
 	UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserTOTP(ctx context.Context, arg UpdateUserTOTPParams) error
+	UpsertContactBalance(ctx context.Context, arg UpsertContactBalanceParams) error
 	UpsertRolePermission(ctx context.Context, arg UpsertRolePermissionParams) error
 }
 

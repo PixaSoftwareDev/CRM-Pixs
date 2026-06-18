@@ -22,6 +22,8 @@ import (
 	"pixs/internal/auth/session"
 	"pixs/internal/config"
 	sqlcgen "pixs/internal/repository/sqlc"
+	svccalendar "pixs/internal/service/calendar"
+	svccontact "pixs/internal/service/contact"
 	svcidentity "pixs/internal/service/identity"
 	"pixs/internal/transport/http/handler"
 	mw "pixs/internal/transport/http/middleware"
@@ -149,7 +151,10 @@ func run() error {
 		AllowCredentials: true,
 	}))
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, logger)
+	contactSvc := svccontact.NewContactService(db, cipher, logger)
+	calendarSvc := svccalendar.NewCalendarService(db, logger)
+
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, logger)
 
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
@@ -185,6 +190,8 @@ func registerRoutes(
 	q *sqlcgen.Queries,
 	policy *rbac.Policy,
 	authSvc *svcidentity.AuthService,
+	contactSvc *svccontact.ContactService,
+	calendarSvc *svccalendar.CalendarService,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -231,7 +238,70 @@ func registerRoutes(
 	protected.POST("/2fa/verify", authHandler.Verify2FA)
 	protected.POST("/2fa/disable", authHandler.Disable2FA)
 
-	_ = policy // will be used by feature route groups
+	registerCRMRoutes(e, authMiddleware, policy, contactSvc, calendarSvc)
+}
+
+func registerCRMRoutes(
+	e *echo.Echo,
+	authMiddleware echo.MiddlewareFunc,
+	policy *rbac.Policy,
+	contactSvc *svccontact.ContactService,
+	calendarSvc *svccalendar.CalendarService,
+) {
+	contactH := handler.NewContactHandler(contactSvc)
+	calendarH := handler.NewCalendarHandler(calendarSvc)
+
+	// All CRM routes require authentication.
+	api := e.Group("/api/v1", authMiddleware)
+
+	// ─── Contacts ──────────────────────────────────────────────────────────────
+	contacts := api.Group("/contacts")
+	canViewContacts := mw.RequirePermission(policy, "contacts", "view")
+	canCreateContacts := mw.RequirePermission(policy, "contacts", "create")
+	canEditContacts := mw.RequirePermission(policy, "contacts", "edit")
+	canDeleteContacts := mw.RequirePermission(policy, "contacts", "delete")
+
+	contacts.GET("", contactH.ListContacts, canViewContacts)
+	contacts.POST("", contactH.CreateContact, canCreateContacts)
+	contacts.GET("/:id", contactH.GetContact, canViewContacts)
+	contacts.PUT("/:id", contactH.UpdateContact, canEditContacts)
+	contacts.DELETE("/:id", contactH.DeleteContact, canDeleteContacts)
+	contacts.GET("/:id/timeline", contactH.GetTimeline, canViewContacts)
+
+	contacts.GET("/:id/persons", contactH.ListPersons, canViewContacts)
+	contacts.POST("/:id/persons", contactH.CreatePerson, canEditContacts)
+	contacts.PUT("/:id/persons/:person_id", contactH.UpdatePerson, canEditContacts)
+	contacts.DELETE("/:id/persons/:person_id", contactH.DeletePerson, canEditContacts)
+
+	contacts.GET("/:id/bank-accounts", contactH.ListBankAccounts, canViewContacts)
+	contacts.POST("/:id/bank-accounts", contactH.CreateBankAccount, canEditContacts)
+	contacts.DELETE("/:id/bank-accounts/:account_id", contactH.DeleteBankAccount, canEditContacts)
+
+	contacts.GET("/:id/notes", contactH.ListNotes, canViewContacts)
+	contacts.POST("/:id/notes", contactH.CreateNote, canViewContacts) // any viewer can add notes
+
+	contacts.GET("/:id/tags", contactH.ListContactTags, canViewContacts)
+	contacts.POST("/:id/tags", contactH.AddContactTag, canEditContacts)
+	contacts.DELETE("/:id/tags/:tag_id", contactH.RemoveContactTag, canEditContacts)
+
+	// ─── Tags ──────────────────────────────────────────────────────────────────
+	tags := api.Group("/tags", canViewContacts)
+	tags.GET("", contactH.ListTags)
+	tags.POST("", contactH.CreateTag, canEditContacts)
+
+	// ─── Calendar ──────────────────────────────────────────────────────────────
+	canViewCalendar := mw.RequirePermission(policy, "calendar", "view")
+	canManageCalendar := mw.RequirePermission(policy, "calendar", "manage")
+
+	calendar := api.Group("/calendar")
+	calendar.GET("/event-types", calendarH.ListEventTypes, canViewCalendar)
+	calendar.POST("/event-types", calendarH.CreateEventType, canManageCalendar)
+
+	calendar.GET("/events", calendarH.ListEvents, canViewCalendar)
+	calendar.POST("/events", calendarH.CreateEvent, canManageCalendar)
+	calendar.GET("/events/:id", calendarH.GetEvent, canViewCalendar)
+	calendar.PUT("/events/:id", calendarH.UpdateEvent, canManageCalendar)
+	calendar.DELETE("/events/:id", calendarH.DeleteEvent, canManageCalendar)
 }
 
 func healthHandler(db *pgxpool.Pool, rdb *redis.Client) echo.HandlerFunc {

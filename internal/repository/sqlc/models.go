@@ -88,6 +88,35 @@ type AuditLogs202609 struct {
 	AfterState  []byte             `db:"after_state" json:"after_state"`
 }
 
+type CalendarEvent struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	CompanyID            uuid.UUID          `db:"company_id" json:"company_id"`
+	Title                string             `db:"title" json:"title"`
+	EventTypeID          pgtype.UUID        `db:"event_type_id" json:"event_type_id"`
+	ContactID            pgtype.UUID        `db:"contact_id" json:"contact_id"`
+	AssignedUserID       uuid.UUID          `db:"assigned_user_id" json:"assigned_user_id"`
+	StartsAt             pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	EndsAt               pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
+	AllDay               bool               `db:"all_day" json:"all_day"`
+	Status               string             `db:"status" json:"status"`
+	Notes                *string            `db:"notes" json:"notes"`
+	RelatedTaskID        pgtype.UUID        `db:"related_task_id" json:"related_task_id"`
+	RelatedOpportunityID pgtype.UUID        `db:"related_opportunity_id" json:"related_opportunity_id"`
+	RelatedProjectID     pgtype.UUID        `db:"related_project_id" json:"related_project_id"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt            pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type CalendarEventType struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	Color     string             `db:"color" json:"color"`
+	Icon      *string            `db:"icon" json:"icon"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Company struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	LegalName         string             `db:"legal_name" json:"legal_name"`
@@ -104,6 +133,83 @@ type Company struct {
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	DeletedAt         pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type Contact struct {
+	ID                        uuid.UUID          `db:"id" json:"id"`
+	CompanyID                 uuid.UUID          `db:"company_id" json:"company_id"`
+	Kind                      []string           `db:"kind" json:"kind"`
+	FantasyName               string             `db:"fantasy_name" json:"fantasy_name"`
+	LegalName                 *string            `db:"legal_name" json:"legal_name"`
+	CuitCuil                  *string            `db:"cuit_cuil" json:"cuit_cuil"`
+	VatCondition              *string            `db:"vat_condition" json:"vat_condition"`
+	FiscalAddress             *string            `db:"fiscal_address" json:"fiscal_address"`
+	City                      *string            `db:"city" json:"city"`
+	Province                  *string            `db:"province" json:"province"`
+	PostalCode                *string            `db:"postal_code" json:"postal_code"`
+	Email                     *string            `db:"email" json:"email"`
+	Phone                     *string            `db:"phone" json:"phone"`
+	Website                   *string            `db:"website" json:"website"`
+	Industry                  *string            `db:"industry" json:"industry"`
+	Source                    *string            `db:"source" json:"source"`
+	DefaultPaymentConditionID pgtype.UUID        `db:"default_payment_condition_id" json:"default_payment_condition_id"`
+	CreditLimit               pgtype.Numeric     `db:"credit_limit" json:"credit_limit"`
+	UsualDiscountPct          pgtype.Numeric     `db:"usual_discount_pct" json:"usual_discount_pct"`
+	AssignedUserID            pgtype.UUID        `db:"assigned_user_id" json:"assigned_user_id"`
+	LifecycleStatus           string             `db:"lifecycle_status" json:"lifecycle_status"`
+	SearchVector              interface{}        `db:"search_vector" json:"search_vector"`
+	CreatedAt                 pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt                 pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ContactBalance struct {
+	ContactID uuid.UUID          `db:"contact_id" json:"contact_id"`
+	Currency  string             `db:"currency" json:"currency"`
+	Balance   pgtype.Numeric     `db:"balance" json:"balance"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ContactBankAccount struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	ContactID     uuid.UUID          `db:"contact_id" json:"contact_id"`
+	CbuCvu        *string            `db:"cbu_cvu" json:"cbu_cvu"`
+	Alias         *string            `db:"alias" json:"alias"`
+	BankName      *string            `db:"bank_name" json:"bank_name"`
+	AccountHolder *string            `db:"account_holder" json:"account_holder"`
+	Currency      string             `db:"currency" json:"currency"`
+	EncryptedCbu  []byte             `db:"encrypted_cbu" json:"encrypted_cbu"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ContactNote struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ContactID uuid.UUID          `db:"contact_id" json:"contact_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Body      string             `db:"body" json:"body"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type ContactPerson struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ContactID uuid.UUID          `db:"contact_id" json:"contact_id"`
+	Name      string             `db:"name" json:"name"`
+	Role      *string            `db:"role" json:"role"`
+	Email     *string            `db:"email" json:"email"`
+	Phone     *string            `db:"phone" json:"phone"`
+	Notes     *string            `db:"notes" json:"notes"`
+	Birthday  pgtype.Date        `db:"birthday" json:"birthday"`
+	IsPrimary bool               `db:"is_primary" json:"is_primary"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ContactTag struct {
+	ContactID uuid.UUID `db:"contact_id" json:"contact_id"`
+	TagID     uuid.UUID `db:"tag_id" json:"tag_id"`
 }
 
 type EmailVerificationToken struct {
@@ -156,6 +262,15 @@ type Session struct {
 	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
 	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+type Tag struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	Color     *string            `db:"color" json:"color"`
+	Area      *string            `db:"area" json:"area"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type TotpBackupCode struct {

@@ -25,7 +25,7 @@ const backupCodeLen = 8
 
 // GenerateSecret generates a new TOTP secret for the given issuer and account name.
 // It returns the base32-encoded secret key and the otpauth:// URI suitable for a QR code.
-func GenerateSecret(issuer, accountName string) (secret string, uri string, err error) {
+func GenerateSecret(issuer, accountName string) (secret, uri string, err error) {
 	key, err := ptotp.Generate(ptotp.GenerateOpts{
 		Issuer:      issuer,
 		AccountName: accountName,
@@ -59,7 +59,7 @@ func ValidateCode(code, secret string) bool {
 // GenerateBackupCodes generates n random 8-character uppercase alphanumeric backup codes.
 // It returns the plaintext codes (to be shown once to the user) and their argon2id hashes
 // (to be persisted). Returns an error if randomness or hashing fails.
-func GenerateBackupCodes(n int) (codes []string, hashes []string, err error) {
+func GenerateBackupCodes(n int) (codes, hashes []string, err error) {
 	codes = make([]string, n)
 	hashes = make([]string, n)
 

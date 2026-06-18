@@ -214,7 +214,7 @@ func (s *AuthService) ConfirmPasswordReset(ctx context.Context, rawToken, newPas
 
 // EnableTOTP generates a new TOTP secret for a user. Returns QR URI and backup codes.
 // The secret is not activated until VerifyTOTP confirms the user can produce a valid code.
-func (s *AuthService) EnableTOTP(ctx context.Context, userID uuid.UUID, userEmail, issuer string) (string, []string, error) {
+func (s *AuthService) EnableTOTP(ctx context.Context, userID uuid.UUID, userEmail, issuer string) (uri string, backupCodes []string, err error) {
 	dbUser, err := s.q.GetUserByIDAnyCompany(ctx, userID)
 	if err != nil {
 		return "", nil, identity.ErrUserNotFound
@@ -242,7 +242,7 @@ func (s *AuthService) EnableTOTP(ctx context.Context, userID uuid.UUID, userEmai
 		return "", nil, errors.Wrap(err, "storing totp secret")
 	}
 
-	_, backupCodes, err := totp.GenerateBackupCodes(8)
+	_, backupCodes, err = totp.GenerateBackupCodes(8)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "generating backup codes")
 	}

@@ -30,3 +30,5 @@ sql:
               import: "github.com/google/uuid"
               package: "uuid"
               type: "UUID"
+          - db_type: "tsvector"
+            go_type: "string"

@@ -79,6 +79,9 @@ func run() error {
 	if err := seedAdminUser(ctx, q, cfg.DevSeedAdminPassword); err != nil {
 		return fmt.Errorf("seeding admin user: %w", err)
 	}
+	if err := seedCalendarEventTypes(ctx, db); err != nil {
+		return fmt.Errorf("seeding calendar event types: %w", err)
+	}
 
 	slog.Info("seed complete",
 		"company_id", seedCompanyID,
@@ -160,21 +163,23 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('scraping','launch'),('scraping','view_costs'),
 		    ('reports','view_financial'),('reports','view_sales'),('reports','export'),
 		    ('documents','view'),('documents','upload'),('documents','delete'),
-		    ('users','manage'),('audit','view'),('settings','manage')
+		    ('users','manage'),('audit','view'),('settings','manage'),
+		    ('calendar','view'),('calendar','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleDireccion); err != nil {
 		return fmt.Errorf("direccion RBAC: %w", err)
 	}
 
-	// ventas: pipeline, quotes, tasks, leads → restricted_to_own. A salesperson
-	// works exclusively on their own pipeline, quotes, tasks, and leads.
+	// ventas: pipeline, quotes, tasks, leads, calendar → restricted_to_own. A salesperson
+	// works exclusively on their own pipeline, quotes, tasks, leads, and calendar events.
 	if _, err := db.Exec(ctx, `
 		INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
 		SELECT $1, p.id,
 		    CASE WHEN (p.module, p.action) IN (
 		        ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
 		        ('quotes','view'),('quotes','create'),('quotes','edit'),
-		        ('tasks','view'),('leads','view')
+		        ('tasks','view'),('leads','view'),
+		        ('calendar','view'),('calendar','manage')
 		    ) THEN true ELSE false END
 		FROM permissions p
 		WHERE (p.module, p.action) IN (
@@ -189,7 +194,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('leads','view'),('leads','convert'),
 		    ('scraping','launch'),
 		    ('reports','view_sales'),
-		    ('documents','view'),('documents','upload')
+		    ('documents','view'),('documents','upload'),
+		    ('calendar','view'),('calendar','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleVentas); err != nil {
 		return fmt.Errorf("ventas RBAC: %w", err)
@@ -211,7 +217,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('expenses','create'),('expenses','view'),
 		    ('cash_flow','view'),
 		    ('reports','view_financial'),('reports','export'),
-		    ('documents','view'),('documents','upload')
+		    ('documents','view'),('documents','upload'),
+		    ('calendar','view'),('calendar','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleCobranzas); err != nil {
 		return fmt.Errorf("cobranzas RBAC: %w", err)
@@ -227,7 +234,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('tasks','view'),('tasks','create'),('tasks','edit'),
 		    ('time_tracking','view_own'),
 		    ('expenses','create'),
-		    ('documents','view'),('documents','upload')
+		    ('documents','view'),('documents','upload'),
+		    ('calendar','view'),('calendar','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleSoporte); err != nil {
 		return fmt.Errorf("soporte RBAC: %w", err)
@@ -243,7 +251,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('tasks','view'),('tasks','create'),('tasks','edit'),
 		    ('time_tracking','view_own'),
 		    ('expenses','create'),
-		    ('documents','view'),('documents','upload')
+		    ('documents','view'),('documents','upload'),
+		    ('calendar','view'),('calendar','manage')
 		)
 		ON CONFLICT DO NOTHING`, roleDesarrollo); err != nil {
 		return fmt.Errorf("desarrollo RBAC: %w", err)
@@ -251,6 +260,7 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 
 	// contable: read-only financial view + documents/view so they can open
 	// attached invoices and contracts without being able to modify anything.
+	// calendar/view added so they can see scheduled meetings (read-only).
 	if _, err := db.Exec(ctx, `
 		INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
 		SELECT $1, p.id, false FROM permissions p
@@ -265,7 +275,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('expenses','view'),
 		    ('cash_flow','view'),
 		    ('reports','view_financial'),('reports','export'),
-		    ('documents','view')
+		    ('documents','view'),
+		    ('calendar','view')
 		)
 		ON CONFLICT DO NOTHING`, roleContable); err != nil {
 		return fmt.Errorf("contable RBAC: %w", err)
@@ -311,5 +322,34 @@ func seedAdminUser(ctx context.Context, q *sqlcgen.Queries, password string) err
 	}
 
 	slog.Info("admin user created", "id", user.ID.String(), "email", adminEmail)
+	return nil
+}
+
+// seedCalendarEventTypes inserts the default calendar event types.
+func seedCalendarEventTypes(ctx context.Context, db *pgxpool.Pool) error {
+	types := []struct {
+		id    string
+		name  string
+		color string
+	}{
+		{"f0000001-0000-4000-8000-000000000001", "Llamada", "#3B82F6"},
+		{"f0000001-0000-4000-8000-000000000002", "Reunión", "#8B5CF6"},
+		{"f0000001-0000-4000-8000-000000000003", "Visita", "#10B981"},
+		{"f0000001-0000-4000-8000-000000000004", "Demo", "#F59E0B"},
+		{"f0000001-0000-4000-8000-000000000005", "Seguimiento", "#EF4444"},
+	}
+
+	for _, t := range types {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO calendar_event_types (id, company_id, name, color)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (id) DO NOTHING`,
+			uuid.MustParse(t.id), seedCompanyID, t.name, t.color,
+		); err != nil {
+			return fmt.Errorf("inserting event type %q: %w", t.name, err)
+		}
+	}
+
+	slog.Info("calendar event types seeded")
 	return nil
 }

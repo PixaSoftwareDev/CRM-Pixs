@@ -16,38 +16,36 @@ linters:
     - bodyclose
     - unparam
     - revive
+  settings:
+    goimports:
+      local-prefixes: pixs
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+        - fieldalignment
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - "disableStutteringCheck"
+            - "disableChecksOnVariables"
+            - "disableChecksOnConstants"
+    misspell:
+      locale: US
 
 formatters:
   enable:
     - gofmt
     - goimports
-
-linters-settings:
-  goimports:
-    local-prefixes: pixs
-
-  govet:
-    enable-all: true
-    disable:
-      - shadow
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam
-      - rangeValCopy
-
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-
-  misspell:
-    locale: US
 
 issues:
   max-issues-per-linter: 50

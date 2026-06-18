@@ -70,7 +70,7 @@ func NewPolicy(entries []PolicyEntry) *Policy {
 //
 // The logic for restrictedToOwn mirrors common RBAC practice: a user with two
 // roles where one is unrestricted should receive the broader access.
-func (p *Policy) Check(roleIDs []string, module, action string) (permitted bool, restrictedToOwn bool) {
+func (p *Policy) Check(roleIDs []string, module, action string) (permitted, restrictedToOwn bool) {
 	// allRestricted tracks whether every hit so far has RestrictedToOwn=true.
 	// We start as true and flip to false the moment we find an unrestricted grant.
 	allRestricted := true

@@ -36,7 +36,7 @@ var okHandler = func(c echo.Context) error {
 // Errors returned by the handler (e.g. *echo.HTTPError) are processed by Echo's
 // error handler so that rec.Code reflects the actual HTTP status.
 func makeRequest(e *echo.Echo, handler echo.HandlerFunc, middlewareFn echo.MiddlewareFunc) int {
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req := httptest.NewRequest(http.MethodPost, "/", http.NoBody)
 	req.RemoteAddr = "127.0.0.1:12345" // fixed IP so IPKey is deterministic
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -114,7 +114,7 @@ func TestRateLimit_DifferentKeysAreIndependent(t *testing.T) {
 	}
 
 	reqWithIP := func(ip string) int {
-		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req := httptest.NewRequest(http.MethodPost, "/", http.NoBody)
 		req.RemoteAddr = ip + ":9000"
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
