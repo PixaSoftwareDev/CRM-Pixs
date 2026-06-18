@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	// ─── Contact Tags ──────────────────────────────────────────────────────────────
 	AddContactTag(ctx context.Context, arg AddContactTagParams) error
+	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
 	ClearPrimaryContactPerson(ctx context.Context, contactID uuid.UUID) error
 	CountActiveSessions(ctx context.Context, userID uuid.UUID) (int32, error)
@@ -33,8 +34,16 @@ type Querier interface {
 	CreateContactNote(ctx context.Context, arg CreateContactNoteParams) (ContactNote, error)
 	// ─── Contact Persons ────────────────────────────────────────────────────────────
 	CreateContactPerson(ctx context.Context, arg CreateContactPersonParams) (ContactPerson, error)
+	CreateLostReason(ctx context.Context, arg CreateLostReasonParams) (LostReason, error)
+	CreateMilestone(ctx context.Context, arg CreateMilestoneParams) (ProjectMilestone, error)
+	CreateOpportunity(ctx context.Context, arg CreateOpportunityParams) (Opportunity, error)
 	// ─── Password Reset Tokens ─────────────────────────────────────────────────────
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (PasswordResetToken, error)
+	CreatePipelineStage(ctx context.Context, arg CreatePipelineStageParams) (PipelineStage, error)
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
+	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateQuote(ctx context.Context, arg CreateQuoteParams) (Quote, error)
+	CreateQuoteItem(ctx context.Context, arg CreateQuoteItemParams) (QuoteItem, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	// ─── Sessions ──────────────────────────────────────────────────────────────────
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -42,9 +51,13 @@ type Querier interface {
 	CreateTOTPBackupCodes(ctx context.Context, arg []CreateTOTPBackupCodesParams) (int64, error)
 	// ─── Tags ─────────────────────────────────────────────────────────────────────
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
+	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
+	CreateTaskComment(ctx context.Context, arg CreateTaskCommentParams) (TaskComment, error)
+	CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams) (TimeEntry, error)
 	// ─── Users ─────────────────────────────────────────────────────────────────────
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteExpiredPasswordResetTokens(ctx context.Context) error
+	DeleteQuoteItems(ctx context.Context, quoteID uuid.UUID) error
 	DeleteRole(ctx context.Context, arg DeleteRoleParams) error
 	DeleteRolePermission(ctx context.Context, arg DeleteRolePermissionParams) error
 	DeleteUserTOTPBackupCodes(ctx context.Context, userID uuid.UUID) error
@@ -61,9 +74,22 @@ type Querier interface {
 	GetContactByID(ctx context.Context, arg GetContactByIDParams) (GetContactByIDRow, error)
 	GetContactPersonByID(ctx context.Context, id uuid.UUID) (ContactPerson, error)
 	GetContactPersonForContact(ctx context.Context, arg GetContactPersonForContactParams) (ContactPerson, error)
+	GetLossStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
+	GetMaxQuoteNumber(ctx context.Context, companyID uuid.UUID) (int32, error)
+	GetMilestoneByID(ctx context.Context, id uuid.UUID) (ProjectMilestone, error)
 	GetOldestActiveSession(ctx context.Context, userID uuid.UUID) (Session, error)
+	GetOpenTimer(ctx context.Context, userID uuid.UUID) (TaskTimeEntry, error)
+	GetOpenTimerForTask(ctx context.Context, arg GetOpenTimerForTaskParams) (TaskTimeEntry, error)
+	GetOpportunityByID(ctx context.Context, arg GetOpportunityByIDParams) (Opportunity, error)
 	GetPasswordResetToken(ctx context.Context, tokenHash string) (PasswordResetToken, error)
 	GetPermissionByModuleAction(ctx context.Context, arg GetPermissionByModuleActionParams) (Permission, error)
+	GetPipelineStageByID(ctx context.Context, arg GetPipelineStageByIDParams) (PipelineStage, error)
+	GetProductByID(ctx context.Context, arg GetProductByIDParams) (Product, error)
+	GetProjectByID(ctx context.Context, arg GetProjectByIDParams) (Project, error)
+	GetProjectTimeStats(ctx context.Context, arg GetProjectTimeStatsParams) (GetProjectTimeStatsRow, error)
+	GetQuoteByID(ctx context.Context, arg GetQuoteByIDParams) (Quote, error)
+	GetQuoteByNumber(ctx context.Context, arg GetQuoteByNumberParams) (Quote, error)
+	GetQuoteVersions(ctx context.Context, arg GetQuoteVersionsParams) ([]Quote, error)
 	// ─── Roles ─────────────────────────────────────────────────────────────────────
 	GetRoleByID(ctx context.Context, arg GetRoleByIDParams) (Role, error)
 	GetRoleByName(ctx context.Context, arg GetRoleByNameParams) (Role, error)
@@ -71,6 +97,10 @@ type Querier interface {
 	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]GetRolePermissionsRow, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetTagByID(ctx context.Context, arg GetTagByIDParams) (Tag, error)
+	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
+	GetTaskHistory(ctx context.Context, taskID uuid.UUID) ([]TaskStatusHistory, error)
+	GetTimeEntryByID(ctx context.Context, arg GetTimeEntryByIDParams) (TimeEntry, error)
+	GetTimesheetWeek(ctx context.Context, arg GetTimesheetWeekParams) ([]TimeEntry, error)
 	GetUnusedTOTPBackupCodes(ctx context.Context, userID uuid.UUID) ([]TotpBackupCode, error)
 	GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (User, error)
 	// Used during login before company is known (single-company context).
@@ -83,6 +113,8 @@ type Querier interface {
 	GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]GetUserPermissionsRow, error)
 	// ─── User Roles ────────────────────────────────────────────────────────────────
 	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]GetUserRolesRow, error)
+	GetUtilizationStats(ctx context.Context, arg GetUtilizationStatsParams) (GetUtilizationStatsRow, error)
+	GetWinStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
 	// ─── Audit Logs ────────────────────────────────────────────────────────────────
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	ListActiveSessions(ctx context.Context, userID uuid.UUID) ([]Session, error)
@@ -95,14 +127,31 @@ type Querier interface {
 	ListContactPersons(ctx context.Context, contactID uuid.UUID) ([]ContactPerson, error)
 	ListContactTags(ctx context.Context, contactID uuid.UUID) ([]Tag, error)
 	ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error)
+	ListLostReasons(ctx context.Context, companyID uuid.UUID) ([]LostReason, error)
+	ListMilestones(ctx context.Context, projectID uuid.UUID) ([]ProjectMilestone, error)
+	ListOpportunities(ctx context.Context, arg ListOpportunitiesParams) ([]Opportunity, error)
+	ListOpportunitiesForForecast(ctx context.Context, companyID uuid.UUID) ([]ListOpportunitiesForForecastRow, error)
 	// ─── Permissions ───────────────────────────────────────────────────────────────
 	ListPermissions(ctx context.Context) ([]Permission, error)
+	ListPipelineStages(ctx context.Context, companyID uuid.UUID) ([]PipelineStage, error)
+	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectMembersRow, error)
+	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
+	ListQuoteItems(ctx context.Context, quoteID uuid.UUID) ([]QuoteItem, error)
+	ListQuotes(ctx context.Context, arg ListQuotesParams) ([]Quote, error)
 	ListRoles(ctx context.Context, companyID uuid.UUID) ([]Role, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
+	ListTaskComments(ctx context.Context, taskID uuid.UUID) ([]TaskComment, error)
+	ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error)
+	ListTimeEntries(ctx context.Context, arg ListTimeEntriesParams) ([]TimeEntry, error)
 	ListUsers(ctx context.Context, companyID uuid.UUID) ([]User, error)
+	LoseOpportunity(ctx context.Context, arg LoseOpportunityParams) (Opportunity, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	MarkTOTPBackupCodeUsed(ctx context.Context, id uuid.UUID) error
+	MoveOpportunityStage(ctx context.Context, arg MoveOpportunityStageParams) (Opportunity, error)
+	RecordTaskHistory(ctx context.Context, arg RecordTaskHistoryParams) (TaskStatusHistory, error)
 	RemoveContactTag(ctx context.Context, arg RemoveContactTagParams) error
+	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
@@ -110,18 +159,36 @@ type Querier interface {
 	SoftDeleteContact(ctx context.Context, arg SoftDeleteContactParams) error
 	SoftDeleteContactBankAccount(ctx context.Context, id uuid.UUID) error
 	SoftDeleteContactPerson(ctx context.Context, id uuid.UUID) error
+	SoftDeleteMilestone(ctx context.Context, arg SoftDeleteMilestoneParams) error
+	SoftDeleteOpportunity(ctx context.Context, arg SoftDeleteOpportunityParams) error
+	SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error
+	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) error
+	SoftDeleteQuote(ctx context.Context, arg SoftDeleteQuoteParams) error
+	SoftDeleteTask(ctx context.Context, arg SoftDeleteTaskParams) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
+	StartTaskTimer(ctx context.Context, arg StartTaskTimerParams) (TaskTimeEntry, error)
+	StopTaskTimer(ctx context.Context, arg StopTaskTimerParams) (TaskTimeEntry, error)
 	UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEventParams) (CalendarEvent, error)
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (Company, error)
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (UpdateContactRow, error)
 	UpdateContactPerson(ctx context.Context, arg UpdateContactPersonParams) (ContactPerson, error)
+	UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams) (ProjectMilestone, error)
+	UpdateOpportunity(ctx context.Context, arg UpdateOpportunityParams) (Opportunity, error)
+	UpdatePipelineStage(ctx context.Context, arg UpdatePipelineStageParams) (PipelineStage, error)
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
+	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateQuote(ctx context.Context, arg UpdateQuoteParams) (Quote, error)
+	UpdateQuoteStatus(ctx context.Context, arg UpdateQuoteStatusParams) (Quote, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
+	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
+	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)
 	UpdateUserIsActive(ctx context.Context, arg UpdateUserIsActiveParams) error
 	UpdateUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserTOTP(ctx context.Context, arg UpdateUserTOTPParams) error
 	UpsertContactBalance(ctx context.Context, arg UpsertContactBalanceParams) error
 	UpsertRolePermission(ctx context.Context, arg UpsertRolePermissionParams) error
+	WinOpportunity(ctx context.Context, arg WinOpportunityParams) (Opportunity, error)
 }
 
 var _ Querier = (*Queries)(nil)

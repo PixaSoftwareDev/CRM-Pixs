@@ -35,6 +35,22 @@ var (
 	roleSoporte    = uuid.MustParse("d0000000-0000-4000-8000-000000000005")
 	roleDesarrollo = uuid.MustParse("d0000000-0000-4000-8000-000000000006")
 	roleContable   = uuid.MustParse("d0000000-0000-4000-8000-000000000007")
+
+	// Pipeline stages (fixed UUIDs).
+	stageProspecto        = uuid.MustParse("e1000001-0000-4000-8000-000000000001")
+	stageContactado       = uuid.MustParse("e1000001-0000-4000-8000-000000000002")
+	stagePropuestaEnviada = uuid.MustParse("e1000001-0000-4000-8000-000000000003")
+	stageNegociacion      = uuid.MustParse("e1000001-0000-4000-8000-000000000004")
+	stageGanada           = uuid.MustParse("e1000001-0000-4000-8000-000000000005")
+	stagePerdida          = uuid.MustParse("e1000001-0000-4000-8000-000000000006")
+
+	// Lost reasons (fixed UUIDs).
+	lostReasonPrecio         = uuid.MustParse("e2000001-0000-4000-8000-000000000001")
+	lostReasonCompetencia    = uuid.MustParse("e2000001-0000-4000-8000-000000000002")
+	lostReasonSinPresupuesto = uuid.MustParse("e2000001-0000-4000-8000-000000000003")
+	lostReasonSinRespuesta   = uuid.MustParse("e2000001-0000-4000-8000-000000000004")
+	lostReasonMalTiming      = uuid.MustParse("e2000001-0000-4000-8000-000000000005")
+	lostReasonOtro           = uuid.MustParse("e2000001-0000-4000-8000-000000000006")
 )
 
 const (
@@ -81,6 +97,12 @@ func run() error {
 	}
 	if err := seedCalendarEventTypes(ctx, db); err != nil {
 		return fmt.Errorf("seeding calendar event types: %w", err)
+	}
+	if err := seedPipelineStages(ctx, db); err != nil {
+		return fmt.Errorf("seeding pipeline stages: %w", err)
+	}
+	if err := seedLostReasons(ctx, db); err != nil {
+		return fmt.Errorf("seeding lost reasons: %w", err)
 	}
 
 	slog.Info("seed complete",
@@ -148,6 +170,7 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('contacts','view'),('contacts','create'),('contacts','edit'),('contacts','delete'),('contacts','export'),
 		    ('pipeline','view'),('pipeline','view_all'),('pipeline','create'),('pipeline','edit'),
 		    ('quotes','view'),('quotes','create'),('quotes','edit'),('quotes','approve'),
+		    ('products','view'),('products','manage'),
 		    ('projects','view'),('projects','create'),('projects','edit'),('projects','view_profitability'),
 		    ('tasks','view'),('tasks','view_all'),('tasks','create'),('tasks','edit'),('tasks','assign'),
 		    ('time_tracking','view_own'),('time_tracking','view_all'),('time_tracking','export'),
@@ -184,6 +207,7 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		FROM permissions p
 		WHERE (p.module, p.action) IN (
 		    ('contacts','view'),('contacts','create'),('contacts','edit'),('contacts','export'),
+		    ('products','view'),
 		    ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
 		    ('quotes','view'),('quotes','create'),('quotes','edit'),
 		    ('projects','view'),('projects','create'),('projects','edit'),
@@ -351,5 +375,64 @@ func seedCalendarEventTypes(ctx context.Context, db *pgxpool.Pool) error {
 	}
 
 	slog.Info("calendar event types seeded")
+	return nil
+}
+
+// seedPipelineStages inserts the default sales pipeline stages.
+func seedPipelineStages(ctx context.Context, db *pgxpool.Pool) error {
+	stages := []struct {
+		id     uuid.UUID
+		name   string
+		orderP int
+		color  string
+		isWin  bool
+		isLoss bool
+		isDef  bool
+	}{
+		{stageProspecto, "Prospecto", 1, "#94A3B8", false, false, true},
+		{stageContactado, "Contactado", 2, "#60A5FA", false, false, false},
+		{stagePropuestaEnviada, "Propuesta enviada", 3, "#A78BFA", false, false, false},
+		{stageNegociacion, "Negociación", 4, "#F59E0B", false, false, false},
+		{stageGanada, "Ganada", 5, "#10B981", true, false, false},
+		{stagePerdida, "Perdida", 6, "#EF4444", false, true, false},
+	}
+	for _, s := range stages {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO pipeline_stages (id, company_id, name, order_pos, color, is_win, is_loss, is_default)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (id) DO NOTHING`,
+			s.id, seedCompanyID, s.name, s.orderP, s.color, s.isWin, s.isLoss, s.isDef,
+		); err != nil {
+			return fmt.Errorf("inserting pipeline stage %q: %w", s.name, err)
+		}
+	}
+	slog.Info("pipeline stages seeded", "count", len(stages))
+	return nil
+}
+
+// seedLostReasons inserts the default opportunity lost reasons.
+func seedLostReasons(ctx context.Context, db *pgxpool.Pool) error {
+	reasons := []struct {
+		id   uuid.UUID
+		name string
+	}{
+		{lostReasonPrecio, "Precio"},
+		{lostReasonCompetencia, "Competencia"},
+		{lostReasonSinPresupuesto, "Sin presupuesto"},
+		{lostReasonSinRespuesta, "Sin respuesta"},
+		{lostReasonMalTiming, "Mal timing"},
+		{lostReasonOtro, "Otro"},
+	}
+	for _, r := range reasons {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO lost_reasons (id, company_id, name)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (id) DO NOTHING`,
+			r.id, seedCompanyID, r.name,
+		); err != nil {
+			return fmt.Errorf("inserting lost reason %q: %w", r.name, err)
+		}
+	}
+	slog.Info("lost reasons seeded", "count", len(reasons))
 	return nil
 }

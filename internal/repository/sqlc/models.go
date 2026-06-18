@@ -221,6 +221,33 @@ type EmailVerificationToken struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type LostReason struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Opportunity struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	CompanyID         uuid.UUID          `db:"company_id" json:"company_id"`
+	ContactID         uuid.UUID          `db:"contact_id" json:"contact_id"`
+	StageID           uuid.UUID          `db:"stage_id" json:"stage_id"`
+	Title             string             `db:"title" json:"title"`
+	Amount            pgtype.Numeric     `db:"amount" json:"amount"`
+	Currency          string             `db:"currency" json:"currency"`
+	ProbabilityPct    pgtype.Numeric     `db:"probability_pct" json:"probability_pct"`
+	ExpectedCloseDate pgtype.Date        `db:"expected_close_date" json:"expected_close_date"`
+	AssignedUserID    pgtype.UUID        `db:"assigned_user_id" json:"assigned_user_id"`
+	Source            *string            `db:"source" json:"source"`
+	LostReasonID      pgtype.UUID        `db:"lost_reason_id" json:"lost_reason_id"`
+	LostNotes         *string            `db:"lost_notes" json:"lost_notes"`
+	LeadID            pgtype.UUID        `db:"lead_id" json:"lead_id"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
 type PasswordResetToken struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
@@ -235,6 +262,116 @@ type Permission struct {
 	Module      string    `db:"module" json:"module"`
 	Action      string    `db:"action" json:"action"`
 	Description *string   `db:"description" json:"description"`
+}
+
+type PipelineStage struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	OrderPos  int16              `db:"order_pos" json:"order_pos"`
+	Color     string             `db:"color" json:"color"`
+	IsWin     bool               `db:"is_win" json:"is_win"`
+	IsLoss    bool               `db:"is_loss" json:"is_loss"`
+	IsDefault bool               `db:"is_default" json:"is_default"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Product struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	CompanyID   uuid.UUID          `db:"company_id" json:"company_id"`
+	Code        *string            `db:"code" json:"code"`
+	Name        string             `db:"name" json:"name"`
+	Description *string            `db:"description" json:"description"`
+	Unit        *string            `db:"unit" json:"unit"`
+	UnitPrice   pgtype.Numeric     `db:"unit_price" json:"unit_price"`
+	Currency    *string            `db:"currency" json:"currency"`
+	Cost        pgtype.Numeric     `db:"cost" json:"cost"`
+	VatRatePct  pgtype.Numeric     `db:"vat_rate_pct" json:"vat_rate_pct"`
+	Category    *string            `db:"category" json:"category"`
+	IsRecurring bool               `db:"is_recurring" json:"is_recurring"`
+	IsActive    bool               `db:"is_active" json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type Project struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	CompanyID        uuid.UUID          `db:"company_id" json:"company_id"`
+	ClientID         uuid.UUID          `db:"client_id" json:"client_id"`
+	Name             string             `db:"name" json:"name"`
+	Description      *string            `db:"description" json:"description"`
+	StartDate        pgtype.Date        `db:"start_date" json:"start_date"`
+	EstimatedEndDate pgtype.Date        `db:"estimated_end_date" json:"estimated_end_date"`
+	ActualEndDate    pgtype.Date        `db:"actual_end_date" json:"actual_end_date"`
+	Status           string             `db:"status" json:"status"`
+	ResponsibleID    pgtype.UUID        `db:"responsible_id" json:"responsible_id"`
+	BudgetHours      pgtype.Numeric     `db:"budget_hours" json:"budget_hours"`
+	BudgetAmount     pgtype.Numeric     `db:"budget_amount" json:"budget_amount"`
+	Currency         string             `db:"currency" json:"currency"`
+	OpportunityID    pgtype.UUID        `db:"opportunity_id" json:"opportunity_id"`
+	QuoteID          pgtype.UUID        `db:"quote_id" json:"quote_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type ProjectMember struct {
+	ProjectID     uuid.UUID `db:"project_id" json:"project_id"`
+	UserID        uuid.UUID `db:"user_id" json:"user_id"`
+	RoleInProject *string   `db:"role_in_project" json:"role_in_project"`
+}
+
+type ProjectMilestone struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	ProjectID     uuid.UUID          `db:"project_id" json:"project_id"`
+	Name          string             `db:"name" json:"name"`
+	Description   *string            `db:"description" json:"description"`
+	Deliverables  *string            `db:"deliverables" json:"deliverables"`
+	CommittedDate pgtype.Date        `db:"committed_date" json:"committed_date"`
+	Status        string             `db:"status" json:"status"`
+	OrderPos      *int16             `db:"order_pos" json:"order_pos"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type Quote struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	CompanyID     uuid.UUID          `db:"company_id" json:"company_id"`
+	Number        string             `db:"number" json:"number"`
+	ContactID     uuid.UUID          `db:"contact_id" json:"contact_id"`
+	OpportunityID pgtype.UUID        `db:"opportunity_id" json:"opportunity_id"`
+	UserID        uuid.UUID          `db:"user_id" json:"user_id"`
+	Date          pgtype.Date        `db:"date" json:"date"`
+	ValidUntil    pgtype.Date        `db:"valid_until" json:"valid_until"`
+	Currency      string             `db:"currency" json:"currency"`
+	ExchangeRate  pgtype.Numeric     `db:"exchange_rate" json:"exchange_rate"`
+	Status        string             `db:"status" json:"status"`
+	Version       int16              `db:"version" json:"version"`
+	ParentID      pgtype.UUID        `db:"parent_id" json:"parent_id"`
+	Notes         *string            `db:"notes" json:"notes"`
+	Subtotal      pgtype.Numeric     `db:"subtotal" json:"subtotal"`
+	TaxTotal      pgtype.Numeric     `db:"tax_total" json:"tax_total"`
+	Total         pgtype.Numeric     `db:"total" json:"total"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type QuoteItem struct {
+	ID           uuid.UUID      `db:"id" json:"id"`
+	QuoteID      uuid.UUID      `db:"quote_id" json:"quote_id"`
+	ProductID    pgtype.UUID    `db:"product_id" json:"product_id"`
+	Description  string         `db:"description" json:"description"`
+	Quantity     pgtype.Numeric `db:"quantity" json:"quantity"`
+	UnitPrice    pgtype.Numeric `db:"unit_price" json:"unit_price"`
+	DiscountPct  pgtype.Numeric `db:"discount_pct" json:"discount_pct"`
+	VatRatePct   pgtype.Numeric `db:"vat_rate_pct" json:"vat_rate_pct"`
+	LineSubtotal pgtype.Numeric `db:"line_subtotal" json:"line_subtotal"`
+	LineTax      pgtype.Numeric `db:"line_tax" json:"line_tax"`
+	LineTotal    pgtype.Numeric `db:"line_total" json:"line_total"`
+	OrderPos     *int16         `db:"order_pos" json:"order_pos"`
 }
 
 type Role struct {
@@ -271,6 +408,79 @@ type Tag struct {
 	Color     *string            `db:"color" json:"color"`
 	Area      *string            `db:"area" json:"area"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Task struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CompanyID      uuid.UUID          `db:"company_id" json:"company_id"`
+	Type           string             `db:"type" json:"type"`
+	Title          string             `db:"title" json:"title"`
+	Description    *string            `db:"description" json:"description"`
+	ContactID      pgtype.UUID        `db:"contact_id" json:"contact_id"`
+	ProjectID      pgtype.UUID        `db:"project_id" json:"project_id"`
+	AssigneeID     pgtype.UUID        `db:"assignee_id" json:"assignee_id"`
+	ReporterID     uuid.UUID          `db:"reporter_id" json:"reporter_id"`
+	Origin         *string            `db:"origin" json:"origin"`
+	Status         string             `db:"status" json:"status"`
+	Priority       string             `db:"priority" json:"priority"`
+	DueDate        pgtype.Date        `db:"due_date" json:"due_date"`
+	ParentID       pgtype.UUID        `db:"parent_id" json:"parent_id"`
+	IsRecurring    bool               `db:"is_recurring" json:"is_recurring"`
+	RecurrenceRule *string            `db:"recurrence_rule" json:"recurrence_rule"`
+	ResolvedAt     pgtype.Timestamptz `db:"resolved_at" json:"resolved_at"`
+	ClosedAt       pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type TaskComment struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	TaskID    uuid.UUID          `db:"task_id" json:"task_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Body      string             `db:"body" json:"body"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type TaskStatusHistory struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	TaskID       uuid.UUID          `db:"task_id" json:"task_id"`
+	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
+	FromStatus   *string            `db:"from_status" json:"from_status"`
+	ToStatus     *string            `db:"to_status" json:"to_status"`
+	FromAssignee pgtype.UUID        `db:"from_assignee" json:"from_assignee"`
+	ToAssignee   pgtype.UUID        `db:"to_assignee" json:"to_assignee"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type TaskTimeEntry struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	TaskID          uuid.UUID          `db:"task_id" json:"task_id"`
+	UserID          uuid.UUID          `db:"user_id" json:"user_id"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	EndedAt         pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	DurationMinutes *int32             `db:"duration_minutes" json:"duration_minutes"`
+	Note            *string            `db:"note" json:"note"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type TimeEntry struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	CompanyID       uuid.UUID          `db:"company_id" json:"company_id"`
+	UserID          uuid.UUID          `db:"user_id" json:"user_id"`
+	Date            pgtype.Date        `db:"date" json:"date"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	EndedAt         pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	DurationMinutes int32              `db:"duration_minutes" json:"duration_minutes"`
+	Description     *string            `db:"description" json:"description"`
+	TaskID          pgtype.UUID        `db:"task_id" json:"task_id"`
+	ProjectID       pgtype.UUID        `db:"project_id" json:"project_id"`
+	ContactID       pgtype.UUID        `db:"contact_id" json:"contact_id"`
+	IsBillable      bool               `db:"is_billable" json:"is_billable"`
+	HourlyRate      pgtype.Numeric     `db:"hourly_rate" json:"hourly_rate"`
+	Currency        *string            `db:"currency" json:"currency"`
+	InvoiceLineID   pgtype.UUID        `db:"invoice_line_id" json:"invoice_line_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type TotpBackupCode struct {

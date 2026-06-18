@@ -25,6 +25,10 @@ import (
 	svccalendar "pixs/internal/service/calendar"
 	svccontact "pixs/internal/service/contact"
 	svcidentity "pixs/internal/service/identity"
+	svcproject "pixs/internal/service/project"
+	svcsales "pixs/internal/service/sales"
+	svctask "pixs/internal/service/task"
+	svctimetracking "pixs/internal/service/timetracking"
 	"pixs/internal/transport/http/handler"
 	mw "pixs/internal/transport/http/middleware"
 	"pixs/internal/transport/http/validator"
@@ -154,7 +158,18 @@ func run() error {
 	contactSvc := svccontact.NewContactService(db, cipher, logger)
 	calendarSvc := svccalendar.NewCalendarService(db, logger)
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, logger)
+	salesProjectTask := &salesProjectTaskServices{
+		products:      svcsales.NewProductService(db, logger),
+		opportunities: svcsales.NewOpportunityService(db, logger),
+		quotes:        svcsales.NewQuoteService(db, logger),
+		projects:      svcproject.NewProjectService(db, logger),
+		profitability: svcproject.NewProfitabilityService(db, logger),
+		tasks:         svctask.NewTaskService(db, logger),
+		timers:        svctask.NewTimerService(db, logger),
+		timeTracking:  svctimetracking.NewTimeTrackingService(db, logger),
+	}
+
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, logger)
 
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
@@ -192,6 +207,7 @@ func registerRoutes(
 	authSvc *svcidentity.AuthService,
 	contactSvc *svccontact.ContactService,
 	calendarSvc *svccalendar.CalendarService,
+	spt *salesProjectTaskServices,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -239,6 +255,128 @@ func registerRoutes(
 	protected.POST("/2fa/disable", authHandler.Disable2FA)
 
 	registerCRMRoutes(e, authMiddleware, policy, contactSvc, calendarSvc)
+	registerSalesProjectTaskRoutes(e, authMiddleware, policy, spt)
+}
+
+// salesProjectTaskServices bundles the services for the sales, projects,
+// tasks, and time-tracking bounded contexts.
+type salesProjectTaskServices struct {
+	products      *svcsales.ProductService
+	opportunities *svcsales.OpportunityService
+	quotes        *svcsales.QuoteService
+	projects      *svcproject.ProjectService
+	profitability *svcproject.ProfitabilityService
+	tasks         *svctask.TaskService
+	timers        *svctask.TimerService
+	timeTracking  *svctimetracking.TimeTrackingService
+}
+
+func registerSalesProjectTaskRoutes(
+	e *echo.Echo,
+	authMiddleware echo.MiddlewareFunc,
+	policy *rbac.Policy,
+	spt *salesProjectTaskServices,
+) {
+	salesH := handler.NewSalesHandler(spt.products, spt.opportunities, spt.quotes)
+	projectH := handler.NewProjectHandler(spt.projects, spt.profitability)
+	taskH := handler.NewTaskHandler(spt.tasks, spt.timers, spt.timeTracking)
+
+	api := e.Group("/api/v1", authMiddleware)
+
+	// ─── Products ────────────────────────────────────────────────────────────────
+	canViewProducts := mw.RequirePermission(policy, "products", "view")
+	canManageProducts := mw.RequirePermission(policy, "products", "manage")
+	products := api.Group("/products")
+	products.GET("", salesH.ListProducts, canViewProducts)
+	products.POST("", salesH.CreateProduct, canManageProducts)
+	products.GET("/:id", salesH.GetProduct, canViewProducts)
+	products.PUT("/:id", salesH.UpdateProduct, canManageProducts)
+	products.DELETE("/:id", salesH.DeleteProduct, canManageProducts)
+
+	// ─── Pipeline / Opportunities ──────────────────────────────────────────────────
+	canViewPipeline := mw.RequirePermission(policy, "pipeline", "view")
+	canCreatePipeline := mw.RequirePermission(policy, "pipeline", "create")
+	canEditPipeline := mw.RequirePermission(policy, "pipeline", "edit")
+
+	pipeline := api.Group("/pipeline")
+	pipeline.GET("/stages", salesH.ListStages, canViewPipeline)
+	pipeline.GET("/lost-reasons", salesH.ListLostReasons, canViewPipeline)
+	pipeline.GET("/forecast", salesH.GetForecast, canViewPipeline)
+
+	opportunities := api.Group("/opportunities")
+	opportunities.GET("", salesH.ListOpportunities, canViewPipeline)
+	opportunities.POST("", salesH.CreateOpportunity, canCreatePipeline)
+	opportunities.GET("/:id", salesH.GetOpportunity, canViewPipeline)
+	opportunities.PUT("/:id", salesH.UpdateOpportunity, canEditPipeline)
+	opportunities.DELETE("/:id", salesH.DeleteOpportunity, canEditPipeline)
+	opportunities.POST("/:id/move", salesH.MoveOpportunityStage, canEditPipeline)
+	opportunities.POST("/:id/win", salesH.WinOpportunity, canEditPipeline)
+	opportunities.POST("/:id/lose", salesH.LoseOpportunity, canEditPipeline)
+
+	// ─── Quotes ────────────────────────────────────────────────────────────────────
+	canViewQuotes := mw.RequirePermission(policy, "quotes", "view")
+	canCreateQuotes := mw.RequirePermission(policy, "quotes", "create")
+	canEditQuotes := mw.RequirePermission(policy, "quotes", "edit")
+
+	quotes := api.Group("/quotes")
+	quotes.GET("", salesH.ListQuotes, canViewQuotes)
+	quotes.POST("", salesH.CreateQuote, canCreateQuotes)
+	quotes.GET("/:id", salesH.GetQuote, canViewQuotes)
+	quotes.PUT("/:id", salesH.UpdateQuote, canEditQuotes)
+	quotes.DELETE("/:id", salesH.DeleteQuote, canEditQuotes)
+	quotes.POST("/:id/status", salesH.ChangeQuoteStatus, canEditQuotes)
+	quotes.GET("/:id/versions", salesH.ListQuoteVersions, canViewQuotes)
+
+	// ─── Projects ──────────────────────────────────────────────────────────────────
+	canViewProjects := mw.RequirePermission(policy, "projects", "view")
+	canCreateProjects := mw.RequirePermission(policy, "projects", "create")
+	canEditProjects := mw.RequirePermission(policy, "projects", "edit")
+	canViewProfitability := mw.RequirePermission(policy, "projects", "view_profitability")
+
+	projects := api.Group("/projects")
+	projects.GET("", projectH.ListProjects, canViewProjects)
+	projects.POST("", projectH.CreateProject, canCreateProjects)
+	projects.GET("/:id", projectH.GetProject, canViewProjects)
+	projects.PUT("/:id", projectH.UpdateProject, canEditProjects)
+	projects.DELETE("/:id", projectH.DeleteProject, canEditProjects)
+	projects.GET("/:id/profitability", projectH.GetProfitability, canViewProfitability)
+
+	projects.GET("/:id/milestones", projectH.ListMilestones, canViewProjects)
+	projects.POST("/:id/milestones", projectH.CreateMilestone, canEditProjects)
+	projects.PUT("/:id/milestones/:milestone_id", projectH.UpdateMilestone, canEditProjects)
+	projects.DELETE("/:id/milestones/:milestone_id", projectH.DeleteMilestone, canEditProjects)
+
+	projects.GET("/:id/members", projectH.ListMembers, canViewProjects)
+	projects.POST("/:id/members", projectH.AddMember, canEditProjects)
+	projects.DELETE("/:id/members/:user_id", projectH.RemoveMember, canEditProjects)
+
+	// ─── Tasks ─────────────────────────────────────────────────────────────────────
+	canViewTasks := mw.RequirePermission(policy, "tasks", "view")
+	canCreateTasks := mw.RequirePermission(policy, "tasks", "create")
+	canEditTasks := mw.RequirePermission(policy, "tasks", "edit")
+	canAssignTasks := mw.RequirePermission(policy, "tasks", "assign")
+
+	tasks := api.Group("/tasks")
+	tasks.GET("", taskH.ListTasks, canViewTasks)
+	tasks.POST("", taskH.CreateTask, canCreateTasks)
+	tasks.GET("/:id", taskH.GetTask, canViewTasks)
+	tasks.PUT("/:id", taskH.UpdateTask, canEditTasks)
+	tasks.DELETE("/:id", taskH.DeleteTask, canEditTasks)
+	tasks.POST("/:id/status", taskH.ChangeTaskStatus, canEditTasks)
+	tasks.POST("/:id/assign", taskH.ReassignTask, canAssignTasks)
+	tasks.GET("/:id/comments", taskH.ListComments, canViewTasks)
+	tasks.POST("/:id/comments", taskH.AddComment, canViewTasks)
+	tasks.GET("/:id/history", taskH.GetHistory, canViewTasks)
+	tasks.POST("/:id/timer/start", taskH.StartTimer, canEditTasks)
+	tasks.POST("/:id/timer/stop", taskH.StopTimer, canEditTasks)
+
+	// ─── Time tracking ─────────────────────────────────────────────────────────────
+	canViewOwnTime := mw.RequirePermission(policy, "time_tracking", "view_own")
+	timeEntries := api.Group("/time-entries")
+	timeEntries.GET("", taskH.ListTimeEntries, canViewOwnTime)
+	timeEntries.POST("", taskH.CreateTimeEntry, canViewOwnTime)
+	timeEntries.GET("/timesheet", taskH.GetTimesheet, canViewOwnTime)
+	timeEntries.GET("/utilization", taskH.GetUtilization, canViewOwnTime)
 }
 
 func registerCRMRoutes(

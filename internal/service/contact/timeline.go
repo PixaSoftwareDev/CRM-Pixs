@@ -17,7 +17,7 @@ import (
 // (invoices, receipts, opportunities) without changing this struct.
 type TimelineEvent struct {
 	ID         uuid.UUID
-	Kind       string // "note" | "calendar_event"
+	Kind       string // "note" | "calendar_event" | "opportunity" | "task"
 	OccurredAt time.Time
 	Title      string
 	Body       *string
@@ -70,6 +70,53 @@ func (s *ContactService) GetTimeline(ctx context.Context, companyID, contactID u
 		}
 		if ce.Notes != nil {
 			e.Body = ce.Notes
+		}
+		events = append(events, e)
+	}
+
+	// Source 3: opportunities for this contact.
+	opps, err := s.q.ListOpportunities(ctx, sqlcgen.ListOpportunitiesParams{
+		CompanyID: companyID,
+		ContactID: pgtype.UUID{Bytes: contactID, Valid: true},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "loading opportunities for timeline")
+	}
+	for _, o := range opps {
+		e := &TimelineEvent{
+			ID:         o.ID,
+			Kind:       "opportunity",
+			OccurredAt: o.CreatedAt.Time,
+			Title:      o.Title,
+			Meta:       map[string]any{"stage_id": o.StageID.String()},
+		}
+		if o.AssignedUserID.Valid {
+			uid := uuid.UUID(o.AssignedUserID.Bytes)
+			e.UserID = &uid
+		}
+		events = append(events, e)
+	}
+
+	// Source 4: tasks linked to this contact.
+	tasks, err := s.q.ListTasks(ctx, sqlcgen.ListTasksParams{
+		CompanyID: companyID,
+		ContactID: pgtype.UUID{Bytes: contactID, Valid: true},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "loading tasks for timeline")
+	}
+	for _, tk := range tasks {
+		e := &TimelineEvent{
+			ID:         tk.ID,
+			Kind:       "task",
+			OccurredAt: tk.CreatedAt.Time,
+			Title:      tk.Title,
+			Body:       tk.Description,
+			Meta:       map[string]any{"status": tk.Status, "priority": tk.Priority},
+		}
+		if tk.AssigneeID.Valid {
+			uid := uuid.UUID(tk.AssigneeID.Bytes)
+			e.UserID = &uid
 		}
 		events = append(events, e)
 	}
