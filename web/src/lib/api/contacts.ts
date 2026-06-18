@@ -41,7 +41,7 @@ export interface ContactPerson {
 export interface ContactBankAccount {
   id: string
   contact_id: string
-  cbu: string
+  cbu_display: string
   alias?: string
   bank_name?: string
   account_holder?: string

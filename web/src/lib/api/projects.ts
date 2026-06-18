@@ -39,16 +39,18 @@ export interface CreateProjectInput {
 export interface Milestone {
   id: string
   project_id: string
-  title: string
-  due_date?: string
+  name: string
+  committed_date?: string
   status: string
   description?: string
+  deliverables?: string
+  order_pos?: number
   created_at: string
 }
 
 export type MilestoneInput = {
-  title: string
-  due_date?: string
+  name: string
+  committed_date?: string
   status: string
   description?: string
 }
@@ -56,8 +58,9 @@ export type MilestoneInput = {
 export interface ProjectMember {
   user_id: string
   project_id?: string
-  name?: string
-  email?: string
+  role_in_project?: string
+  full_name: string
+  email: string
 }
 
 // Profitability shape is backend-driven; keep it permissive.

@@ -16,13 +16,13 @@ import (
 // The Kind field discriminates the source; Meta allows extension by other modules
 // (invoices, receipts, opportunities) without changing this struct.
 type TimelineEvent struct {
-	ID         uuid.UUID
-	Kind       string // "note" | "calendar_event" | "opportunity" | "task"
-	OccurredAt time.Time
-	Title      string
-	Body       *string
-	UserID     *uuid.UUID
-	Meta       map[string]any
+	ID         uuid.UUID      `json:"id"`
+	Kind       string         `json:"kind"` // "note" | "calendar_event" | "opportunity" | "task"
+	OccurredAt time.Time      `json:"timestamp"`
+	Title      string         `json:"title"`
+	Body       *string        `json:"body"`
+	UserID     *uuid.UUID     `json:"user_id"`
+	Meta       map[string]any `json:"meta"`
 }
 
 // GetTimeline returns a unified timeline for a contact, sorted newest-first.

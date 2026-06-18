@@ -168,9 +168,9 @@ function MilestonesSection({ projectId, canEdit }: { projectId: string; canEdit:
               className="flex items-center justify-between rounded-xl border border-border bg-surface p-4"
             >
               <div>
-                <p className="font-medium text-text">{m.title}</p>
+                <p className="font-medium text-text">{m.name}</p>
                 <p className="text-sm text-text-secondary">
-                  {m.due_date ? formatDate(m.due_date) : 'Sin fecha'}
+                  {m.committed_date ? formatDate(m.committed_date) : 'Sin fecha'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -212,8 +212,8 @@ function MilestoneForm({
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
   const [form, setForm] = useState<MilestoneInput>({
-    title: milestone?.title ?? '',
-    due_date: milestone?.due_date?.slice(0, 10) ?? '',
+    name: milestone?.name ?? '',
+    committed_date: milestone?.committed_date?.slice(0, 10) ?? '',
     status: milestone?.status ?? 'pending',
     description: milestone?.description ?? '',
   })
@@ -237,16 +237,16 @@ function MilestoneForm({
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault()
-          if (!form.title.trim()) return
-          save.mutate({ ...form, due_date: form.due_date || undefined, description: form.description || undefined })
+          if (!form.name.trim()) return
+          save.mutate({ ...form, committed_date: form.committed_date || undefined, description: form.description || undefined })
         }}
       >
-        <Input label="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+        <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <Input
           label="Fecha comprometida"
           type="date"
-          value={form.due_date ?? ''}
-          onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+          value={form.committed_date ?? ''}
+          onChange={(e) => setForm({ ...form, committed_date: e.target.value })}
         />
         <Select
           label="Estado"
@@ -314,7 +314,7 @@ function MembersSection({ projectId, canEdit }: { projectId: string; canEdit: bo
                   key={m.user_id}
                   className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
                 >
-                  <span className="text-sm text-text">{m.name ?? m.email ?? m.user_id}</span>
+                  <span className="text-sm text-text">{m.full_name || m.email || m.user_id}</span>
                   {canEdit && (
                     <Button variant="ghost" size="sm" onClick={() => remove.mutate(m.user_id)}>
                       <Trash2 size={14} />

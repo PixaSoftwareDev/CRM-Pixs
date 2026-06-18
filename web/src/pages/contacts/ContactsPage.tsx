@@ -21,9 +21,10 @@ import { ContactForm } from './ContactForm'
 
 const kindFilterOptions = [
   { value: '', label: 'Todos los tipos' },
-  { value: 'cliente', label: 'Clientes' },
-  { value: 'proveedor', label: 'Proveedores' },
-  { value: 'prospecto', label: 'Prospectos' },
+  { value: 'client', label: 'Clientes' },
+  { value: 'supplier', label: 'Proveedores' },
+  { value: 'prospect', label: 'Prospectos' },
+  { value: 'lead', label: 'Leads' },
 ]
 
 export function ContactsPage() {

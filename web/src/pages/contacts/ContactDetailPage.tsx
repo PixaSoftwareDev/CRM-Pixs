@@ -399,7 +399,7 @@ function BankAccountsTab({ contactId, canEdit }: { contactId: string; canEdit: b
               className="flex items-center justify-between rounded-xl border border-border bg-surface p-4"
             >
               <div>
-                <p className="font-mono text-sm text-text">•••• •••• {a.cbu.slice(-4)}</p>
+                <p className="font-mono text-sm text-text">{a.cbu_display}</p>
                 <p className="text-sm text-text-secondary">
                   {[a.alias, a.bank_name, a.currency].filter(Boolean).join(' · ')}
                 </p>
