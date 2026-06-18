@@ -141,6 +141,25 @@ go vet ./...        # Limpio
 make test           # Tests con -race
 ```
 
+## Cómo agregar un River job
+
+River (cola de jobs sobre Postgres) maneja el trabajo en background. Sus tablas
+(`river_*`) **no** se gestionan con Atlas: se aplican programáticamente al
+arrancar el worker (`rivermigrate` en `cmd/worker`). Para agregar un job nuevo:
+
+1. Definir `YourJobArgs struct` que implemente `river.JobArgs` con `Kind() string`.
+2. Implementar `YourWorker` embebiendo `river.WorkerDefaults[YourJobArgs]` con
+   `Work(ctx context.Context, job *river.Job[YourJobArgs]) error`.
+3. Registrarlo con `river.AddWorker(workers, &YourWorker{})` en `cmd/worker/main.go`.
+4. Encolar desde un service con `jobClient.Insert(ctx, YourJobArgs{...}, &river.InsertOpts{Queue: "tu_cola"})`.
+   El API usa un cliente *enqueue-only* (`jobs.NewEnqueueClient`); el worker usa
+   `jobs.NewWorkerClient` con los workers registrados.
+5. Colas declaradas en `internal/jobs/client.go` (`river.QueueDefault`, `"scraping"`).
+
+Nota: el proceso `cmd/worker` debe correr al menos una vez para crear las tablas
+`river_*` antes de que el API pueda encolar; de lo contrario `Insert` falla.
+Convención de canal de progreso (para WebSocket futuro): `scraping:job:{job_id}`.
+
 ## Flujo de Trabajo por Sesión
 
 1. Leer este CLAUDE.md antes de escribir una línea de código.

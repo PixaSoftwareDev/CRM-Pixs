@@ -21,11 +21,13 @@ import (
 	"pixs/internal/auth/rbac"
 	"pixs/internal/auth/session"
 	"pixs/internal/config"
+	"pixs/internal/jobs"
 	sqlcgen "pixs/internal/repository/sqlc"
 	svccalendar "pixs/internal/service/calendar"
 	svccontact "pixs/internal/service/contact"
 	svcfinance "pixs/internal/service/finance"
 	svcidentity "pixs/internal/service/identity"
+	svclead "pixs/internal/service/lead"
 	svcproject "pixs/internal/service/project"
 	svcsales "pixs/internal/service/sales"
 	svctask "pixs/internal/service/task"
@@ -184,7 +186,20 @@ func run() error {
 		catalog:   svcfinance.NewCatalogService(db, logger),
 	}
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, logger)
+	// River enqueue client (no workers — the worker process runs them).
+	riverClient, err := jobs.NewEnqueueClient(db)
+	if err != nil {
+		return fmt.Errorf("creating river enqueue client: %w", err)
+	}
+
+	leadServices := &leadServices{
+		leads:        svclead.NewLeadService(db, logger),
+		conversion:   svclead.NewConversionService(db, logger),
+		metrics:      svclead.NewMetricsService(db, logger),
+		orchestrator: svclead.NewScrapingOrchestrator(db, riverClient, svclead.ScrapingConfig{DailyQuota: cfg.ScrapingDailyQuota}, logger),
+	}
+
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, logger)
 
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
@@ -224,6 +239,7 @@ func registerRoutes(
 	calendarSvc *svccalendar.CalendarService,
 	spt *salesProjectTaskServices,
 	fin *financeServices,
+	leads *leadServices,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -273,6 +289,55 @@ func registerRoutes(
 	registerCRMRoutes(e, authMiddleware, policy, contactSvc, calendarSvc)
 	registerSalesProjectTaskRoutes(e, authMiddleware, policy, spt)
 	registerFinanceRoutes(e, authMiddleware, policy, fin)
+	registerLeadRoutes(e, authMiddleware, policy, leads)
+}
+
+// leadServices bundles the services for the leads + scraping bounded context.
+type leadServices struct {
+	leads        *svclead.LeadService
+	conversion   *svclead.ConversionService
+	metrics      *svclead.MetricsService
+	orchestrator *svclead.ScrapingOrchestrator
+}
+
+func registerLeadRoutes(
+	e *echo.Echo,
+	authMiddleware echo.MiddlewareFunc,
+	policy *rbac.Policy,
+	leads *leadServices,
+) {
+	leadH := handler.NewLeadHandler(leads.leads, leads.conversion, leads.metrics)
+	scrapingH := handler.NewScrapingHandler(leads.orchestrator)
+
+	api := e.Group("/api/v1", authMiddleware)
+
+	canView := mw.RequirePermission(policy, "leads", "view")
+	canCreate := mw.RequirePermission(policy, "leads", "create")
+	canEdit := mw.RequirePermission(policy, "leads", "edit")
+	canAssign := mw.RequirePermission(policy, "leads", "assign")
+	canConvert := mw.RequirePermission(policy, "leads", "convert")
+
+	leadsGroup := api.Group("/leads")
+	leadsGroup.GET("", leadH.ListLeads, canView)
+	leadsGroup.POST("", leadH.CreateLead, canCreate)
+	leadsGroup.GET("/metrics", leadH.GetLeadMetrics, canView)
+	leadsGroup.GET("/:id", leadH.GetLead, canView)
+	leadsGroup.PATCH("/:id", leadH.UpdateLead, canEdit)
+	leadsGroup.POST("/:id/status", leadH.ChangeLeadStatus, canEdit)
+	leadsGroup.POST("/:id/assign", leadH.AssignLead, canAssign)
+	leadsGroup.POST("/:id/note", leadH.AddNote, canView)
+	leadsGroup.POST("/:id/convert", leadH.ConvertToContact, canConvert)
+	leadsGroup.POST("/:id/send-to-opportunity", leadH.SendToOpportunity, canConvert)
+	leadsGroup.GET("/:id/activities", leadH.ListLeadActivities, canView)
+
+	// ─── Scraping ──────────────────────────────────────────────────────────────
+	canRun := mw.RequirePermission(policy, "scraping", "run")
+	canViewScraping := mw.RequirePermission(policy, "scraping", "view")
+
+	scraping := api.Group("/scraping-jobs")
+	scraping.POST("", scrapingH.EnqueueScrapingJob, canRun)
+	scraping.GET("", scrapingH.ListScrapingJobs, canViewScraping)
+	scraping.GET("/:id", scrapingH.GetScrapingJob, canViewScraping)
 }
 
 // financeServices bundles the finance bounded-context services.

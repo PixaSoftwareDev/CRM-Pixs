@@ -16,10 +16,15 @@ type Querier interface {
 	AddContactTag(ctx context.Context, arg AddContactTagParams) error
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	AdvanceRecurringNextDue(ctx context.Context, arg AdvanceRecurringNextDueParams) (RecurringPayment, error)
+	AssignLead(ctx context.Context, arg AssignLeadParams) (Lead, error)
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
+	CheckLeadDuplicate(ctx context.Context, arg CheckLeadDuplicateParams) (uuid.UUID, error)
 	ClearPrimaryContactPerson(ctx context.Context, contactID uuid.UUID) error
 	CloseSession(ctx context.Context, arg CloseSessionParams) (CashRegisterSession, error)
+	ConvertLead(ctx context.Context, arg ConvertLeadParams) (Lead, error)
 	CountActiveSessions(ctx context.Context, userID uuid.UUID) (int32, error)
+	CountLeads(ctx context.Context, arg CountLeadsParams) (int64, error)
+	CountScrapingJobsToday(ctx context.Context, arg CountScrapingJobsTodayParams) (int32, error)
 	// ─── Bank accounts ─────────────────────────────────────────────────────────────
 	CreateBankAccountFinance(ctx context.Context, arg CreateBankAccountFinanceParams) (BankAccountsFinance, error)
 	// ─── Bank movements ────────────────────────────────────────────────────────────
@@ -56,6 +61,12 @@ type Querier interface {
 	CreateInvoiceReceived(ctx context.Context, arg CreateInvoiceReceivedParams) (InvoicesReceived, error)
 	// ─── Invoice taxes ─────────────────────────────────────────────────────────────
 	CreateInvoiceTax(ctx context.Context, arg CreateInvoiceTaxParams) (InvoiceTax, error)
+	CreateLead(ctx context.Context, arg CreateLeadParams) (Lead, error)
+	CreateLeadActivity(ctx context.Context, arg CreateLeadActivityParams) (LeadActivity, error)
+	CreateLeadEmail(ctx context.Context, arg CreateLeadEmailParams) (LeadEmail, error)
+	CreateLeadOpportunity(ctx context.Context, arg CreateLeadOpportunityParams) (Opportunity, error)
+	CreateLeadPhone(ctx context.Context, arg CreateLeadPhoneParams) (LeadPhone, error)
+	CreateLeadSocial(ctx context.Context, arg CreateLeadSocialParams) (LeadSocial, error)
 	CreateLostReason(ctx context.Context, arg CreateLostReasonParams) (LostReason, error)
 	CreateMilestone(ctx context.Context, arg CreateMilestoneParams) (ProjectMilestone, error)
 	CreateOpportunity(ctx context.Context, arg CreateOpportunityParams) (Opportunity, error)
@@ -83,6 +94,7 @@ type Querier interface {
 	// ─── Recurring payments ────────────────────────────────────────────────────────
 	CreateRecurringPayment(ctx context.Context, arg CreateRecurringPaymentParams) (RecurringPayment, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
+	CreateScrapingJob(ctx context.Context, arg CreateScrapingJobParams) (ScrapingJob, error)
 	// ─── Sessions ──────────────────────────────────────────────────────────────────
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	// ─── TOTP Backup Codes ─────────────────────────────────────────────────────────
@@ -136,6 +148,10 @@ type Querier interface {
 	GetInvoiceReceivedByID(ctx context.Context, arg GetInvoiceReceivedByIDParams) (InvoicesReceived, error)
 	GetInvoiceReceivedForUpdate(ctx context.Context, arg GetInvoiceReceivedForUpdateParams) (InvoicesReceived, error)
 	GetLatestExchangeRate(ctx context.Context, arg GetLatestExchangeRateParams) (ExchangeRate, error)
+	GetLeadByID(ctx context.Context, arg GetLeadByIDParams) (Lead, error)
+	GetLeadConversionByUser(ctx context.Context, companyID uuid.UUID) ([]GetLeadConversionByUserRow, error)
+	GetLeadForUpdate(ctx context.Context, arg GetLeadForUpdateParams) (Lead, error)
+	GetLeadMetrics(ctx context.Context, companyID uuid.UUID) (GetLeadMetricsRow, error)
 	GetLossStage(ctx context.Context, companyID uuid.UUID) (PipelineStage, error)
 	GetMaxQuoteNumber(ctx context.Context, companyID uuid.UUID) (int32, error)
 	GetMilestoneByID(ctx context.Context, id uuid.UUID) (ProjectMilestone, error)
@@ -164,6 +180,7 @@ type Querier interface {
 	GetRoleByName(ctx context.Context, arg GetRoleByNameParams) (Role, error)
 	// ─── Role Permissions ──────────────────────────────────────────────────────────
 	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]GetRolePermissionsRow, error)
+	GetScrapingJobByID(ctx context.Context, arg GetScrapingJobByIDParams) (ScrapingJob, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 	GetTagByID(ctx context.Context, arg GetTagByIDParams) (Tag, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
@@ -210,6 +227,11 @@ type Querier interface {
 	ListInvoiceTaxes(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceTax, error)
 	ListInvoices(ctx context.Context, arg ListInvoicesParams) ([]InvoicesIssued, error)
 	ListInvoicesReceived(ctx context.Context, arg ListInvoicesReceivedParams) ([]InvoicesReceived, error)
+	ListLeadActivities(ctx context.Context, leadID uuid.UUID) ([]LeadActivity, error)
+	ListLeadEmails(ctx context.Context, leadID uuid.UUID) ([]LeadEmail, error)
+	ListLeadPhones(ctx context.Context, leadID uuid.UUID) ([]LeadPhone, error)
+	ListLeadSocials(ctx context.Context, leadID uuid.UUID) ([]LeadSocial, error)
+	ListLeads(ctx context.Context, arg ListLeadsParams) ([]Lead, error)
 	ListLostReasons(ctx context.Context, companyID uuid.UUID) ([]LostReason, error)
 	ListMilestones(ctx context.Context, projectID uuid.UUID) ([]ProjectMilestone, error)
 	ListOpportunities(ctx context.Context, arg ListOpportunitiesParams) ([]Opportunity, error)
@@ -232,6 +254,7 @@ type Querier interface {
 	ListReceipts(ctx context.Context, arg ListReceiptsParams) ([]Receipt, error)
 	ListRecurringPayments(ctx context.Context, companyID uuid.UUID) ([]RecurringPayment, error)
 	ListRoles(ctx context.Context, companyID uuid.UUID) ([]Role, error)
+	ListScrapingJobs(ctx context.Context, companyID uuid.UUID) ([]ScrapingJob, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListTaskComments(ctx context.Context, taskID uuid.UUID) ([]TaskComment, error)
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error)
@@ -240,6 +263,7 @@ type Querier interface {
 	// ─── Catalogs ──────────────────────────────────────────────────────────────────
 	ListVATRates(ctx context.Context, companyID uuid.UUID) ([]VatRate, error)
 	LoseOpportunity(ctx context.Context, arg LoseOpportunityParams) (Opportunity, error)
+	MarkLeadExtractionFailed(ctx context.Context, arg MarkLeadExtractionFailedParams) error
 	MarkObligationPaid(ctx context.Context, arg MarkObligationPaidParams) (PaymentObligation, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error
 	MarkTOTPBackupCodeUsed(ctx context.Context, id uuid.UUID) error
@@ -266,6 +290,7 @@ type Querier interface {
 	SoftDeleteExpense(ctx context.Context, arg SoftDeleteExpenseParams) error
 	SoftDeleteInvoice(ctx context.Context, arg SoftDeleteInvoiceParams) error
 	SoftDeleteInvoiceReceived(ctx context.Context, arg SoftDeleteInvoiceReceivedParams) error
+	SoftDeleteLead(ctx context.Context, arg SoftDeleteLeadParams) error
 	SoftDeleteMilestone(ctx context.Context, arg SoftDeleteMilestoneParams) error
 	SoftDeleteOpportunity(ctx context.Context, arg SoftDeleteOpportunityParams) error
 	SoftDeletePaymentOrder(ctx context.Context, arg SoftDeletePaymentOrderParams) error
@@ -290,6 +315,8 @@ type Querier interface {
 	UpdateInvoicePaidAmount(ctx context.Context, arg UpdateInvoicePaidAmountParams) (InvoicesIssued, error)
 	UpdateInvoiceReceived(ctx context.Context, arg UpdateInvoiceReceivedParams) (InvoicesReceived, error)
 	UpdateInvoiceReceivedPaidAmount(ctx context.Context, arg UpdateInvoiceReceivedPaidAmountParams) (InvoicesReceived, error)
+	UpdateLead(ctx context.Context, arg UpdateLeadParams) (Lead, error)
+	UpdateLeadStatus(ctx context.Context, arg UpdateLeadStatusParams) (Lead, error)
 	UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams) (ProjectMilestone, error)
 	UpdateOpportunity(ctx context.Context, arg UpdateOpportunityParams) (Opportunity, error)
 	UpdatePipelineStage(ctx context.Context, arg UpdatePipelineStageParams) (PipelineStage, error)
@@ -298,6 +325,8 @@ type Querier interface {
 	UpdateQuote(ctx context.Context, arg UpdateQuoteParams) (Quote, error)
 	UpdateQuoteStatus(ctx context.Context, arg UpdateQuoteStatusParams) (Quote, error)
 	UpdateRecurringPayment(ctx context.Context, arg UpdateRecurringPaymentParams) (RecurringPayment, error)
+	UpdateScrapingJobCosts(ctx context.Context, arg UpdateScrapingJobCostsParams) (ScrapingJob, error)
+	UpdateScrapingJobStatus(ctx context.Context, arg UpdateScrapingJobStatusParams) (ScrapingJob, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)

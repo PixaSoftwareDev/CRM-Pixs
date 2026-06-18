@@ -37,6 +37,25 @@ type Config struct {
 
 	// DevSeedAdminPassword is only used by the seed command in dev/staging.
 	DevSeedAdminPassword string `envconfig:"DEV_SEED_ADMIN_PASSWORD" default:"admin123!"`
+
+	// --- Scraping / Leads module ---
+
+	// SerperAPIKey authenticates against the Serper.dev search API.
+	// When empty, scraping jobs are still enqueued but fail at the search step.
+	SerperAPIKey string `envconfig:"SERPER_API_KEY"`
+
+	// AnthropicAPIKey authenticates against the Anthropic Messages API for
+	// LLM-based company-info extraction. When empty, LLM extraction is skipped.
+	AnthropicAPIKey string `envconfig:"ANTHROPIC_API_KEY"`
+
+	// ChromedpEnabled toggles JS rendering for SPA sites (optional, off by default).
+	ChromedpEnabled bool `envconfig:"CHROMEDP_ENABLED" default:"false"`
+
+	// RespectRobots toggles robots.txt checking during fetching.
+	RespectRobots bool `envconfig:"SCRAPING_RESPECT_ROBOTS" default:"true"`
+
+	// ScrapingDailyQuota caps the number of URLs a user may request per day.
+	ScrapingDailyQuota int `envconfig:"SCRAPING_DAILY_QUOTA" default:"200"`
 }
 
 // Load reads configuration from environment variables with the PIXS prefix.

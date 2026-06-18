@@ -189,8 +189,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('payment_calendar','view'),
 		    ('cta_cte','view'),
 		    ('cash_flow','view'),
-		    ('leads','view'),('leads','view_all'),('leads','convert'),
-		    ('scraping','launch'),('scraping','view_costs'),
+		    ('leads','view'),('leads','view_all'),('leads','create'),('leads','edit'),('leads','assign'),('leads','convert'),
+		    ('scraping','launch'),('scraping','view_costs'),('scraping','run'),('scraping','view'),
 		    ('reports','view_financial'),('reports','view_sales'),('reports','export'),
 		    ('documents','view'),('documents','upload'),('documents','delete'),
 		    ('users','manage'),('audit','view'),('settings','manage'),
@@ -208,7 +208,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    CASE WHEN (p.module, p.action) IN (
 		        ('pipeline','view'),('pipeline','create'),('pipeline','edit'),
 		        ('quotes','view'),('quotes','create'),('quotes','edit'),
-		        ('tasks','view'),('leads','view'),
+		        ('tasks','view'),
+		        ('leads','view'),('leads','edit'),
 		        ('calendar','view'),('calendar','manage')
 		    ) THEN true ELSE false END
 		FROM permissions p
@@ -222,8 +223,8 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		    ('time_tracking','view_own'),
 		    ('invoices_issued','view'),('invoices_issued','create'),('invoices_issued','edit'),
 		    ('expenses','create'),
-		    ('leads','view'),('leads','convert'),
-		    ('scraping','launch'),
+		    ('leads','view'),('leads','create'),('leads','edit'),('leads','convert'),
+		    ('scraping','launch'),('scraping','run'),('scraping','view'),
 		    ('reports','view_sales'),
 		    ('documents','view'),('documents','upload'),
 		    ('calendar','view'),('calendar','manage')

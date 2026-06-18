@@ -422,6 +422,67 @@ type InvoicesReceived struct {
 	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
+type Lead struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	CompanyID           uuid.UUID          `db:"company_id" json:"company_id"`
+	CompanyName         string             `db:"company_name" json:"company_name"`
+	Description         *string            `db:"description" json:"description"`
+	WhatTheyDo          *string            `db:"what_they_do" json:"what_they_do"`
+	SourceUrl           *string            `db:"source_url" json:"source_url"`
+	Website             *string            `db:"website" json:"website"`
+	Industry            *string            `db:"industry" json:"industry"`
+	ApproximateSize     *string            `db:"approximate_size" json:"approximate_size"`
+	City                *string            `db:"city" json:"city"`
+	Country             *string            `db:"country" json:"country"`
+	Language            *string            `db:"language" json:"language"`
+	AssignedTo          pgtype.UUID        `db:"assigned_to" json:"assigned_to"`
+	Status              string             `db:"status" json:"status"`
+	RejectionReason     *string            `db:"rejection_reason" json:"rejection_reason"`
+	FollowUpDate        pgtype.Date        `db:"follow_up_date" json:"follow_up_date"`
+	ScrapingJobID       pgtype.UUID        `db:"scraping_job_id" json:"scraping_job_id"`
+	ConvertedContactID  pgtype.UUID        `db:"converted_contact_id" json:"converted_contact_id"`
+	LlmExtractionFailed bool               `db:"llm_extraction_failed" json:"llm_extraction_failed"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt           pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type LeadActivity struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	LeadID       uuid.UUID          `db:"lead_id" json:"lead_id"`
+	UserID       pgtype.UUID        `db:"user_id" json:"user_id"`
+	ActivityType string             `db:"activity_type" json:"activity_type"`
+	Detail       *string            `db:"detail" json:"detail"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type LeadEmail struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	LeadID    uuid.UUID          `db:"lead_id" json:"lead_id"`
+	Email     string             `db:"email" json:"email"`
+	Context   *string            `db:"context" json:"context"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type LeadPhone struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	LeadID    uuid.UUID          `db:"lead_id" json:"lead_id"`
+	Phone     string             `db:"phone" json:"phone"`
+	Type      string             `db:"type" json:"type"`
+	Country   *string            `db:"country" json:"country"`
+	Context   *string            `db:"context" json:"context"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type LeadSocial struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	LeadID    uuid.UUID          `db:"lead_id" json:"lead_id"`
+	Platform  string             `db:"platform" json:"platform"`
+	Handle    *string            `db:"handle" json:"handle"`
+	Url       *string            `db:"url" json:"url"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type LostReason struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
@@ -705,6 +766,28 @@ type RolePermission struct {
 	RoleID          uuid.UUID `db:"role_id" json:"role_id"`
 	PermissionID    uuid.UUID `db:"permission_id" json:"permission_id"`
 	RestrictedToOwn bool      `db:"restricted_to_own" json:"restricted_to_own"`
+}
+
+type ScrapingJob struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	CompanyID            uuid.UUID          `db:"company_id" json:"company_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	Query                string             `db:"query" json:"query"`
+	ResultCountRequested int32              `db:"result_count_requested" json:"result_count_requested"`
+	Country              *string            `db:"country" json:"country"`
+	Language             *string            `db:"language" json:"language"`
+	Status               string             `db:"status" json:"status"`
+	StartedAt            pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt           pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	SearchApiCostUsd     pgtype.Numeric     `db:"search_api_cost_usd" json:"search_api_cost_usd"`
+	LlmTokensInput       *int32             `db:"llm_tokens_input" json:"llm_tokens_input"`
+	LlmTokensOutput      *int32             `db:"llm_tokens_output" json:"llm_tokens_output"`
+	LlmCostUsd           pgtype.Numeric     `db:"llm_cost_usd" json:"llm_cost_usd"`
+	TotalCostUsd         pgtype.Numeric     `db:"total_cost_usd" json:"total_cost_usd"`
+	UrlsProcessed        int32              `db:"urls_processed" json:"urls_processed"`
+	LeadsFound           int32              `db:"leads_found" json:"leads_found"`
+	ErrorSummary         *string            `db:"error_summary" json:"error_summary"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type SequenceNumber struct {
