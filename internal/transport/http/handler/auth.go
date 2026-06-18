@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"pixs/internal/auth/rbac"
 	"pixs/internal/domain/identity"
 	svcidentity "pixs/internal/service/identity"
 	mw "pixs/internal/transport/http/middleware"
@@ -15,12 +16,13 @@ import (
 
 // AuthHandler handles all authentication-related routes.
 type AuthHandler struct {
-	svc *svcidentity.AuthService
+	svc    *svcidentity.AuthService
+	policy *rbac.Policy
 }
 
 // NewAuthHandler constructs an AuthHandler.
-func NewAuthHandler(svc *svcidentity.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *svcidentity.AuthService, policy *rbac.Policy) *AuthHandler {
+	return &AuthHandler{svc: svc, policy: policy}
 }
 
 // ─── request / response DTOs ─────────────────────────────────────────────────
@@ -163,6 +165,22 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		"full_name":  data.FullName,
 		"role_ids":   data.RoleIDs,
 	})
+}
+
+// MePermissions godoc GET /api/v1/me/permissions — returns the caller's effective permissions.
+func (h *AuthHandler) MePermissions(c echo.Context) error {
+	data := mw.SessionFromContext(c)
+	entries := h.policy.Entries(data.RoleIDs)
+	type permEntry struct {
+		Module          string `json:"module"`
+		Action          string `json:"action"`
+		RestrictedToOwn bool   `json:"restricted_to_own"`
+	}
+	perms := make([]permEntry, len(entries))
+	for i, e := range entries {
+		perms[i] = permEntry{Module: e.Module, Action: e.Action, RestrictedToOwn: e.RestrictedToOwn}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"permissions": perms})
 }
 
 // ListSessions godoc GET /auth/sessions

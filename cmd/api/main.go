@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -201,6 +202,13 @@ func run() error {
 
 	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, logger)
 
+	// --- SPA static serving (must come after all API routes) ---
+	// The compiled frontend lives at web/dist relative to the working directory
+	// (the systemd unit sets WorkingDirectory to the project root). Assets are
+	// served directly; any other non-API path falls back to index.html so the
+	// client-side router can handle it.
+	registerSPA(e, "web/dist")
+
 	// --- Graceful shutdown ---
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -265,7 +273,11 @@ func registerRoutes(
 		Prefix: "pwdreset:ip",
 	})
 
-	authHandler := handler.NewAuthHandler(authSvc)
+	authHandler := handler.NewAuthHandler(authSvc, policy)
+
+	// Effective-permissions endpoint for the SPA, under the protected /api/v1 group.
+	apiAuth := e.Group("/api/v1", authMiddleware)
+	apiAuth.GET("/me/permissions", authHandler.MePermissions)
 
 	// Mount /auth group — apply rate limits selectively per handler.
 	auth := e.Group("/auth")
@@ -677,6 +689,31 @@ func registerCRMRoutes(
 	calendar.GET("/events/:id", calendarH.GetEvent, canViewCalendar)
 	calendar.PUT("/events/:id", calendarH.UpdateEvent, canManageCalendar)
 	calendar.DELETE("/events/:id", calendarH.DeleteEvent, canManageCalendar)
+}
+
+// registerSPA serves the compiled single-page app from distPath, if it exists.
+// Assets are served from distPath/assets; every other GET that is not an API
+// route falls back to index.html for client-side routing.
+func registerSPA(e *echo.Echo, distPath string) {
+	info, err := os.Stat(distPath)
+	if err != nil || !info.IsDir() {
+		slog.Warn("SPA dist directory not found; frontend will not be served", "path", distPath)
+		return
+	}
+
+	e.Static("/assets", distPath+"/assets")
+	e.File("/favicon.svg", distPath+"/favicon.svg")
+
+	indexPath := distPath + "/index.html"
+	e.GET("/*", func(c echo.Context) error {
+		// Never let the SPA fallback swallow API or health routes.
+		p := c.Param("*")
+		if strings.HasPrefix(p, "api/") || strings.HasPrefix(p, "auth/") || p == "health" {
+			return echo.NewHTTPError(http.StatusNotFound)
+		}
+		return c.File(indexPath)
+	})
+	slog.Info("SPA serving enabled", "path", distPath)
 }
 
 func healthHandler(db *pgxpool.Pool, rdb *redis.Client) echo.HandlerFunc {

@@ -1,4 +1,5 @@
-.PHONY: db-up db-down migrate migrate-new sqlc lint vet test test-cover build run-api seed help
+.PHONY: db-up db-down migrate migrate-new sqlc lint vet test test-cover build run-api seed help \
+        web-install web-dev web-build web-types
 
 # ── Tool paths ───────────────────────────────────────────────────────────────
 
@@ -70,6 +71,22 @@ build:
 	$(GO) build -o $(BIN_DIR)/migrate ./cmd/migrate
 	@echo "Binaries built in $(BIN_DIR)/"
 
+# ── Frontend ──────────────────────────────────────────────────────────────────
+
+WEB_DIR := web
+
+web-install:
+	cd $(WEB_DIR) && npm install
+
+web-dev:
+	cd $(WEB_DIR) && npm run dev
+
+web-build:
+	cd $(WEB_DIR) && npm run build
+
+web-types:
+	cd $(WEB_DIR) && npm run types:api
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 run-api:
@@ -94,6 +111,10 @@ help:
 	@echo "  test           Run all tests with race detector"
 	@echo "  test-cover     Run tests and generate HTML coverage report"
 	@echo "  build          Compile all three binaries to /bin"
+	@echo "  web-install    Install frontend dependencies (npm)"
+	@echo "  web-dev        Run the Vite dev server (proxies /api to :8080)"
+	@echo "  web-build      Build the frontend to web/dist"
+	@echo "  web-types      Regenerate TS types from api/openapi.yaml"
 	@echo "  run-api        Run the API server (loads .env if present)"
 	@echo "  seed           Insert dev admin user (admin@pixs.local) — dev only"
 	@echo ""

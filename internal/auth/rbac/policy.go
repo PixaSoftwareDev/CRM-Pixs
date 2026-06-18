@@ -61,6 +61,23 @@ func NewPolicy(entries []PolicyEntry) *Policy {
 	return &Policy{roleEntries: roleEntries}
 }
 
+// Entries returns all effective (de-duplicated) permissions for the given role IDs.
+// If two roles grant the same (module, action), the first one encountered wins.
+func (p *Policy) Entries(roleIDs []string) []Entry {
+	seen := make(map[string]bool)
+	var result []Entry
+	for _, rid := range roleIDs {
+		for _, e := range p.roleEntries[rid] {
+			key := e.Module + ":" + e.Action
+			if !seen[key] {
+				seen[key] = true
+				result = append(result, e)
+			}
+		}
+	}
+	return result
+}
+
 // Check evaluates whether any of the given roleIDs grants (module, action).
 //
 // Returns:

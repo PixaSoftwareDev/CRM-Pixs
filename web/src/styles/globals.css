@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-brand: #6366f1;
+  --color-brand-hover: #4f46e5;
+  --color-brand-light: #eef2ff;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Light mode surfaces */
+  --color-surface: #ffffff;
+  --color-surface-raised: #f9fafb;
+  --color-surface-overlay: #ffffff;
+  --color-text: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #ffffff;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-overlay: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+.dark {
+  --color-brand: #818cf8;
+  --color-brand-hover: #6366f1;
+  --color-brand-light: #1e1b4b;
+
+  --color-surface: #111827;
+  --color-surface-raised: #1f2937;
+  --color-surface-overlay: #1f2937;
+  --color-text: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-tertiary: #6b7280;
+  --color-text-inverse: #111827;
+  --color-border: #374151;
+  --color-border-strong: #4b5563;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-overlay: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-surface text-text font-sans text-base antialiased;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Focus visible globally */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-brand;
+}
