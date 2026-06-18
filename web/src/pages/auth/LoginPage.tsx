@@ -91,6 +91,14 @@ export function LoginPage() {
               <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
                 Ingresar
               </Button>
+
+              <button
+                type="button"
+                onClick={() => { setEmail('admin@pixs.local'); setPassword('Admin123!pixs') }}
+                className="w-full rounded-lg border border-dashed border-border py-2 text-xs text-text-tertiary hover:border-brand hover:text-brand transition-colors"
+              >
+                🔑 Completar con admin de prueba
+              </button>
             </form>
           )}
         </div>

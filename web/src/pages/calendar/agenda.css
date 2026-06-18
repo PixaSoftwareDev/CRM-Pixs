@@ -1,0 +1,67 @@
+/* Adapt react-big-calendar to the PIXS theme (CSS vars). Scoped to .rbc-shell. */
+.rbc-shell {
+  color: var(--color-text, inherit);
+}
+.rbc-shell .rbc-calendar {
+  height: 100%;
+}
+.rbc-shell .rbc-toolbar {
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rbc-shell .rbc-toolbar button {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+.rbc-shell .rbc-toolbar button:hover,
+.rbc-shell .rbc-toolbar button:focus {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.rbc-shell .rbc-toolbar button.rbc-active {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+.rbc-shell .rbc-toolbar-label {
+  font-weight: 600;
+}
+.rbc-shell .rbc-header,
+.rbc-shell .rbc-time-header-content,
+.rbc-shell .rbc-month-view,
+.rbc-shell .rbc-time-view,
+.rbc-shell .rbc-time-content,
+.rbc-shell .rbc-day-bg,
+.rbc-shell .rbc-time-slot,
+.rbc-shell .rbc-timeslot-group,
+.rbc-shell .rbc-day-slot,
+.rbc-shell .rbc-time-header,
+.rbc-shell .rbc-time-header-gutter,
+.rbc-shell .rbc-time-content > * + * > *,
+.rbc-shell .rbc-month-row + .rbc-month-row,
+.rbc-shell .rbc-day-bg + .rbc-day-bg,
+.rbc-shell .rbc-header + .rbc-header,
+.rbc-shell .rbc-agenda-view table {
+  border-color: var(--color-border) !important;
+}
+.rbc-shell .rbc-off-range-bg {
+  background: var(--color-surface-raised);
+}
+.rbc-shell .rbc-today {
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+.rbc-shell .rbc-event {
+  background: var(--color-brand);
+  border: none;
+  border-radius: 6px;
+}
+.rbc-shell .rbc-show-more {
+  color: var(--color-brand);
+  background: transparent;
+}
+.rbc-shell .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  border-color: var(--color-border);
+}

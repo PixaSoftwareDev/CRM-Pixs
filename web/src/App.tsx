@@ -5,6 +5,15 @@ import { AppLayout } from './components/layout/AppLayout'
 import { LoginPage } from './pages/auth/LoginPage'
 import { SessionsPage } from './pages/auth/SessionsPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ContactsPage } from './pages/contacts/ContactsPage'
+import { ContactDetailPage } from './pages/contacts/ContactDetailPage'
+import { AgendaPage } from './pages/calendar/AgendaPage'
+import { PipelinePage } from './pages/sales/PipelinePage'
+import { QuotesPage } from './pages/sales/QuotesPage'
+import { QuoteFormPage } from './pages/sales/QuoteFormPage'
+import { ProjectsPage } from './pages/projects/ProjectsPage'
+import { ProjectDetailPage } from './pages/projects/ProjectDetailPage'
+import { TasksPage } from './pages/tasks/TasksPage'
 import { ToastContainer } from './components/ui/Toast'
 import { useTheme } from './hooks/useTheme'
 
@@ -33,19 +42,17 @@ export default function App() {
                   <AppLayout>
                     <Routes>
                       <Route path="/" element={<DashboardPage />} />
-                      <Route path="/contactos" element={<PlaceholderPage title="Contactos" />} />
-                      <Route
-                        path="/ventas/pipeline"
-                        element={<PlaceholderPage title="Pipeline de ventas" />}
-                      />
-                      <Route
-                        path="/ventas/presupuestos"
-                        element={<PlaceholderPage title="Presupuestos" />}
-                      />
-                      <Route path="/agenda" element={<PlaceholderPage title="Agenda" />} />
+                      <Route path="/contactos" element={<ContactsPage />} />
+                      <Route path="/contactos/:id" element={<ContactDetailPage />} />
+                      <Route path="/ventas/pipeline" element={<PipelinePage />} />
+                      <Route path="/ventas/presupuestos" element={<QuotesPage />} />
+                      <Route path="/ventas/presupuestos/nuevo" element={<QuoteFormPage />} />
+                      <Route path="/ventas/presupuestos/:id/editar" element={<QuoteFormPage />} />
+                      <Route path="/agenda" element={<AgendaPage />} />
                       <Route path="/leads" element={<PlaceholderPage title="Leads" />} />
-                      <Route path="/proyectos" element={<PlaceholderPage title="Proyectos" />} />
-                      <Route path="/tareas" element={<PlaceholderPage title="Tareas" />} />
+                      <Route path="/proyectos" element={<ProjectsPage />} />
+                      <Route path="/proyectos/:id" element={<ProjectDetailPage />} />
+                      <Route path="/tareas" element={<TasksPage />} />
                       <Route
                         path="/finanzas/facturacion"
                         element={<PlaceholderPage title="Facturación" />}

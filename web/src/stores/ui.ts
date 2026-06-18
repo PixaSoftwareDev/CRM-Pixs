@@ -9,13 +9,20 @@ interface Toast {
   message: string
 }
 
+interface ActiveTimer {
+  taskId: string
+  startedAt: string
+}
+
 interface UIState {
   theme: Theme
   sidebarCollapsed: boolean
   toasts: Toast[]
+  activeTimer: ActiveTimer | null
 
   setTheme: (t: Theme) => void
   toggleSidebar: () => void
+  setActiveTimer: (timer: ActiveTimer | null) => void
   addToast: (type: Toast['type'], message: string) => void
   removeToast: (id: string) => void
   toast: {
@@ -31,9 +38,11 @@ export const useUIStore = create<UIState>()(
       theme: 'system',
       sidebarCollapsed: false,
       toasts: [],
+      activeTimer: null,
 
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setActiveTimer: (activeTimer) => set({ activeTimer }),
 
       addToast: (type, message) => {
         const id = crypto.randomUUID()
@@ -52,7 +61,11 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'pixs-ui',
-      partialize: (state) => ({ theme: state.theme, sidebarCollapsed: state.sidebarCollapsed }),
+      partialize: (state) => ({
+        theme: state.theme,
+        sidebarCollapsed: state.sidebarCollapsed,
+        activeTimer: state.activeTimer,
+      }),
     },
   ),
 )

@@ -55,6 +55,15 @@ Nunca jerga técnica ni inglés en la UI.
 Contraste 4.5:1, navegación por teclado, ARIA en componentes interactivos,
 foco visible global (`:focus-visible`). Modales con focus trap y cierre por Escape.
 
+## Componentes agregados (CRM + Ventas)
+
+- `ErrorState`: panel estándar de error con ícono, mensaje y botón "Reintentar".
+  Usar en todas las vistas para el estado de error.
+- `ContactPicker`: buscador con debounce (300ms) para elegir un contacto por nombre.
+  Reemplaza al `Select` cuando hay que elegir un contacto/cliente en formularios.
+- Selección de usuarios (asignados/responsables): sin endpoint de listado de usuarios,
+  los formularios usan un input de texto con el ID prellenado al usuario actual.
+
 ## Por qué sin librería de componentes
 
 Construimos todo desde cero (sin shadcn/radix) para tener control total sobre

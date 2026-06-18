@@ -11,9 +11,15 @@
     "types:api": "npx openapi-typescript ../api/openapi.yaml -o src/lib/api/schema.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@tanstack/react-query": "^5.51.1",
+    "@types/react-big-calendar": "^1.16.3",
+    "date-fns": "^4.4.0",
     "lucide-react": "^0.435.0",
     "react": "^18.3.1",
+    "react-big-calendar": "^1.20.0",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.52.2",
     "react-router-dom": "^6.26.1",
