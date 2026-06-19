@@ -10,6 +10,7 @@ package jobs
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,8 +28,9 @@ func NewWorkerClient(pool *pgxpool.Pool, workers *river.Workers) (*river.Client[
 			river.QueueDefault: {MaxWorkers: 10},
 			QueueScraping:      {MaxWorkers: 3},
 		},
-		Workers: workers,
-		Logger:  slog.Default(),
+		Workers:   workers,
+		Logger:    slog.Default(),
+		JobTimeout: 30 * time.Minute,
 	})
 }
 
