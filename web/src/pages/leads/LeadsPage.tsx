@@ -43,6 +43,17 @@ import { useAuthStore } from '../../stores/auth'
 import { leadsApi, type Lead, type LeadStatus, type CreateLeadInput, type LeadActivity } from '../../lib/api/leads'
 import { MetricsSection } from './MetricsSection'
 
+// Mirrors the Go domain validTransitions map.
+const VALID_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+  new:       ['contacted', 'qualified', 'converted', 'rejected', 'waiting'],
+  contacted: ['following', 'qualified', 'converted', 'rejected', 'waiting'],
+  following: ['contacted', 'qualified', 'converted', 'rejected', 'waiting'],
+  qualified: ['converted', 'rejected'],
+  waiting:   ['contacted', 'following', 'converted', 'rejected'],
+  converted: [],
+  rejected:  ['new'],
+}
+
 const STATUS_LABELS: Record<LeadStatus, string> = {
   new: 'Nuevo',
   contacted: 'Contactado',
@@ -273,7 +284,7 @@ function LeadDetail({
   })
 
   const isTerminal = lead.status === 'converted' || lead.status === 'rejected'
-  const canConvert = lead.status === 'qualified'
+  const canConvert = !isTerminal
 
   const emails = lead.emails ?? []
   const phones = lead.phones ?? []
@@ -514,14 +525,17 @@ function StatusChangeForm({
   onSave: (v: StatusFormValues) => void
   isLoading: boolean
 }) {
-  const STATUS_OPTIONS: { value: string; label: string }[] = [
+  const ALL_STATUS_OPTIONS: { value: string; label: string }[] = [
     { value: 'new', label: 'Nuevo' },
     { value: 'contacted', label: 'Contactado' },
     { value: 'following', label: 'En seguimiento' },
     { value: 'qualified', label: 'Calificado' },
     { value: 'waiting', label: 'En espera' },
+    { value: 'converted', label: 'Convertido' },
     { value: 'rejected', label: 'Rechazado' },
-  ].filter((o) => o.value !== lead.status)
+  ]
+  const validNext = VALID_TRANSITIONS[lead.status as LeadStatus] ?? []
+  const STATUS_OPTIONS = ALL_STATUS_OPTIONS.filter((o) => validNext.includes(o.value as LeadStatus))
 
   const { register, handleSubmit, watch } = useForm<StatusFormValues>({
     resolver: zodResolver(statusSchema),

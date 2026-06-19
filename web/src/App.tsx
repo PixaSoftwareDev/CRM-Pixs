@@ -70,6 +70,7 @@ function AppWithSearch() {
                   <Route path="/proyectos" element={<ProjectsPage />} />
                   <Route path="/proyectos/:id" element={<ProjectDetailPage />} />
                   <Route path="/tareas" element={<TasksPage />} />
+                  <Route path="/finanzas" element={<Navigate to="/finanzas/facturacion" replace />} />
                   <Route path="/finanzas/facturacion" element={<FacturacionPage />} />
                   <Route path="/finanzas/cobros" element={<CobrosPage />} />
                   <Route path="/finanzas/cajas" element={<CajasPage />} />

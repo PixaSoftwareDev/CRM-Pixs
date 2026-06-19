@@ -29,11 +29,11 @@ func (s LeadStatus) IsValid() bool {
 // validTransitions defines allowed lead status transitions.
 // "converted" is terminal.
 var validTransitions = map[LeadStatus][]LeadStatus{
-	StatusNew:       {StatusContacted, StatusRejected, StatusWaiting},
-	StatusContacted: {StatusFollowing, StatusQualified, StatusRejected, StatusWaiting},
-	StatusFollowing: {StatusContacted, StatusQualified, StatusRejected, StatusWaiting},
+	StatusNew:       {StatusContacted, StatusQualified, StatusConverted, StatusRejected, StatusWaiting},
+	StatusContacted: {StatusFollowing, StatusQualified, StatusConverted, StatusRejected, StatusWaiting},
+	StatusFollowing: {StatusContacted, StatusQualified, StatusConverted, StatusRejected, StatusWaiting},
 	StatusQualified: {StatusConverted, StatusRejected},
-	StatusWaiting:   {StatusContacted, StatusFollowing, StatusRejected},
+	StatusWaiting:   {StatusContacted, StatusFollowing, StatusConverted, StatusRejected},
 	StatusConverted: {},          // terminal
 	StatusRejected:  {StatusNew}, // can reopen
 }

@@ -2,7 +2,9 @@ package lead
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/cockroachdb/errors"
 	"github.com/google/uuid"
@@ -36,6 +38,11 @@ type ConvertResult struct {
 
 // ConvertToContact creates a contact from the lead, marks the lead converted,
 // and (when stageID is provided) creates a linked opportunity — atomically.
+//
+// All scraped emails, phones and socials are transferred to the new contact:
+//   - First email/phone go onto the contact record itself.
+//   - Each unique email/phone pair becomes a ContactPerson entry so they appear
+//     in the Personas tab, ready to fill in names later.
 func (s *ConversionService) ConvertToContact(ctx context.Context, companyID, callerID, leadID uuid.UUID, stageID *uuid.UUID) (*ConvertResult, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -53,7 +60,13 @@ func (s *ConversionService) ConvertToContact(ctx context.Context, companyID, cal
 		return nil, errors.WithStack(domain.ErrLeadAlreadyConverted)
 	}
 
-	// Create the contact as a prospect.
+	// Fetch scraped contact data while still inside the transaction.
+	emails, _ := qtx.ListLeadEmails(ctx, leadID)
+	phones, _ := qtx.ListLeadPhones(ctx, leadID)
+	socials, _ := qtx.ListLeadSocials(ctx, leadID)
+
+	// Build the contact params — populate email/phone at company level from
+	// the first scraped value found.
 	contactParams := sqlcgen.CreateContactParams{
 		CompanyID:       companyID,
 		Kind:            []string{string(domaincontact.KindProspect)},
@@ -71,9 +84,70 @@ func (s *ConversionService) ConvertToContact(ctx context.Context, companyID, cal
 	if err := contactParams.UsualDiscountPct.Scan("0"); err != nil {
 		return nil, errors.Wrap(err, "init discount")
 	}
+	if len(emails) > 0 {
+		contactParams.Email = &emails[0].Email
+	}
+	if len(phones) > 0 {
+		contactParams.Phone = &phones[0].Phone
+	}
+
 	contact, err := qtx.CreateContact(ctx, contactParams)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating contact")
+	}
+
+	// Create ContactPerson entries for each scraped email/phone pair so they
+	// appear in the Personas tab. We pair by index: email[0]+phone[0],
+	// email[1]+phone[1], etc., then continue with leftovers.
+	maxPairs := len(emails)
+	if len(phones) > maxPairs {
+		maxPairs = len(phones)
+	}
+	role := "Contacto (scraping)"
+	for i := 0; i < maxPairs; i++ {
+		p := sqlcgen.CreateContactPersonParams{
+			ContactID: contact.ID,
+			Name:      row.CompanyName + " — contacto " + fmt.Sprint(i+1),
+			Role:      &role,
+			IsPrimary: i == 0,
+		}
+		if i < len(emails) {
+			p.Name = strings.Split(emails[i].Email, "@")[0]
+			p.Email = &emails[i].Email
+		}
+		if i < len(phones) {
+			p.Phone = &phones[i].Phone
+		}
+		if _, err := qtx.CreateContactPerson(ctx, p); err != nil {
+			s.logger.Warn("could not create contact person from lead", "err", err, "index", i)
+		}
+	}
+
+	// Append socials as a structured note on the contact so the data is
+	// visible. A proper socials table on contacts can be added later.
+	if len(socials) > 0 {
+		var sb strings.Builder
+		sb.WriteString("Redes sociales (importado desde lead):\n")
+		for _, sc := range socials {
+			sb.WriteString("• ")
+			sb.WriteString(strings.Title(sc.Platform))
+			if sc.Handle != nil && *sc.Handle != "" {
+				sb.WriteString(": @")
+				sb.WriteString(*sc.Handle)
+			}
+			if sc.Url != nil && *sc.Url != "" {
+				sb.WriteString(" ")
+				sb.WriteString(*sc.Url)
+			}
+			sb.WriteString("\n")
+		}
+		note := sb.String()
+		if _, err := qtx.CreateContactNote(ctx, sqlcgen.CreateContactNoteParams{
+			ContactID: contact.ID,
+			Body:      note,
+		}); err != nil {
+			s.logger.Warn("could not create socials note", "err", err)
+		}
 	}
 
 	// Mark the lead converted.
