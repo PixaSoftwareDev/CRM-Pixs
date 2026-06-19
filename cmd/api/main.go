@@ -266,7 +266,7 @@ func registerRoutes(
 	// Rate limiters for login and password reset.
 	loginIPLimit := mw.RateLimit(rdb, mw.RateLimitConfig{
 		KeyFn:  mw.IPKey,
-		Limit:  5,
+		Limit:  20,
 		Window: 15 * time.Minute,
 		Prefix: "login:ip",
 	})
