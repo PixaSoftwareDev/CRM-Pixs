@@ -57,6 +57,10 @@ var emailDenylist = []string{
 	"user@", "admin@", "webmaster@", ".png", ".jpg", ".gif", ".css",
 }
 
+// urlEncodePrefix matches URL-encoded characters (e.g. %20) that appear before
+// an email address when the mailto: href is not properly decoded before regex.
+var urlEncodedPrefix = regexp.MustCompile(`(?i)%[0-9a-f]{2}`)
+
 var emailRegex = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
 
 var socialPatterns = map[string]*regexp.Regexp{
@@ -115,6 +119,8 @@ var deobfuscationTokens = regexp.MustCompile(`(?i)\s*(?:\[at\]|\(at\)| at |\[arr
 var dotTokens = regexp.MustCompile(`(?i)\s*(?:\[dot\]|\(dot\)|\[punto\]|\(punto\))\s*`)
 
 func extractEmails(body string) []EmailResult {
+	// Strip URL-encoded prefixes (e.g. %20 before mailto addresses).
+	body = urlEncodedPrefix.ReplaceAllString(body, "")
 	// Deobfuscate common patterns, collapsing any surrounding whitespace so the
 	// reconstructed address matches the email regex.
 	body = deobfuscationTokens.ReplaceAllString(body, "@")

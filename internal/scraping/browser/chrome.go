@@ -75,6 +75,7 @@ const extractLinksJS = `
 		'wikipedia.org','wikimedia.org',
 		'linkedin.com','bing.com','microsoft.com','msn.com','live.com','yahoo.com',
 		'tripadvisor.','yelp.','foursquare.','zomato.','opentable.',
+		'sortlist.com','clutch.co','goodfirms.co','designrush.com','upcity.com',
 		'mercadolibre.','amazon.','ebay.','aliexpress.',
 		'rae.es','wordreference.','dictionary.','thefreedictionary.',
 		'cloudflare.com','w3.org','mozilla.org','github.com','stackoverflow.',
