@@ -279,6 +279,9 @@ func seedFinanceCatalogs(ctx context.Context, db *pgxpool.Pool) error {
 		    ('f5000001-0000-4000-8000-000000000007', $1, 'Honorarios'),
 		    ('f5000001-0000-4000-8000-000000000008', $1, 'Otros')
 		 ON CONFLICT (id) DO NOTHING`,
+		`INSERT INTO cash_registers (id, company_id, name, currency, is_active) VALUES
+		    ('ca000001-0000-4000-8000-000000000001', $1, 'Caja Principal', 'ARS', true)
+		 ON CONFLICT (id) DO NOTHING`,
 		`INSERT INTO sequence_numbers (company_id, document_type, sale_point, last_number) VALUES
 		    ($1, 'invoice_A', 1, 0),
 		    ($1, 'invoice_B', 1, 0),

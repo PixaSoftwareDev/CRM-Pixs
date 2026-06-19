@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -248,6 +248,9 @@ const expenseSchema = z.object({
   cash_id: z.string().optional(),
   bank_id: z.string().optional(),
   status: z.string().optional(),
+  is_recurring: z.boolean().optional(),
+  recurring_frequency: z.string().optional(),
+  recurring_due_day: z.string().optional(),
 })
 type ExpenseFormValues = z.infer<typeof expenseSchema>
 
@@ -278,11 +281,13 @@ function ExpenseForm({
       currency: 'ARS',
       paid_by: 'company_cash',
       status: 'approved',
+      is_recurring: false,
     },
   })
 
   const paidBy = watch('paid_by')
   const currency = watch('currency')
+  const isRecurring = watch('is_recurring')
 
   const save = useMutation({
     mutationFn: (data: ExpenseFormValues) => {
@@ -296,6 +301,8 @@ function ExpenseForm({
         paid_by_cash_id: data.paid_by === 'company_cash' ? data.cash_id || undefined : undefined,
         paid_by_bank_id: data.paid_by === 'company_bank' ? data.bank_id || undefined : undefined,
         status: data.paid_by === 'employee' ? 'pending_approval' : (data.status || 'approved'),
+        recurring_frequency: data.is_recurring && data.recurring_frequency ? data.recurring_frequency : undefined,
+        recurring_due_day: data.is_recurring && data.recurring_due_day ? parseInt(data.recurring_due_day, 10) : undefined,
       }
       return financeApi.expenses.create(body)
     },
@@ -309,6 +316,16 @@ function ExpenseForm({
   const cashOptions = cashRegisters?.map((c) => ({ value: c.id, label: c.name })) ?? []
   const bankOptions = bankAccounts?.map((b) => ({ value: b.id, label: `${b.bank_name} ${b.alias ?? ''}`.trim() })) ?? []
   const categoryOptions = categories.map((c) => ({ value: c.id, label: c.name }))
+
+  // Auto-select first available cash/bank when switching paid_by
+  useEffect(() => {
+    if (paidBy === 'company_cash' && cashOptions.length > 0 && !watch('cash_id')) {
+      setValue('cash_id', cashOptions[0].value)
+    }
+    if (paidBy === 'company_bank' && bankOptions.length > 0 && !watch('bank_id')) {
+      setValue('bank_id', bankOptions[0].value)
+    }
+  }, [paidBy, cashOptions.length, bankOptions.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SlideOver open onClose={onClose} title="Registrar gasto">
@@ -364,25 +381,78 @@ function ExpenseForm({
           </div>
         )}
 
+        {paidBy === 'company_cash' && cashOptions.length === 0 && (
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            No hay cajas creadas. Creá una en Finanzas → Cajas antes de registrar este gasto.
+          </div>
+        )}
         {paidBy === 'company_cash' && cashOptions.length > 0 && (
           <Select
             label="Caja"
             {...register('cash_id')}
-            options={[{ value: '', label: 'Sin caja específica' }, ...cashOptions]}
+            options={cashOptions}
           />
         )}
 
+        {paidBy === 'company_bank' && bankOptions.length === 0 && (
+          <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            No hay cuentas bancarias cargadas. Agregá una en Finanzas → Bancos.
+          </div>
+        )}
         {paidBy === 'company_bank' && bankOptions.length > 0 && (
           <Select
             label="Cuenta bancaria"
             {...register('bank_id')}
-            options={[{ value: '', label: 'Sin cuenta específica' }, ...bankOptions]}
+            options={bankOptions}
           />
         )}
 
+        <div className="rounded-xl border border-border bg-surface-alt p-3 flex flex-col gap-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border accent-primary"
+              {...register('is_recurring')}
+            />
+            <span className="text-sm font-medium text-text">¿Se repite todos los meses?</span>
+          </label>
+
+          {isRecurring && (
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                label="Frecuencia"
+                {...register('recurring_frequency')}
+                options={[
+                  { value: 'monthly', label: 'Mensual' },
+                  { value: 'bimonthly', label: 'Bimestral' },
+                  { value: 'quarterly', label: 'Trimestral' },
+                  { value: 'annual', label: 'Anual' },
+                ]}
+              />
+              <Input
+                label="Día de vencimiento"
+                type="number"
+                min={1}
+                max={31}
+                placeholder="Ej: 10"
+                {...register('recurring_due_day')}
+              />
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" variant="primary" size="md" loading={save.isPending}>Registrar</Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            loading={save.isPending}
+            disabled={
+              (paidBy === 'company_cash' && cashOptions.length === 0) ||
+              (paidBy === 'company_bank' && bankOptions.length === 0)
+            }
+          >Registrar</Button>
         </div>
       </form>
     </SlideOver>

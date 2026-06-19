@@ -130,6 +130,149 @@ type ConsolidatedBalance struct {
 	Balance  decimal.Decimal `json:"balance"`
 }
 
+// AlertsOverdueInvoice is a receivable that is past its due date or unpaid.
+type AlertsOverdueInvoice struct {
+	ID          uuid.UUID       `json:"id"`
+	ContactName string          `json:"contact_name"`
+	InvoiceType string          `json:"invoice_type"`
+	Number      *int32          `json:"number"`
+	DueDate     *string         `json:"due_date"`
+	Currency    string          `json:"currency"`
+	Remaining   decimal.Decimal `json:"remaining"`
+	Status      string          `json:"status"`
+}
+
+// AlertsObligation is a pending payment obligation due soon or overdue.
+type AlertsObligation struct {
+	ID          uuid.UUID       `json:"id"`
+	Description string          `json:"description"`
+	DueDate     *string         `json:"due_date"`
+	Currency    string          `json:"currency"`
+	Amount      decimal.Decimal `json:"amount"`
+	SourceType  string          `json:"source_type"`
+}
+
+// AlertsRecurring is a recurring payment due within the alert window.
+type AlertsRecurring struct {
+	ID          uuid.UUID       `json:"id"`
+	Description string          `json:"description"`
+	NextDueDate *string         `json:"next_due_date"`
+	Currency    string          `json:"currency"`
+	Amount      decimal.Decimal `json:"amount"`
+	Frequency   string          `json:"frequency"`
+}
+
+// AlertsSummary aggregates actionable alerts for the dashboard.
+type AlertsSummary struct {
+	OverdueReceivables  []AlertsOverdueInvoice `json:"overdue_receivables"`
+	UpcomingObligations []AlertsObligation     `json:"upcoming_obligations"`
+	UpcomingRecurring   []AlertsRecurring      `json:"upcoming_recurring"`
+}
+
+// GetAlerts returns actionable alerts: overdue receivables, upcoming obligations,
+// and recurring payments due within the next alertDays days.
+func (s *CashFlowService) GetAlerts(ctx context.Context, companyID uuid.UUID, alertDays int) (*AlertsSummary, error) {
+	if alertDays <= 0 {
+		alertDays = 7
+	}
+	today := time.Now()
+	horizon := today.AddDate(0, 0, alertDays)
+
+	summary := &AlertsSummary{
+		OverdueReceivables:  []AlertsOverdueInvoice{},
+		UpcomingObligations: []AlertsObligation{},
+		UpcomingRecurring:   []AlertsRecurring{},
+	}
+
+	// Overdue / unpaid receivables (any unpaid invoice, sorted by due date).
+	receivables, err := s.q.GetArReceivables(ctx, sqlcgen.GetArReceivablesParams{CompanyID: companyID})
+	if err != nil {
+		return nil, errors.Wrap(err, "getting receivables")
+	}
+	for _, r := range receivables {
+		var dueDateStr *string
+		if r.DueDate.Valid {
+			s := r.DueDate.Time.Format("2006-01-02")
+			dueDateStr = &s
+		}
+		summary.OverdueReceivables = append(summary.OverdueReceivables, AlertsOverdueInvoice{
+			ID:          r.ID,
+			ContactName: r.ContactName,
+			InvoiceType: r.InvoiceType,
+			Number:      r.Number,
+			DueDate:     dueDateStr,
+			Currency:    r.Currency,
+			Remaining:   pgconv.NumericToDecimalZero(r.Remaining),
+			Status:      r.Status,
+		})
+	}
+
+	// Pending payment obligations due within the alert window.
+	status := "pending"
+	fromDate := pgconv.PtrDate(&today)
+	toHorizon := pgconv.PtrDate(&horizon)
+	obligations, err := s.q.ListPaymentObligations(ctx, sqlcgen.ListPaymentObligationsParams{
+		CompanyID: companyID,
+		Status:    &status,
+		FromDate:  fromDate,
+		ToDate:    toHorizon,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "getting obligations")
+	}
+	for _, o := range obligations {
+		var dueDateStr *string
+		if o.DueDate.Valid {
+			s := o.DueDate.Time.Format("2006-01-02")
+			dueDateStr = &s
+		}
+		cur := "ARS"
+		if o.Currency != nil {
+			cur = *o.Currency
+		}
+		summary.UpcomingObligations = append(summary.UpcomingObligations, AlertsObligation{
+			ID:          o.ID,
+			Description: o.Description,
+			DueDate:     dueDateStr,
+			Currency:    cur,
+			Amount:      pgconv.NumericToDecimalZero(o.Amount),
+			SourceType:  o.SourceType,
+		})
+	}
+
+	// Recurring payments whose next_due_date falls within the alert window.
+	recurring, err := s.q.ListRecurringPayments(ctx, companyID)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting recurring payments")
+	}
+	for _, r := range recurring {
+		if r.Status != "active" || !r.NextDueDate.Valid {
+			continue
+		}
+		due := r.NextDueDate.Time
+		if due.After(horizon) {
+			continue
+		}
+		var dueDateStr *string
+		s := due.Format("2006-01-02")
+		dueDateStr = &s
+		cur := "ARS"
+		if r.Currency != nil {
+			cur = *r.Currency
+		}
+		summary.UpcomingRecurring = append(summary.UpcomingRecurring, AlertsRecurring{
+			ID:          r.ID,
+			Description: r.Description,
+			NextDueDate: dueDateStr,
+			Currency:    cur,
+			Amount:      pgconv.NumericToDecimalZero(r.Amount),
+			Frequency:   r.Frequency,
+		})
+	}
+
+	return summary, nil
+}
+
 // GetConsolidatedBalance returns balances per currency across cash and banks.
 func (s *CashFlowService) GetConsolidatedBalance(ctx context.Context, companyID uuid.UUID) ([]ConsolidatedBalance, error) {
 	rows, err := s.q.GetConsolidatedBalance(ctx, companyID)

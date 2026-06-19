@@ -167,8 +167,19 @@ export function FacturacionPage() {
     },
     {
       key: 'paid_amount',
-      header: 'Cobrado',
-      render: (inv) => formatMoney(inv.paid_amount, inv.currency),
+      header: 'Cobrado / Resta',
+      render: (inv) => {
+        const remaining = parseFloat(inv.total_amount ?? '0') - parseFloat(inv.paid_amount ?? '0')
+        const isPaid = remaining <= 0.01
+        return (
+          <div className="text-sm">
+            <span>{formatMoney(inv.paid_amount, inv.currency)}</span>
+            {!isPaid && inv.status !== 'draft' && inv.status !== 'void' && (
+              <span className="ml-1 text-danger">/ falta {formatMoney(String(remaining), inv.currency)}</span>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: 'actions',
@@ -251,8 +262,19 @@ export function FacturacionPage() {
     },
     {
       key: 'paid_amount',
-      header: 'Pagado',
-      render: (inv) => formatMoney(inv.paid_amount, inv.currency ?? 'ARS'),
+      header: 'Pagado / Resta',
+      render: (inv) => {
+        const remaining = parseFloat(inv.total_amount ?? '0') - parseFloat(inv.paid_amount ?? '0')
+        const isPaid = remaining <= 0.01
+        return (
+          <div className="text-sm">
+            <span>{formatMoney(inv.paid_amount, inv.currency ?? 'ARS')}</span>
+            {!isPaid && inv.status !== 'void' && (
+              <span className="ml-1 text-warning">/ falta {formatMoney(String(remaining), inv.currency ?? 'ARS')}</span>
+            )}
+          </div>
+        )
+      },
     },
   ]
 

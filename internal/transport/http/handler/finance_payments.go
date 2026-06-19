@@ -62,13 +62,17 @@ func buildPaymentMethods(reqs []paymentMethodRequest) ([]svcfinance.PaymentMetho
 // ─── Receipts ────────────────────────────────────────────────────────────────────
 
 type createReceiptRequest struct {
-	ContactID      string                 `json:"contact_id"   validate:"required,uuid"`
-	Date           string                 `json:"date"         validate:"required"`
-	Currency       string                 `json:"currency"     validate:"required"`
-	ExchangeRate   string                 `json:"exchange_rate"`
-	Notes          *string                `json:"notes"`
-	PaymentMethods []paymentMethodRequest `json:"payment_methods" validate:"required,min=1"`
-	Applications   []applicationRequest   `json:"applications"`
+	ContactID          string                 `json:"contact_id"   validate:"required,uuid"`
+	Date               string                 `json:"date"         validate:"required"`
+	Currency           string                 `json:"currency"     validate:"required"`
+	ExchangeRate       string                 `json:"exchange_rate"`
+	Notes              *string                `json:"notes"`
+	PaymentMethods     []paymentMethodRequest `json:"payment_methods" validate:"required,min=1"`
+	Applications       []applicationRequest   `json:"applications"`
+	// Optional: if set, also creates a recurring income template.
+	RecurringFrequency *string `json:"recurring_frequency"`
+	RecurringDueDay    *int16  `json:"recurring_due_day"`
+	RecurringDesc      *string `json:"recurring_description"`
 }
 
 // CreateReceipt POST /receipts
@@ -131,6 +135,34 @@ func (h *FinanceHandler) CreateReceipt(c echo.Context) error {
 	if replayed {
 		return c.JSON(http.StatusOK, receipt)
 	}
+
+	// If marked as recurring, auto-create the income recurring template.
+	if req.RecurringFrequency != nil && *req.RecurringFrequency != "" {
+		totalAmt := receipt.TotalAmount
+		desc := req.Notes
+		if req.RecurringDesc != nil && *req.RecurringDesc != "" {
+			desc = req.RecurringDesc
+		}
+		descStr := ""
+		if desc != nil {
+			descStr = *desc
+		}
+		if descStr == "" {
+			descStr = "Cobro recurrente"
+		}
+		cur := req.Currency
+		rin := svcfinance.RecurringInput{
+			Description: descStr,
+			Amount:      &totalAmt,
+			Currency:    &cur,
+			Frequency:   *req.RecurringFrequency,
+			DueDay:      req.RecurringDueDay,
+		}
+		if _, err := h.recurring.CreateRecurring(c.Request().Context(), companyFromCtx(c), callerID(c), rin); err != nil {
+			c.Logger().Errorf("auto-create recurring income: %v", err)
+		}
+	}
+
 	return c.JSON(http.StatusCreated, receipt)
 }
 

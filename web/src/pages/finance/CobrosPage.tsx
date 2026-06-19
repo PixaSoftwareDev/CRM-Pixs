@@ -279,6 +279,10 @@ const receiptSchema = z.object({
   notes: z.string().optional(),
   payment_methods: z.array(paymentMethodSchema).min(1, 'Agregá al menos un medio de pago'),
   applications: z.array(applicationSchema).optional(),
+  is_recurring: z.boolean().optional(),
+  recurring_frequency: z.string().optional(),
+  recurring_due_day: z.string().optional(),
+  recurring_description: z.string().optional(),
 })
 type ReceiptFormValues = z.infer<typeof receiptSchema>
 
@@ -304,6 +308,7 @@ function ReceiptForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       exchange_rate: '1',
       payment_methods: [{ method_type: 'cash', amount: '', cash_register_id: '' }],
       applications: [],
+      is_recurring: false,
     },
   })
 
@@ -318,6 +323,7 @@ function ReceiptForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   })
 
   const currency = watch('currency')
+  const isRecurring = watch('is_recurring')
 
   const loadPendingInvoices = async (contactId: string) => {
     if (!contactId) return
@@ -347,6 +353,9 @@ function ReceiptForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           invoice_id: a.invoice_id,
           amount: a.amount,
         })),
+        recurring_frequency: data.is_recurring && data.recurring_frequency ? data.recurring_frequency : undefined,
+        recurring_due_day: data.is_recurring && data.recurring_due_day ? parseInt(data.recurring_due_day, 10) : undefined,
+        recurring_description: data.is_recurring && data.recurring_description ? data.recurring_description : undefined,
       }
       return financeApi.receipts.create(body, key)
     },
@@ -505,6 +514,46 @@ function ReceiptForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         )}
 
         <Input label="Observaciones" {...register('notes')} />
+
+        <div className="rounded-xl border border-border bg-surface-alt p-3 flex flex-col gap-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border accent-primary"
+              {...register('is_recurring')}
+            />
+            <span className="text-sm font-medium text-text">¿Este cliente paga todos los meses?</span>
+          </label>
+          {isRecurring && (
+            <div className="flex flex-col gap-3">
+              <Input
+                label="Concepto (opcional)"
+                {...register('recurring_description')}
+                placeholder="Ej: Suscripción mensual Plan Pro"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Select
+                  label="Frecuencia"
+                  {...register('recurring_frequency')}
+                  options={[
+                    { value: 'monthly', label: 'Mensual' },
+                    { value: 'bimonthly', label: 'Bimestral' },
+                    { value: 'quarterly', label: 'Trimestral' },
+                    { value: 'annual', label: 'Anual' },
+                  ]}
+                />
+                <Input
+                  label="Día de cobro"
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="Ej: 5"
+                  {...register('recurring_due_day')}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" size="md" onClick={onClose}>

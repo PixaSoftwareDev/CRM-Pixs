@@ -24,6 +24,9 @@ type createExpenseRequest struct {
 	PaidByBankID *string `json:"paid_by_bank_id"`
 	ProjectID    *string `json:"project_id"`
 	Status       string  `json:"status"`
+	// Optional: if set, also creates a recurring payment template.
+	RecurringFrequency *string `json:"recurring_frequency"`
+	RecurringDueDay    *int16  `json:"recurring_due_day"`
 }
 
 // CreateExpense POST /expenses
@@ -71,6 +74,24 @@ func (h *FinanceHandler) CreateExpense(c echo.Context) error {
 	if err != nil {
 		return mapFinanceError(err)
 	}
+
+	// If the caller marked this expense as recurring, auto-create the recurring template.
+	if req.RecurringFrequency != nil && *req.RecurringFrequency != "" {
+		cur := req.Currency
+		in := svcfinance.RecurringInput{
+			Description: req.Description,
+			Amount:      &amt,
+			Currency:    &cur,
+			Frequency:   *req.RecurringFrequency,
+			DueDay:      req.RecurringDueDay,
+			CategoryID:  &catID,
+		}
+		if _, err := h.recurring.CreateRecurring(c.Request().Context(), companyFromCtx(c), callerID(c), in); err != nil {
+			// Non-fatal: expense was created; log and continue.
+			c.Logger().Errorf("auto-create recurring payment: %v", err)
+		}
+	}
+
 	return c.JSON(http.StatusCreated, exp)
 }
 
@@ -377,6 +398,21 @@ func (h *FinanceHandler) GetConsolidatedBalance(c echo.Context) error {
 		return mapFinanceError(err)
 	}
 	return c.JSON(http.StatusOK, balances)
+}
+
+// GetAlerts GET /alerts
+func (h *FinanceHandler) GetAlerts(c echo.Context) error {
+	days := 7
+	if v := c.QueryParam("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = n
+		}
+	}
+	summary, err := h.cashflow.GetAlerts(c.Request().Context(), companyFromCtx(c), days)
+	if err != nil {
+		return mapFinanceError(err)
+	}
+	return c.JSON(http.StatusOK, summary)
 }
 
 // ─── Catalogs ────────────────────────────────────────────────────────────────────

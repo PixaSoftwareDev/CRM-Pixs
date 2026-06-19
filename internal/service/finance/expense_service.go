@@ -105,6 +105,24 @@ func (s *ExpenseService) Create(ctx context.Context, companyID, callerID uuid.UU
 		}
 	}
 
+	// Auto-register a cash movement when paid from a cash register so the balance updates.
+	if in.PaidByCashID != nil && status == string(domain.ExpenseStatusApproved) {
+		if _, err := qtx.CreateCashMovement(ctx, sqlcgen.CreateCashMovementParams{
+			CompanyID:      companyID,
+			CashRegisterID: *in.PaidByCashID,
+			SessionID:      pgtype.UUID{},
+			Type:           "expense",
+			Amount:         pgconv.DecimalToNumericValue(in.Amount),
+			Currency:       currency,
+			Description:    &in.Description,
+			ReferenceType:  strPtr("expense"),
+			ReferenceID:    pgtype.UUID{Bytes: row.ID, Valid: true},
+			CreatedBy:      callerID,
+		}); err != nil {
+			return nil, errors.Wrap(err, "creating cash movement for expense")
+		}
+	}
+
 	exp := expenseFromRow(row)
 	writeAudit(ctx, qtx, companyID, "expense", nil, exp, &callerID, row.ID, "create")
 	if err := tx.Commit(ctx); err != nil {

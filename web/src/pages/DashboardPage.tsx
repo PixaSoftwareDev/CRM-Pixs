@@ -1,14 +1,15 @@
 import { useQueries } from '@tanstack/react-query'
-import { DollarSign, TrendingUp, Zap, Target, CheckCircle2, Calendar, ArrowRight } from 'lucide-react'
+import { DollarSign, TrendingUp, Zap, Target, CheckCircle2, Calendar, ArrowRight, AlertTriangle, Clock, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { KPICard } from '../components/ui/KPICard'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useAuthStore } from '../stores/auth'
-import { financeApi } from '../lib/api/finance'
+import { financeApi, type AlertsSummary } from '../lib/api/finance'
 import { leadsApi } from '../lib/api/leads'
 import { pipelineApi, type Opportunity } from '../lib/api/sales'
 import { tasksApi, type Task } from '../lib/api/tasks'
 import { calendarApi, type CalendarEvent } from '../lib/api/calendar'
+import { formatMoney, formatDate } from '../lib/utils'
 
 const fmtShort = (n: number) => {
   if (n >= 1_000_000) return `$ ${(n / 1_000_000).toFixed(1)}M`
@@ -103,6 +104,69 @@ function SectionCard({
 // Silences unused import warning for Opportunity (used only for type inference via pipelineApi)
 void (null as unknown as Opportunity)
 
+function AlertsPanel({ data, loading }: { data?: AlertsSummary; loading?: boolean }) {
+  if (loading) return <Skeleton className="h-24 w-full" />
+
+  const overdue = data?.overdue_receivables ?? []
+  const obligations = data?.upcoming_obligations ?? []
+  const recurring = data?.upcoming_recurring ?? []
+  const total = overdue.length + obligations.length + recurring.length
+  if (total === 0) return null
+
+  return (
+    <div className="space-y-2">
+      {overdue.map((inv) => (
+        <Link
+          key={inv.id}
+          to="/finanzas/facturacion"
+          className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-3 hover:bg-danger/15 transition-colors"
+        >
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-danger" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-danger">
+              {inv.contact_name} — Factura {inv.invoice_type} {inv.number ? String(inv.number).padStart(8,'0') : 'S/N'} sin cobrar
+            </p>
+            <p className="text-xs text-danger/80">
+              Resta {formatMoney(inv.remaining, inv.currency)}{inv.due_date ? ` · Vence ${formatDate(inv.due_date)}` : ''}
+            </p>
+          </div>
+        </Link>
+      ))}
+      {obligations.map((ob) => (
+        <Link
+          key={ob.id}
+          to="/finanzas/calendario"
+          className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 hover:bg-warning/15 transition-colors"
+        >
+          <Clock size={16} className="mt-0.5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-warning">{ob.description}</p>
+            <p className="text-xs text-warning/80">
+              {formatMoney(ob.amount, ob.currency)}{ob.due_date ? ` · Vence ${formatDate(ob.due_date)}` : ''}
+              {ob.source_type === 'recurring' ? ' · Recurrente' : ob.source_type === 'reimbursement' ? ' · Reembolso' : ''}
+            </p>
+          </div>
+        </Link>
+      ))}
+      {recurring.map((r) => (
+        <Link
+          key={r.id}
+          to="/finanzas/recurrentes"
+          className="flex items-start gap-3 rounded-xl border border-info/30 bg-info/10 p-3 hover:bg-info/15 transition-colors"
+        >
+          <RefreshCw size={16} className="mt-0.5 shrink-0 text-info" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-info">{r.description}</p>
+            <p className="text-xs text-info/80">
+              {formatMoney(r.amount, r.currency)} · Próximo venc. {r.next_due_date ? formatDate(r.next_due_date) : '—'}
+            </p>
+          </div>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const can = useAuthStore((s) => s.can)
@@ -146,10 +210,15 @@ export function DashboardPage() {
         queryFn: () => calendarApi.events({ from: today }),
         enabled: can('calendar', 'view'),
       },
+      {
+        queryKey: ['dashboard', 'alerts'],
+        queryFn: () => financeApi.cashFlow.alerts(14),
+        enabled: can('cash_flow', 'view'),
+      },
     ],
   })
 
-  const [balanceQ, invoicesQ, leadsQ, forecastQ, tasksQ, eventsQ] = results
+  const [balanceQ, invoicesQ, leadsQ, forecastQ, tasksQ, eventsQ, alertsQ] = results
 
   const arsBalance = (balanceQ.data ?? []).find((b: { currency: string; balance: string }) => b.currency === 'ARS')?.balance
   const balanceNum = arsBalance ? parseFloat(arsBalance) : null
@@ -218,6 +287,13 @@ export function DashboardPage() {
           />
         )}
       </div>
+
+      {can('cash_flow', 'view') && (alertsQ.isLoading || ((alertsQ.data?.overdue_receivables?.length ?? 0) + (alertsQ.data?.upcoming_obligations?.length ?? 0) + (alertsQ.data?.upcoming_recurring?.length ?? 0)) > 0) && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Alertas financieras</h2>
+          <AlertsPanel data={alertsQ.data} loading={alertsQ.isLoading} />
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {can('tasks', 'view') && (

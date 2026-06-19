@@ -45,6 +45,13 @@ import { TaskForm } from '../tasks/TaskForm'
 import { projectsApi } from '../../lib/api/projects'
 import { opportunitiesApi, pipelineApi } from '../../lib/api/sales'
 
+const VAT_CONDITION_LABELS: Record<string, string> = {
+  ri: 'Responsable Inscripto',
+  monotributo: 'Monotributista',
+  exempt: 'Exento',
+  final_consumer: 'Consumidor Final',
+}
+
 type Tab = 'personas' | 'cuentas' | 'notas' | 'timeline' | 'etiquetas'
 
 export function ContactDetailPage() {
@@ -200,7 +207,7 @@ export function ContactDetailPage() {
 
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-3">
         <Field label="CUIT/CUIL" value={contact.cuit_cuil} />
-        <Field label="Condición IVA" value={contact.vat_condition} />
+        <Field label="Condición IVA" value={VAT_CONDITION_LABELS[contact.vat_condition ?? ''] ?? contact.vat_condition} />
         <Field label="Ciudad" value={[contact.city, contact.province].filter(Boolean).join(', ')} />
         <Field label="Email" value={contact.email} />
         <Field label="Teléfono" value={contact.phone} />

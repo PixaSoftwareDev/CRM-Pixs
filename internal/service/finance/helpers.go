@@ -14,6 +14,8 @@ import (
 	sqlcgen "pixs/internal/repository/sqlc"
 )
 
+func strPtr(s string) *string { return &s }
+
 func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false

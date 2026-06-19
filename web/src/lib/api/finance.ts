@@ -212,6 +212,9 @@ export type CreateReceiptInput = {
   notes?: string
   payment_methods: PaymentMethodInput[]
   applications?: ApplicationInput[]
+  recurring_frequency?: string
+  recurring_due_day?: number
+  recurring_description?: string
 }
 
 // ─── Payment Orders ──────────────────────────────────────────────────────────
@@ -356,6 +359,8 @@ export type CreateExpenseInput = {
   paid_by_bank_id?: string
   project_id?: string
   status?: string
+  recurring_frequency?: string
+  recurring_due_day?: number
 }
 
 // ─── Recurring Payments ──────────────────────────────────────────────────────
@@ -649,5 +654,44 @@ export const financeApi = {
       return api.get<CashFlowProjection>(`/cash-flow${q ? '?' + q : ''}`)
     },
     consolidatedBalance: () => api.get<ConsolidatedBalance[]>('/consolidated-balance'),
+    alerts: (days?: number) =>
+      api.get<AlertsSummary>(`/alerts${days ? '?days=' + days : ''}`),
   },
+}
+
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+
+export type AlertsOverdueInvoice = {
+  id: string
+  contact_name: string
+  invoice_type: string
+  number?: number
+  due_date?: string
+  currency: string
+  remaining: string
+  status: string
+}
+
+export type AlertsObligation = {
+  id: string
+  description: string
+  due_date?: string
+  currency: string
+  amount: string
+  source_type: string
+}
+
+export type AlertsRecurring = {
+  id: string
+  description: string
+  next_due_date?: string
+  currency: string
+  amount: string
+  frequency: string
+}
+
+export type AlertsSummary = {
+  overdue_receivables: AlertsOverdueInvoice[]
+  upcoming_obligations: AlertsObligation[]
+  upcoming_recurring: AlertsRecurring[]
 }

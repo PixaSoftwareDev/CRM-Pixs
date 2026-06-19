@@ -563,6 +563,7 @@ func registerFinanceRoutes(
 	api.GET("/cash-flow", h.GetCashFlowProjection, canViewFlow)
 	api.GET("/contacts/:id/account-statement", h.GetAccountStatement, canViewCtaCte)
 	api.GET("/consolidated-balance", h.GetConsolidatedBalance, canViewFlow)
+	api.GET("/alerts", h.GetAlerts, canViewFlow)
 
 	// ─── Catalogs (any invoices viewer) ────────────────────────────────────────
 	finCatalog := api.Group("/finance", canViewInv)

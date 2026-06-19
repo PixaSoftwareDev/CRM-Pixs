@@ -277,7 +277,7 @@ function OpportunityCard({
           {...attributes}
           {...listeners}
           className="min-w-0 flex-1 cursor-grab active:cursor-grabbing"
-          onClick={() => opportunity.contact_id && navigate(`/contacts/${opportunity.contact_id}`)}
+          onClick={() => opportunity.contact_id && navigate(`/contactos/${opportunity.contact_id}`)}
         >
           <p className="truncate text-sm font-medium text-text hover:text-brand cursor-pointer">{opportunity.title}</p>
           {contact && <p className="truncate text-xs text-text-secondary">{contact.fantasy_name || contact.legal_name}</p>}
