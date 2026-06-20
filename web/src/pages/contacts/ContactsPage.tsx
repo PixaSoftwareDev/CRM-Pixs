@@ -118,70 +118,73 @@ export function ContactsPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-          />
-          <Input
-            placeholder="Buscar contactos…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-            aria-label="Buscar contactos"
-          />
+      {/* Toolbar de filtros */}
+      <div className="space-y-3 rounded-xl border border-border bg-surface p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+            />
+            <Input
+              placeholder="Buscar contactos…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+              aria-label="Buscar contactos"
+            />
+          </div>
+          <div className="w-52">
+            <Select
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              options={[
+                { value: '', label: 'Todos los rubros' },
+                ...(industriesQ.data ?? []).map((i) => ({ value: i.name, label: i.name })),
+              ]}
+              aria-label="Filtrar por rubro"
+            />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-text whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={onlyMine}
+              onChange={(e) => setOnlyMine(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-brand"
+            />
+            Solo mías
+          </label>
         </div>
-        <div className="w-56">
-          <Select
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            options={[
-              { value: '', label: 'Todos los rubros' },
-              ...(industriesQ.data ?? []).map((i) => ({ value: i.name, label: i.name })),
-            ]}
-            aria-label="Filtrar por rubro"
-          />
-        </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-text whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={onlyMine}
-            onChange={(e) => setOnlyMine(e.target.checked)}
-            className="h-4 w-4 rounded border-border accent-brand"
-          />
-          Solo mis contactos
-        </label>
-      </div>
 
-      {/* Botones por tipo con contador */}
-      <div className="flex flex-wrap gap-2">
-        {kindTabs.map((t) => {
-          const active = kind === t.value
-          return (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setKind(t.value)}
-              className={
-                'flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ' +
-                (active
-                  ? 'border-brand bg-brand text-white'
-                  : 'border-border bg-surface text-text-secondary hover:border-border-strong')
-              }
-            >
-              {t.label}
-              <span
+        {/* Chips por tipo con contador */}
+        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+          {kindTabs.map((t) => {
+            const active = kind === t.value
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setKind(t.value)}
                 className={
-                  'rounded-full px-1.5 text-xs ' +
-                  (active ? 'bg-white/20 text-white' : 'bg-surface-subtle text-text-tertiary')
+                  'flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ' +
+                  (active
+                    ? 'border-brand bg-brand text-white shadow-sm'
+                    : 'border-border bg-surface-subtle text-text-secondary hover:border-brand/50 hover:text-text')
                 }
               >
-                {counts[t.value] ?? 0}
-              </span>
-            </button>
-          )
-        })}
+                {t.label}
+                <span
+                  className={
+                    'min-w-[1.25rem] rounded-full px-1.5 text-center text-xs font-semibold ' +
+                    (active ? 'bg-white/25 text-white' : 'bg-surface text-text-tertiary')
+                  }
+                >
+                  {counts[t.value] ?? 0}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {isError ? (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Play, Square, UserCheck, Paperclip, Download, FileText, Trash2 } from 'lucide-react'
+import { Play, Square, UserCheck, Download, FileText, Trash2 } from 'lucide-react'
 import { SlideOver } from '../../components/ui/SlideOver'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -17,6 +17,7 @@ import {
 } from '../../lib/crm'
 import { tasksApi, taskTransitions } from '../../lib/api/tasks'
 import { documentsApi } from '../../lib/api/documents'
+import { FileDropzone } from '../../components/ui/FileDropzone'
 
 function elapsed(fromIso: string): string {
   const secs = Math.max(0, Math.floor((Date.now() - new Date(fromIso).getTime()) / 1000))
@@ -256,22 +257,9 @@ function TaskDocumentsSection({ taskId }: { taskId: string }) {
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-medium text-text">Documentos</p>
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-brand hover:underline">
-          <Paperclip size={13} />
-          {upload.isPending ? 'Subiendo…' : 'Adjuntar'}
-          <input
-            type="file"
-            className="hidden"
-            disabled={upload.isPending}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) upload.mutate(f)
-              e.target.value = ''
-            }}
-          />
-        </label>
+      <p className="mb-2 text-sm font-medium text-text">Documentos</p>
+      <div className="mb-3">
+        <FileDropzone onFile={(f) => upload.mutate(f)} pending={upload.isPending} compact />
       </div>
       {isLoading ? (
         <Skeleton className="h-12 w-full" />

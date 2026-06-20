@@ -12,9 +12,14 @@ import {
   TrendingUp,
   DollarSign,
   Download,
-  Paperclip,
   AlertTriangle,
   CheckCircle2,
+  Users,
+  MessageSquare,
+  CreditCard,
+  Clock,
+  Tag as TagIcon,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -24,6 +29,7 @@ import { ConfirmModal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ErrorState } from '../../components/ui/ErrorState'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { FileDropzone } from '../../components/ui/FileDropzone'
 import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
 import { formatRelativeTime, formatDate, formatMoney, cn } from '../../lib/utils'
@@ -58,7 +64,7 @@ const VAT_CONDITION_LABELS: Record<string, string> = {
   final_consumer: 'Consumidor Final',
 }
 
-type Tab = 'personas' | 'financiero' | 'comentarios' | 'documentos' | 'cuentas' | 'notas' | 'timeline' | 'etiquetas'
+type Tab = 'financiero' | 'comentarios' | 'personas' | 'documentos' | 'cuentas' | 'timeline' | 'etiquetas'
 
 export function ContactDetailPage() {
   const { id = '' } = useParams()
@@ -66,7 +72,7 @@ export function ContactDetailPage() {
   const qc = useQueryClient()
   const can = useAuthStore((s) => s.can)
   const toast = useUIStore((s) => s.toast)
-  const [tab, setTab] = useState<Tab>('personas')
+  const [tab, setTab] = useState<Tab>('comentarios')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
@@ -118,15 +124,14 @@ export function ContactDetailPage() {
   const canDelete = can('contacts', 'delete')
 
   const isClient = contact.kind.includes('client')
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'personas', label: 'Personas' },
-    ...(isClient ? [{ key: 'financiero' as Tab, label: 'Situación financiera' }] : []),
-    { key: 'comentarios', label: 'Comentarios' },
-    { key: 'documentos', label: 'Documentos' },
-    { key: 'cuentas', label: 'Cuentas bancarias' },
-    { key: 'notas', label: 'Notas' },
-    { key: 'timeline', label: 'Timeline' },
-    { key: 'etiquetas', label: 'Etiquetas' },
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
+    ...(isClient ? [{ key: 'financiero' as Tab, label: 'Situación financiera', icon: DollarSign }] : []),
+    { key: 'comentarios', label: 'Comentarios', icon: MessageSquare },
+    { key: 'personas', label: 'Personas', icon: Users },
+    { key: 'documentos', label: 'Documentos', icon: FileText },
+    { key: 'cuentas', label: 'Cuentas bancarias', icon: CreditCard },
+    { key: 'timeline', label: 'Actividad', icon: Clock },
+    { key: 'etiquetas', label: 'Etiquetas', icon: TagIcon },
   ]
 
   return (
@@ -229,22 +234,26 @@ export function ContactDetailPage() {
 
       <div className="border-b border-border">
         <nav className="flex gap-1 overflow-x-auto" role="tablist">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                tab === t.key
-                  ? 'border-brand text-text'
-                  : 'border-transparent text-text-secondary hover:text-text',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                  tab === t.key
+                    ? 'border-brand text-text'
+                    : 'border-transparent text-text-secondary hover:text-text',
+                )}
+              >
+                <Icon size={15} />
+                {t.label}
+              </button>
+            )
+          })}
         </nav>
       </div>
 
@@ -253,7 +262,6 @@ export function ContactDetailPage() {
       {tab === 'comentarios' && <CommentsTab contactId={id} canEdit={canEdit} />}
       {tab === 'documentos' && <DocumentsTab contactId={id} canEdit={canEdit} />}
       {tab === 'cuentas' && <BankAccountsTab contactId={id} canEdit={canEdit} />}
-      {tab === 'notas' && <NotesTab contactId={id} canEdit={canEdit} />}
       {tab === 'timeline' && <TimelineTab contactId={id} />}
       {tab === 'etiquetas' && <TagsTab contactId={id} canEdit={canEdit} />}
 
@@ -596,77 +604,6 @@ function BankAccountForm({ contactId, onClose }: { contactId: string; onClose: (
   )
 }
 
-// ---------------- Notes ----------------
-
-function NotesTab({ contactId, canEdit }: { contactId: string; canEdit: boolean }) {
-  const qc = useQueryClient()
-  const toast = useUIStore((s) => s.toast)
-  const [body, setBody] = useState('')
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['contact', contactId, 'notes'],
-    queryFn: () => contactsApi.notes.list(contactId),
-  })
-
-  const add = useMutation({
-    mutationFn: (text: string) => contactsApi.notes.create(contactId, text),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contact', contactId, 'notes'] })
-      setBody('')
-      toast.success('Nota agregada')
-    },
-    onError: () => toast.error('No se pudo guardar la nota'),
-  })
-
-  if (isLoading) return <Skeleton className="h-24 w-full" />
-  if (isError) return <ErrorState onRetry={() => refetch()} />
-
-  const notes = [...(data ?? [])].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )
-
-  return (
-    <div className="space-y-4">
-      {canEdit && (
-        <div className="space-y-2 rounded-xl border border-border bg-surface p-4">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Escribí una nota sobre este contacto…"
-            rows={3}
-            className="w-full rounded border border-border bg-surface p-3 text-base text-text placeholder:text-text-tertiary focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          />
-          <div className="flex justify-end">
-            <Button
-              variant="primary"
-              size="md"
-              loading={add.isPending}
-              disabled={!body.trim()}
-              onClick={() => add.mutate(body.trim())}
-            >
-              Agregar nota
-            </Button>
-          </div>
-        </div>
-      )}
-      {notes.length === 0 ? (
-        <EmptyState title="Sin notas" description="Agregá una nota sobre este contacto." />
-      ) : (
-        <ul className="space-y-2">
-          {notes.map((n) => (
-            <li key={n.id} className="rounded-xl border border-border bg-surface p-4">
-              <p className="whitespace-pre-wrap text-sm text-text">{n.body}</p>
-              <p className="mt-2 text-xs text-text-tertiary" title={formatDate(n.created_at)}>
-                {formatRelativeTime(n.created_at)}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 // ---------------- Situación financiera ----------------
 
 function DebtBadge({ contactId, onClick }: { contactId: string; onClick: () => void }) {
@@ -709,49 +646,89 @@ function FinancialTab({ contactId }: { contactId: string }) {
   const owes = balance > 0.009
   const aging = data.aging
   const buckets = [
-    { label: 'Por vencer', value: aging.Current },
-    { label: '0–30 días', value: aging.Bucket30 },
-    { label: '31–60 días', value: aging.Bucket60 },
-    { label: '61–90 días', value: aging.Bucket90 },
-    { label: '+90 días', value: aging.Bucket90P },
+    { label: 'Por vencer', value: aging.Current, overdue: false },
+    { label: '0–30 días', value: aging.Bucket30, overdue: true },
+    { label: '31–60 días', value: aging.Bucket60, overdue: true },
+    { label: '61–90 días', value: aging.Bucket90, overdue: true },
+    { label: '+90 días', value: aging.Bucket90P, overdue: true },
   ]
+  const maxBucket = Math.max(1, ...buckets.map((b) => Math.abs(parseFloat(b.value || '0'))))
+
+  const downloadCsv = () => {
+    const rows = [
+      ['Fecha', 'Concepto', 'Debe', 'Haber', 'Saldo'],
+      ...data.entries.map((e) => [formatDate(e.date), e.reference, e.debit, e.credit, e.running_balance]),
+    ]
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `estado-cuenta-${currency}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <select
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-          className="rounded border border-border bg-surface px-2 py-1 text-sm text-text focus:border-brand focus:outline-none"
-        >
-          {currencyOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Saldo */}
+    <div className="space-y-5">
+      {/* Saldo destacado + acciones */}
       <div className={cn(
-        'rounded-xl border p-5',
+        'flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5',
         owes ? 'border-danger/30 bg-danger/5' : 'border-success/30 bg-success/5',
       )}>
-        <p className="text-xs text-text-tertiary">Saldo de cuenta corriente</p>
-        <p className={cn('text-2xl font-semibold', owes ? 'text-danger' : 'text-success')}>
-          {formatMoney(data.balance, currency)}
-        </p>
-        <p className="mt-1 text-sm text-text-secondary">
-          {owes ? 'El cliente tiene deuda pendiente.' : 'El cliente está al día.'}
-        </p>
+        <div className="flex items-center gap-4">
+          <div className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-full',
+            owes ? 'bg-danger/15 text-danger' : 'bg-success/15 text-success',
+          )}>
+            {owes ? <AlertTriangle size={24} /> : <CheckCircle2 size={24} />}
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-text-tertiary">Saldo de cuenta corriente</p>
+            <p className={cn('text-3xl font-bold leading-tight', owes ? 'text-danger' : 'text-success')}>
+              {formatMoney(data.balance, currency)}
+            </p>
+            <p className="text-sm text-text-secondary">
+              {owes ? 'El cliente tiene deuda pendiente.' : 'El cliente está al día.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-text focus:border-brand focus:outline-none"
+          >
+            {currencyOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <Button variant="secondary" size="md" onClick={downloadCsv} disabled={data.entries.length === 0}>
+            <Download size={15} className="mr-1" /> Descargar
+          </Button>
+        </div>
       </div>
 
-      {/* Aging */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {buckets.map((b) => (
-          <div key={b.label} className="rounded-lg border border-border bg-surface p-3">
-            <p className="text-xs text-text-tertiary">{b.label}</p>
-            <p className="text-sm font-medium text-text">{formatMoney(b.value, currency)}</p>
-          </div>
-        ))}
+      {/* Aging con barra de proporción */}
+      <div>
+        <p className="mb-2 text-sm font-medium text-text">Antigüedad de la deuda</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {buckets.map((b) => {
+            const v = Math.abs(parseFloat(b.value || '0'))
+            const pct = Math.round((v / maxBucket) * 100)
+            return (
+              <div key={b.label} className="rounded-xl border border-border bg-surface p-3">
+                <p className="text-xs text-text-tertiary">{b.label}</p>
+                <p className="text-sm font-semibold text-text">{formatMoney(b.value, currency)}</p>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                  <div
+                    className={cn('h-full rounded-full', v === 0 ? '' : b.overdue ? 'bg-danger' : 'bg-success')}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Movimientos */}
@@ -924,20 +901,11 @@ function DocumentsTab({ contactId, canEdit }: { contactId: string; canEdit: bool
   return (
     <div className="space-y-4">
       {canEdit && (
-        <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:border-brand hover:text-brand">
-          <Paperclip size={16} />
-          {upload.isPending ? 'Subiendo…' : 'Adjuntar documento'}
-          <input
-            type="file"
-            className="hidden"
-            disabled={upload.isPending}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) upload.mutate(f)
-              e.target.value = ''
-            }}
-          />
-        </label>
+        <FileDropzone
+          onFile={(f) => upload.mutate(f)}
+          pending={upload.isPending}
+          hint="PDF, imágenes, planillas… hasta el límite configurado"
+        />
       )}
       {docs.length === 0 ? (
         <EmptyState title="Sin documentos" description="Adjuntá archivos relacionados a este contacto." />
