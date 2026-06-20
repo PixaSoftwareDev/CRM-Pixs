@@ -48,7 +48,7 @@ export function TopBar() {
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
 
   return (
-    <header className="flex h-16 items-center gap-3 border-b border-border bg-surface px-4">
+    <header className="relative z-30 flex h-16 items-center gap-3 border-b border-border bg-surface px-4">
       {/* Search trigger (Cmd+K placeholder) */}
       <button
         className="flex h-10 flex-1 max-w-md items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 text-sm text-text-tertiary hover:border-border-strong"
@@ -90,7 +90,7 @@ export function TopBar() {
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-surface-overlay py-2 shadow-overlay"
+            className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-border bg-surface-overlay py-2 shadow-overlay"
           >
             <div className="border-b border-border px-4 py-2">
               <p className="truncate text-sm font-medium text-text">{user?.full_name}</p>
