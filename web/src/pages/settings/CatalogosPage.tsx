@@ -188,6 +188,12 @@ export function CatalogosPage() {
     toast.success('Etiqueta creada')
     qc.invalidateQueries({ queryKey: ['catalogs-tags'] })
   }
+  const addExpCat = async (name: string) => {
+    await catalogsApi.expenseCategories.create({ name })
+    toast.success('Categoría de gasto creada')
+    qc.invalidateQueries({ queryKey: ['catalogs-expense-categories'] })
+    qc.invalidateQueries({ queryKey: ['expense-categories'] })
+  }
 
   if (!can('users', 'view')) {
     return <div className="p-6"><p className="text-text-secondary">Sin permiso.</p></div>
@@ -298,8 +304,8 @@ export function CatalogosPage() {
           items={expCats}
           isLoading={loadEC}
           canManage={canManage}
-          addPlaceholder=""
-          readOnly
+          addPlaceholder="Nueva categoría (ej. Marketing)"
+          onAdd={addExpCat}
         />
 
         <CatalogCard

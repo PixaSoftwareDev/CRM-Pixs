@@ -786,6 +786,30 @@ func (h *AdminHandler) ListExpenseCategories(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// CreateExpenseCategory POST /api/v1/admin/catalogs/expense-categories
+func (h *AdminHandler) CreateExpenseCategory(c echo.Context) error {
+	var body struct {
+		Name string `json:"name" validate:"required"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&body); err != nil {
+		return err
+	}
+	item, err := h.q.CreateExpenseCategory(c.Request().Context(), sqlcgen.CreateExpenseCategoryParams{
+		CompanyID: companyFromCtx(c),
+		Name:      body.Name,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+			return echo.NewHTTPError(http.StatusConflict, "ya existe una categoría con ese nombre")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "error al crear la categoría")
+	}
+	return c.JSON(http.StatusCreated, item)
+}
+
 // GET /api/v1/admin/catalogs/currencies
 func (h *AdminHandler) ListCurrencies(c echo.Context) error {
 	items, err := h.q.ListCurrencies(c.Request().Context())

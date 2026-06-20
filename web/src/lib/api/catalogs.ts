@@ -82,6 +82,8 @@ export const catalogsApi = {
   },
   expenseCategories: {
     list: () => api.get<ExpenseCategory[]>('/admin/catalogs/expense-categories'),
+    create: (data: { name: string }) =>
+      api.post<ExpenseCategory>('/admin/catalogs/expense-categories', data),
   },
   currencies: {
     list: () => api.get<Currency[]>('/admin/catalogs/currencies'),

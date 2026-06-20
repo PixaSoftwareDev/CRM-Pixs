@@ -59,6 +59,7 @@ type Querier interface {
 	CreateExchangeRate(ctx context.Context, arg CreateExchangeRateParams) (ExchangeRate, error)
 	// ─── Expenses ──────────────────────────────────────────────────────────────────
 	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Expense, error)
+	CreateExpenseCategory(ctx context.Context, arg CreateExpenseCategoryParams) (ExpenseCategory, error)
 	// Industry (rubro) queries for sqlc generation.
 	CreateIndustry(ctx context.Context, arg CreateIndustryParams) (Industry, error)
 	// ─── Invoices issued ───────────────────────────────────────────────────────────

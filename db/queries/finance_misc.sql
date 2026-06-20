@@ -126,6 +126,11 @@ SELECT * FROM payment_conditions WHERE company_id = $1 AND is_active = true ORDE
 -- name: ListExpenseCategories :many
 SELECT * FROM expense_categories WHERE company_id = $1 AND is_active = true ORDER BY name;
 
+-- name: CreateExpenseCategory :one
+INSERT INTO expense_categories (company_id, name)
+VALUES ($1, $2)
+RETURNING *;
+
 -- name: ListCurrencies :many
 SELECT * FROM currencies ORDER BY code;
 

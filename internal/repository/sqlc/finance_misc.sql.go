@@ -155,6 +155,30 @@ func (q *Queries) CreateExpense(ctx context.Context, arg CreateExpenseParams) (E
 	return i, err
 }
 
+const createExpenseCategory = `-- name: CreateExpenseCategory :one
+INSERT INTO expense_categories (company_id, name)
+VALUES ($1, $2)
+RETURNING id, company_id, name, is_active, created_at
+`
+
+type CreateExpenseCategoryParams struct {
+	CompanyID uuid.UUID `db:"company_id" json:"company_id"`
+	Name      string    `db:"name" json:"name"`
+}
+
+func (q *Queries) CreateExpenseCategory(ctx context.Context, arg CreateExpenseCategoryParams) (ExpenseCategory, error) {
+	row := q.db.QueryRow(ctx, createExpenseCategory, arg.CompanyID, arg.Name)
+	var i ExpenseCategory
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.Name,
+		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createPaymentObligation = `-- name: CreatePaymentObligation :one
 
 INSERT INTO payment_obligations (

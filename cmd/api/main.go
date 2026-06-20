@@ -382,6 +382,7 @@ func registerAdminRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc, polic
 	admin.GET("/catalogs/vat-rates", h.ListVATRates, canViewUsers)
 	admin.GET("/catalogs/payment-conditions", h.ListPaymentConditions, canViewUsers)
 	admin.GET("/catalogs/expense-categories", h.ListExpenseCategories, canViewUsers)
+	admin.POST("/catalogs/expense-categories", h.CreateExpenseCategory, canManageUsers)
 	admin.GET("/catalogs/currencies", h.ListCurrencies, canViewUsers)
 
 	// Self-service endpoints (all authenticated users)
