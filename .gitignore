@@ -50,3 +50,6 @@ Thumbs.db
 # Test / benchmark artifacts
 /tmp/
 web/dist/
+
+# Local document storage (runtime artifact)
+storage/

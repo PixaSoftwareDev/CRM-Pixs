@@ -25,6 +25,7 @@ import { FlujoCajaPage } from './pages/finance/FlujoCajaPage'
 import { LeadsPage } from './pages/leads/LeadsPage'
 import { ScrapingPage } from './pages/leads/ScrapingPage'
 import { UsuariosPage } from './pages/settings/UsuariosPage'
+import { RolesPage } from './pages/settings/RolesPage'
 import { EmpresaPage } from './pages/settings/EmpresaPage'
 import { CatalogosPage } from './pages/settings/CatalogosPage'
 import { CotizacionesPage } from './pages/settings/CotizacionesPage'
@@ -82,6 +83,7 @@ function AppWithSearch() {
                   <Route path="/ajustes" element={<PerfilPage />} />
                   <Route path="/ajustes/sesiones" element={<SessionsPage />} />
                   <Route path="/ajustes/usuarios" element={<UsuariosPage />} />
+                  <Route path="/ajustes/roles" element={<RolesPage />} />
                   <Route path="/ajustes/empresa" element={<EmpresaPage />} />
                   <Route path="/ajustes/catalogos" element={<CatalogosPage />} />
                   <Route path="/ajustes/cotizaciones" element={<CotizacionesPage />} />

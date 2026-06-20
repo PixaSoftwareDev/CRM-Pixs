@@ -24,6 +24,7 @@ type Querier interface {
 	ConvertLead(ctx context.Context, arg ConvertLeadParams) (Lead, error)
 	CountActiveSessions(ctx context.Context, userID uuid.UUID) (int32, error)
 	CountLeads(ctx context.Context, arg CountLeadsParams) (int64, error)
+	CountPostalCodes(ctx context.Context) (int64, error)
 	CountScrapingJobsToday(ctx context.Context, arg CountScrapingJobsTodayParams) (int32, error)
 	// ─── Bank accounts ─────────────────────────────────────────────────────────────
 	CreateBankAccountFinance(ctx context.Context, arg CreateBankAccountFinanceParams) (BankAccountsFinance, error)
@@ -46,13 +47,20 @@ type Querier interface {
 	CreateContact(ctx context.Context, arg CreateContactParams) (CreateContactRow, error)
 	// ─── Contact Bank Accounts ─────────────────────────────────────────────────────
 	CreateContactBankAccount(ctx context.Context, arg CreateContactBankAccountParams) (ContactBankAccount, error)
+	// ─── Contact Comments (editable, soft-delete) ─────────────────────────────────
+	CreateContactComment(ctx context.Context, arg CreateContactCommentParams) (ContactComment, error)
 	// ─── Contact Notes (append-only) ───────────────────────────────────────────────
 	CreateContactNote(ctx context.Context, arg CreateContactNoteParams) (ContactNote, error)
 	// ─── Contact Persons ────────────────────────────────────────────────────────────
 	CreateContactPerson(ctx context.Context, arg CreateContactPersonParams) (ContactPerson, error)
+	// Document (attachment) queries for sqlc generation.
+	// Metadata only; bytes live on disk under PIXS_STORAGE_DIR at storage_key.
+	CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error)
 	CreateExchangeRate(ctx context.Context, arg CreateExchangeRateParams) (ExchangeRate, error)
 	// ─── Expenses ──────────────────────────────────────────────────────────────────
 	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Expense, error)
+	// Industry (rubro) queries for sqlc generation.
+	CreateIndustry(ctx context.Context, arg CreateIndustryParams) (Industry, error)
 	// ─── Invoices issued ───────────────────────────────────────────────────────────
 	CreateInvoiceDraft(ctx context.Context, arg CreateInvoiceDraftParams) (InvoicesIssued, error)
 	// ─── Invoice items ─────────────────────────────────────────────────────────────
@@ -113,7 +121,9 @@ type Querier interface {
 	DeleteQuoteItems(ctx context.Context, quoteID uuid.UUID) error
 	DeleteRole(ctx context.Context, arg DeleteRoleParams) error
 	DeleteRolePermission(ctx context.Context, arg DeleteRolePermissionParams) error
+	DeleteRolePermissionsByRole(ctx context.Context, roleID uuid.UUID) error
 	DeleteScrapingJob(ctx context.Context, arg DeleteScrapingJobParams) error
+	DeleteUserRolesByRole(ctx context.Context, roleID uuid.UUID) error
 	DeleteUserTOTPBackupCodes(ctx context.Context, userID uuid.UUID) error
 	GetArPayables(ctx context.Context, arg GetArPayablesParams) ([]GetArPayablesRow, error)
 	// ─── Accounts receivable (CtaCte / cash flow) ──────────────────────────────────
@@ -134,14 +144,17 @@ type Querier interface {
 	GetContactBankAccountByID(ctx context.Context, id uuid.UUID) (ContactBankAccount, error)
 	GetContactBankAccountForContact(ctx context.Context, arg GetContactBankAccountForContactParams) (ContactBankAccount, error)
 	GetContactByID(ctx context.Context, arg GetContactByIDParams) (GetContactByIDRow, error)
+	GetContactCommentByID(ctx context.Context, id uuid.UUID) (ContactComment, error)
 	// ─── Account statement (CtaCte for a single contact) ───────────────────────────
 	GetContactInvoicesIssued(ctx context.Context, arg GetContactInvoicesIssuedParams) ([]GetContactInvoicesIssuedRow, error)
 	GetContactPersonByID(ctx context.Context, id uuid.UUID) (ContactPerson, error)
 	GetContactPersonForContact(ctx context.Context, arg GetContactPersonForContactParams) (ContactPerson, error)
 	GetContactReceipts(ctx context.Context, arg GetContactReceiptsParams) ([]GetContactReceiptsRow, error)
+	GetDocumentByID(ctx context.Context, arg GetDocumentByIDParams) (Document, error)
 	GetExpenseByID(ctx context.Context, arg GetExpenseByIDParams) (Expense, error)
 	// ─── Contact balances ──────────────────────────────────────────────────────────
 	GetFinanceContactBalance(ctx context.Context, arg GetFinanceContactBalanceParams) (ContactBalance, error)
+	GetIndustryByID(ctx context.Context, arg GetIndustryByIDParams) (Industry, error)
 	GetInvoiceApplicationSum(ctx context.Context, invoiceID uuid.UUID) (pgtype.Numeric, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (InvoicesIssued, error)
 	GetInvoiceByIdempotencyKey(ctx context.Context, arg GetInvoiceByIdempotencyKeyParams) (InvoicesIssued, error)
@@ -219,13 +232,16 @@ type Querier interface {
 	ListCashMovements(ctx context.Context, arg ListCashMovementsParams) ([]CashMovement, error)
 	ListCashRegisters(ctx context.Context, companyID uuid.UUID) ([]CashRegister, error)
 	ListContactBankAccounts(ctx context.Context, contactID uuid.UUID) ([]ContactBankAccount, error)
+	ListContactComments(ctx context.Context, contactID uuid.UUID) ([]ContactComment, error)
 	ListContactNotes(ctx context.Context, contactID uuid.UUID) ([]ContactNote, error)
 	ListContactPersons(ctx context.Context, contactID uuid.UUID) ([]ContactPerson, error)
 	ListContactTags(ctx context.Context, contactID uuid.UUID) ([]Tag, error)
 	ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error)
 	ListCurrencies(ctx context.Context) ([]Currency, error)
+	ListDocuments(ctx context.Context, arg ListDocumentsParams) ([]Document, error)
 	ListExpenseCategories(ctx context.Context, companyID uuid.UUID) ([]ExpenseCategory, error)
 	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
+	ListIndustries(ctx context.Context, companyID uuid.UUID) ([]Industry, error)
 	ListInvoiceItems(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceItem, error)
 	ListInvoiceTaxes(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceTax, error)
 	ListInvoices(ctx context.Context, arg ListInvoicesParams) ([]InvoicesIssued, error)
@@ -266,6 +282,8 @@ type Querier interface {
 	// ─── Catalogs ──────────────────────────────────────────────────────────────────
 	ListVATRates(ctx context.Context, companyID uuid.UUID) ([]VatRate, error)
 	ListVaultEntries(ctx context.Context, arg ListVaultEntriesParams) ([]VaultEntry, error)
+	// Postal code reference lookups for sqlc generation.
+	LookupPostalCode(ctx context.Context, postalCode string) ([]LookupPostalCodeRow, error)
 	LoseOpportunity(ctx context.Context, arg LoseOpportunityParams) (Opportunity, error)
 	MarkLeadExtractionFailed(ctx context.Context, arg MarkLeadExtractionFailedParams) error
 	MarkObligationPaid(ctx context.Context, arg MarkObligationPaidParams) (PaymentObligation, error)
@@ -290,7 +308,9 @@ type Querier interface {
 	SoftDeleteCashRegister(ctx context.Context, arg SoftDeleteCashRegisterParams) error
 	SoftDeleteContact(ctx context.Context, arg SoftDeleteContactParams) error
 	SoftDeleteContactBankAccount(ctx context.Context, id uuid.UUID) error
+	SoftDeleteContactComment(ctx context.Context, id uuid.UUID) error
 	SoftDeleteContactPerson(ctx context.Context, id uuid.UUID) error
+	SoftDeleteDocument(ctx context.Context, arg SoftDeleteDocumentParams) error
 	SoftDeleteExpense(ctx context.Context, arg SoftDeleteExpenseParams) error
 	SoftDeleteInvoice(ctx context.Context, arg SoftDeleteInvoiceParams) error
 	SoftDeleteInvoiceReceived(ctx context.Context, arg SoftDeleteInvoiceReceivedParams) error
@@ -314,6 +334,7 @@ type Querier interface {
 	UpdateCashRegister(ctx context.Context, arg UpdateCashRegisterParams) (CashRegister, error)
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (Company, error)
 	UpdateContact(ctx context.Context, arg UpdateContactParams) (UpdateContactRow, error)
+	UpdateContactComment(ctx context.Context, arg UpdateContactCommentParams) (ContactComment, error)
 	UpdateContactPerson(ctx context.Context, arg UpdateContactPersonParams) (ContactPerson, error)
 	UpdateExpenseStatus(ctx context.Context, arg UpdateExpenseStatusParams) (Expense, error)
 	UpdateInvoiceDraft(ctx context.Context, arg UpdateInvoiceDraftParams) (InvoicesIssued, error)
@@ -330,6 +351,7 @@ type Querier interface {
 	UpdateQuote(ctx context.Context, arg UpdateQuoteParams) (Quote, error)
 	UpdateQuoteStatus(ctx context.Context, arg UpdateQuoteStatusParams) (Quote, error)
 	UpdateRecurringPayment(ctx context.Context, arg UpdateRecurringPaymentParams) (RecurringPayment, error)
+	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateScrapingJobCosts(ctx context.Context, arg UpdateScrapingJobCostsParams) (ScrapingJob, error)
 	UpdateScrapingJobStatus(ctx context.Context, arg UpdateScrapingJobStatusParams) (ScrapingJob, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error

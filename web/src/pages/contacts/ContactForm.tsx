@@ -10,6 +10,8 @@ import { useAuthStore } from '../../stores/auth'
 import { ApiRequestError } from '../../lib/api/client'
 import {
   contactsApi,
+  industriesApi,
+  postalCodesApi,
   type Contact,
   type CreateContactInput,
 } from '../../lib/api/contacts'
@@ -92,12 +94,52 @@ export function ContactForm({ open, onClose, contact }: ContactFormProps) {
   const set = <K extends keyof CreateContactInput>(k: K, v: CreateContactInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
 
-  const toggleKind = (k: string) => {
-    setForm((f) => {
-      const has = f.kind.includes(k)
-      const next = has ? f.kind.filter((x) => x !== k) : [...f.kind, k]
-      return { ...f, kind: next }
-    })
+  // Single-select: choosing a type replaces any previous selection.
+  const selectKind = (k: string) => setForm((f) => ({ ...f, kind: [k] }))
+
+  // ── Rubros (industries) ──
+  const industriesQ = useQuery({ queryKey: ['industries'], queryFn: () => industriesApi.list() })
+  const [creatingIndustry, setCreatingIndustry] = useState(false)
+  const [newIndustry, setNewIndustry] = useState('')
+  const createIndustry = useMutation({
+    mutationFn: (name: string) => industriesApi.create(name),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['industries'] })
+      set('industry', created.name)
+      setCreatingIndustry(false)
+      setNewIndustry('')
+    },
+    onError: (e) => {
+      const msg = e instanceof ApiRequestError ? e.error.message : 'No se pudo crear el rubro'
+      toast.error(msg)
+    },
+  })
+
+  // ── Autocompletado por código postal ──
+  const [cpLoading, setCpLoading] = useState(false)
+  const lookupPostalCode = async (cp: string) => {
+    const clean = cp.trim()
+    if (!clean) return
+    setCpLoading(true)
+    try {
+      const matches = await postalCodesApi.lookup(clean)
+      if (matches.length === 0) return
+      const first = matches[0]
+      setForm((f) => ({
+        ...f,
+        province: first.province,
+        // Solo autocompletar localidad si está vacía (no pisar lo que cargó el usuario).
+        city: f.city?.trim() ? f.city : first.locality,
+        phone:
+          first.phone_prefix && !f.phone?.trim()
+            ? `${first.phone_prefix} `
+            : f.phone,
+      }))
+    } catch {
+      /* CP no encontrado: dejar campos como están */
+    } finally {
+      setCpLoading(false)
+    }
   }
 
   const addPerson = () => setPersons((p) => [...p, emptyPerson()])
@@ -212,7 +254,7 @@ export function ContactForm({ open, onClose, contact }: ContactFormProps) {
                 <button
                   type="button"
                   key={k}
-                  onClick={() => toggleKind(k)}
+                  onClick={() => selectKind(k)}
                   className={
                     'rounded-full border px-3 py-1.5 text-sm transition-colors ' +
                     (active
@@ -261,16 +303,82 @@ export function ContactForm({ open, onClose, contact }: ContactFormProps) {
           onChange={(e) => set('vat_condition', e.target.value)}
           options={vatConditionOptions}
         />
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Ciudad" value={form.city ?? ''} onChange={(e) => set('city', e.target.value)} />
+        <div className="grid grid-cols-3 gap-4">
+          <Input
+            label={cpLoading ? 'Código postal…' : 'Código postal'}
+            value={form.postal_code ?? ''}
+            onChange={(e) => set('postal_code', e.target.value)}
+            onBlur={(e) => lookupPostalCode(e.target.value)}
+            placeholder="5000"
+          />
+          <Input label="Localidad" value={form.city ?? ''} onChange={(e) => set('city', e.target.value)} />
           <Input label="Provincia" value={form.province ?? ''} onChange={(e) => set('province', e.target.value)} />
         </div>
+        <Input
+          label="Domicilio"
+          value={form.fiscal_address ?? ''}
+          onChange={(e) => set('fiscal_address', e.target.value)}
+          placeholder="Calle 123, Piso/Depto"
+        />
         <div className="grid grid-cols-2 gap-4">
           <Input label="Email empresa" type="email" value={form.email ?? ''} onChange={(e) => set('email', e.target.value)} />
           <Input label="Teléfono empresa" value={form.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
         </div>
+
+        {/* Rubro: seleccionable y creable */}
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Rubro" value={form.industry ?? ''} onChange={(e) => set('industry', e.target.value)} />
+          <div>
+            {creatingIndustry ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text">Nuevo rubro</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newIndustry}
+                    onChange={(e) => setNewIndustry(e.target.value)}
+                    placeholder="Ej: Metalúrgica"
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    loading={createIndustry.isPending}
+                    onClick={() => newIndustry.trim() && createIndustry.mutate(newIndustry.trim())}
+                  >
+                    Crear
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    onClick={() => {
+                      setCreatingIndustry(false)
+                      setNewIndustry('')
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Select
+                  label="Rubro"
+                  placeholder="Seleccioná un rubro"
+                  value={form.industry ?? ''}
+                  onChange={(e) => set('industry', e.target.value)}
+                  options={(industriesQ.data ?? []).map((i) => ({ value: i.name, label: i.name }))}
+                />
+                <button
+                  type="button"
+                  onClick={() => setCreatingIndustry(true)}
+                  className="mt-1 flex items-center gap-1 text-xs text-brand hover:underline"
+                >
+                  <Plus size={12} /> Crear rubro
+                </button>
+              </>
+            )}
+          </div>
           <Input label="Sitio web" value={form.website ?? ''} onChange={(e) => set('website', e.target.value)} />
         </div>
         <Select

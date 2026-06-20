@@ -84,8 +84,19 @@ INSERT INTO roles (company_id, name, description, is_system)
 VALUES ($1, $2, $3, false)
 RETURNING *;
 
+-- name: UpdateRole :one
+UPDATE roles SET name = $3, description = $4
+WHERE id = $1 AND company_id = $2 AND is_system = false
+RETURNING *;
+
 -- name: DeleteRole :exec
 DELETE FROM roles WHERE id = $1 AND company_id = $2 AND is_system = false;
+
+-- name: DeleteRolePermissionsByRole :exec
+DELETE FROM role_permissions WHERE role_id = $1;
+
+-- name: DeleteUserRolesByRole :exec
+DELETE FROM user_roles WHERE role_id = $1;
 
 -- ─── Permissions ───────────────────────────────────────────────────────────────
 

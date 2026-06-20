@@ -151,6 +151,7 @@ func (s *ContactService) GetContact(ctx context.Context, companyID, id, callerUs
 type ListFilter struct {
 	Query          string
 	Kind           string
+	Industry       *string
 	AssignedUserID *uuid.UUID
 	Page           int32
 	PerPage        int32
@@ -170,6 +171,7 @@ func (s *ContactService) ListContacts(ctx context.Context, companyID, callerUser
 		CompanyID: companyID,
 		Column2:   f.Query,
 		Column3:   f.Kind,
+		Industry:  f.Industry,
 		Limit:     f.PerPage,
 		Offset:    offset,
 	}
@@ -479,6 +481,54 @@ func (s *ContactService) ListNotes(ctx context.Context, contactID uuid.UUID) ([]
 	return out, nil
 }
 
+// ─── Comments (editable, soft-delete) ───────────────────────────────────────────
+
+// CreateComment adds an editable comment to a contact.
+func (s *ContactService) CreateComment(ctx context.Context, contactID, userID uuid.UUID, body string) (*domain.ContactComment, error) {
+	if strings.TrimSpace(body) == "" {
+		return nil, errors.WithStack(domain.ErrNoteBodyRequired)
+	}
+	row, err := s.q.CreateContactComment(ctx, sqlcgen.CreateContactCommentParams{
+		ContactID: contactID,
+		UserID:    userID,
+		Body:      body,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "creating comment")
+	}
+	return commentFromRow(row), nil
+}
+
+// ListComments returns all (non-deleted) comments for a contact, newest first.
+func (s *ContactService) ListComments(ctx context.Context, contactID uuid.UUID) ([]*domain.ContactComment, error) {
+	rows, err := s.q.ListContactComments(ctx, contactID)
+	if err != nil {
+		return nil, errors.Wrap(err, "listing comments")
+	}
+	out := make([]*domain.ContactComment, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, commentFromRow(r))
+	}
+	return out, nil
+}
+
+// UpdateComment edits a comment's body.
+func (s *ContactService) UpdateComment(ctx context.Context, commentID uuid.UUID, body string) (*domain.ContactComment, error) {
+	if strings.TrimSpace(body) == "" {
+		return nil, errors.WithStack(domain.ErrNoteBodyRequired)
+	}
+	row, err := s.q.UpdateContactComment(ctx, sqlcgen.UpdateContactCommentParams{ID: commentID, Body: body})
+	if err != nil {
+		return nil, errors.WithStack(domain.ErrContactNotFound)
+	}
+	return commentFromRow(row), nil
+}
+
+// DeleteComment soft-deletes a comment.
+func (s *ContactService) DeleteComment(ctx context.Context, commentID uuid.UUID) error {
+	return errors.Wrap(s.q.SoftDeleteContactComment(ctx, commentID), "deleting comment")
+}
+
 // ─── Tags ──────────────────────────────────────────────────────────────────────
 
 // CreateTag creates a new company-scoped tag.
@@ -542,6 +592,58 @@ func (s *ContactService) ListContactTags(ctx context.Context, contactID uuid.UUI
 			Color:     r.Color,
 			Area:      r.Area,
 			CreatedAt: r.CreatedAt.Time,
+		})
+	}
+	return out, nil
+}
+
+// ─── Industries (rubros) ─────────────────────────────────────────────────────────
+
+// CreateIndustry creates a new company-scoped industry (rubro).
+func (s *ContactService) CreateIndustry(ctx context.Context, companyID uuid.UUID, name string) (*domain.Industry, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.WithStack(domain.ErrIndustryNameRequired)
+	}
+	row, err := s.q.CreateIndustry(ctx, sqlcgen.CreateIndustryParams{CompanyID: companyID, Name: name})
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, errors.WithStack(domain.ErrIndustryAlreadyExists)
+		}
+		return nil, errors.Wrap(err, "creating industry")
+	}
+	return industryFromRow(row), nil
+}
+
+// ListIndustries returns all industries for a company.
+func (s *ContactService) ListIndustries(ctx context.Context, companyID uuid.UUID) ([]*domain.Industry, error) {
+	rows, err := s.q.ListIndustries(ctx, companyID)
+	if err != nil {
+		return nil, errors.Wrap(err, "listing industries")
+	}
+	out := make([]*domain.Industry, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, industryFromRow(r))
+	}
+	return out, nil
+}
+
+// ─── Postal codes ────────────────────────────────────────────────────────────────
+
+// LookupPostalCode resolves a CP to its matching localities/province/prefix.
+func (s *ContactService) LookupPostalCode(ctx context.Context, cp string) ([]*domain.PostalCode, error) {
+	cp = strings.TrimSpace(cp)
+	rows, err := s.q.LookupPostalCode(ctx, cp)
+	if err != nil {
+		return nil, errors.Wrap(err, "looking up postal code")
+	}
+	out := make([]*domain.PostalCode, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, &domain.PostalCode{
+			PostalCode:  r.PostalCode,
+			Locality:    r.Locality,
+			Province:    r.Province,
+			PhonePrefix: r.PhonePrefix,
 		})
 	}
 	return out, nil
@@ -767,6 +869,31 @@ func noteFromRow(r sqlcgen.ContactNote) *domain.ContactNote {
 		ContactID: r.ContactID,
 		UserID:    r.UserID,
 		Body:      r.Body,
+		CreatedAt: r.CreatedAt.Time,
+	}
+}
+
+func commentFromRow(r sqlcgen.ContactComment) *domain.ContactComment {
+	c := &domain.ContactComment{
+		ID:        r.ID,
+		ContactID: r.ContactID,
+		UserID:    r.UserID,
+		Body:      r.Body,
+		CreatedAt: r.CreatedAt.Time,
+		UpdatedAt: r.UpdatedAt.Time,
+	}
+	if r.DeletedAt.Valid {
+		t := r.DeletedAt.Time
+		c.DeletedAt = &t
+	}
+	return c
+}
+
+func industryFromRow(r sqlcgen.Industry) *domain.Industry {
+	return &domain.Industry{
+		ID:        r.ID,
+		CompanyID: r.CompanyID,
+		Name:      r.Name,
 		CreatedAt: r.CreatedAt.Time,
 	}
 }

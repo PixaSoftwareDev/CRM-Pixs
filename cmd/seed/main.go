@@ -9,12 +9,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
+	"embed"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"pixs/internal/auth/argon2"
@@ -23,11 +28,15 @@ import (
 	sqlcgen "pixs/internal/repository/sqlc"
 )
 
+//go:embed data/postal_codes.csv
+var seedData embed.FS
+
 // Fixed UUIDs — must stay stable across DB resets so runbooks and
 // test fixtures can reference them by UUID.
 var (
 	seedCompanyID = uuid.MustParse("c0000000-0000-4000-8000-000000000001")
 	roleAdmin     = uuid.MustParse("d0000000-0000-4000-8000-000000000001")
+	roleCliente   = uuid.MustParse("d0000000-0000-4000-8000-000000000002")
 
 	// Pipeline stages (fixed UUIDs).
 	stageProspecto        = uuid.MustParse("e1000001-0000-4000-8000-000000000001")
@@ -85,6 +94,9 @@ func run() error {
 	if err := seedRBACMatrix(ctx, db); err != nil {
 		return fmt.Errorf("seeding RBAC matrix: %w", err)
 	}
+	if err := seedClientRole(ctx, db); err != nil {
+		return fmt.Errorf("seeding client role: %w", err)
+	}
 	if err := seedAdminUser(ctx, q, cfg.DevSeedAdminPassword); err != nil {
 		return fmt.Errorf("seeding admin user: %w", err)
 	}
@@ -99,6 +111,12 @@ func run() error {
 	}
 	if err := seedFinanceCatalogs(ctx, db); err != nil {
 		return fmt.Errorf("seeding finance catalogs: %w", err)
+	}
+	if err := seedIndustries(ctx, db); err != nil {
+		return fmt.Errorf("seeding industries: %w", err)
+	}
+	if err := seedPostalCodes(ctx, db, q); err != nil {
+		return fmt.Errorf("seeding postal codes: %w", err)
 	}
 
 	slog.Info("seed complete",
@@ -148,6 +166,40 @@ func seedRBACMatrix(ctx context.Context, db *pgxpool.Pool) error {
 		return fmt.Errorf("admin RBAC: %w", err)
 	}
 	slog.Info("RBAC matrix seeded")
+	return nil
+}
+
+// seedClientRole creates a sample read-only "Cliente" profile and grants it
+// view permissions on the data a client should be able to see. It's an example
+// profile; permissions can be tuned later from the Roles screen.
+func seedClientRole(ctx context.Context, db *pgxpool.Pool) error {
+	if _, err := db.Exec(ctx, `
+		INSERT INTO roles (id, company_id, name, description, is_system) VALUES
+		    ($1, $2, 'Cliente', 'Perfil de cliente: acceso de solo lectura a su información', false)
+		ON CONFLICT (id) DO NOTHING`,
+		roleCliente, seedCompanyID,
+	); err != nil {
+		return err
+	}
+	// Grant view-only permissions by (module, action).
+	grants := [][2]string{
+		{"contacts", "view"},
+		{"cta_cte", "view"},
+		{"documents", "view"},
+		{"invoices_issued", "view"},
+		{"receipts", "view"},
+	}
+	for _, g := range grants {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO role_permissions (role_id, permission_id, restricted_to_own)
+			SELECT $1, id, true FROM permissions WHERE module = $2 AND action = $3
+			ON CONFLICT DO NOTHING`,
+			roleCliente, g[0], g[1],
+		); err != nil {
+			return fmt.Errorf("granting %s/%s to client role: %w", g[0], g[1], err)
+		}
+	}
+	slog.Info("client role seeded")
 	return nil
 }
 
@@ -297,6 +349,78 @@ func seedFinanceCatalogs(ctx context.Context, db *pgxpool.Pool) error {
 		}
 	}
 	slog.Info("finance catalogs seeded")
+	return nil
+}
+
+// seedIndustries inserts a small starter set of rubros for the company.
+// Idempotent: skips any rubro that already exists (case-insensitive).
+func seedIndustries(ctx context.Context, db *pgxpool.Pool) error {
+	names := []string{
+		"Comercio", "Industria", "Servicios", "Construcción", "Salud",
+		"Educación", "Tecnología", "Agro", "Gastronomía", "Transporte",
+		"Profesional", "Inmobiliaria",
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO industries (company_id, name)
+		SELECT $1, x FROM unnest($2::text[]) AS x
+		WHERE NOT EXISTS (
+			SELECT 1 FROM industries
+			WHERE company_id = $1 AND lower(name) = lower(x) AND deleted_at IS NULL
+		)`,
+		seedCompanyID, names,
+	); err != nil {
+		return err
+	}
+	slog.Info("industries seeded", "count", len(names))
+	return nil
+}
+
+// seedPostalCodes bulk-loads the Argentine postal-code reference table from the
+// embedded CSV. Idempotent: skips entirely if the table is already populated.
+func seedPostalCodes(ctx context.Context, db *pgxpool.Pool, q *sqlcgen.Queries) error {
+	count, err := q.CountPostalCodes(ctx)
+	if err != nil {
+		return fmt.Errorf("counting postal codes: %w", err)
+	}
+	if count > 0 {
+		slog.Info("postal codes already seeded", "count", count)
+		return nil
+	}
+
+	raw, err := seedData.ReadFile("data/postal_codes.csv")
+	if err != nil {
+		return fmt.Errorf("reading embedded postal codes: %w", err)
+	}
+	r := csv.NewReader(bytes.NewReader(raw))
+	if _, err := r.Read(); err != nil { // skip header
+		return fmt.Errorf("reading postal codes header: %w", err)
+	}
+
+	rows := make([][]any, 0, 23000)
+	for {
+		rec, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("parsing postal codes csv: %w", err)
+		}
+		var prefix any
+		if len(rec) > 3 && rec[3] != "" {
+			prefix = rec[3]
+		}
+		rows = append(rows, []any{rec[0], rec[1], rec[2], prefix})
+	}
+
+	n, err := db.CopyFrom(ctx,
+		pgx.Identifier{"postal_codes"},
+		[]string{"postal_code", "locality", "province", "phone_prefix"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		return fmt.Errorf("copying postal codes: %w", err)
+	}
+	slog.Info("postal codes seeded", "count", n)
 	return nil
 }
 

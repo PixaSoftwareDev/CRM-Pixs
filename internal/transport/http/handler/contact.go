@@ -111,8 +111,13 @@ func mapContactError(err error) *echo.HTTPError {
 		errors.Is(err, domaincontact.ErrTagNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, errors.UnwrapAll(err).Error())
 	case errors.Is(err, domaincontact.ErrTagAlreadyExists),
-		errors.Is(err, domaincontact.ErrNoteBodyRequired):
+		errors.Is(err, domaincontact.ErrNoteBodyRequired),
+		errors.Is(err, domaincontact.ErrIndustryNameRequired):
 		return echo.NewHTTPError(http.StatusBadRequest, errors.UnwrapAll(err).Error())
+	case errors.Is(err, domaincontact.ErrIndustryAlreadyExists):
+		return echo.NewHTTPError(http.StatusConflict, errors.UnwrapAll(err).Error())
+	case errors.Is(err, domaincontact.ErrIndustryNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, errors.UnwrapAll(err).Error())
 	default:
 		return echo.NewHTTPError(http.StatusInternalServerError, "error interno del servidor")
 	}
@@ -206,6 +211,9 @@ func (h *ContactHandler) ListContacts(c echo.Context) error {
 		Kind:    c.QueryParam("kind"),
 		Page:    int32(page),
 		PerPage: int32(perPage),
+	}
+	if industry := c.QueryParam("industry"); industry != "" {
+		f.Industry = &industry
 	}
 	if assigned := c.QueryParam("assigned_user_id"); assigned != "" {
 		uid, err := uuid.Parse(assigned)
@@ -319,7 +327,7 @@ func (h *ContactHandler) CreatePerson(c echo.Context) error {
 		Notes:     req.Notes,
 		IsPrimary: req.IsPrimary,
 	}
-	if req.Birthday != nil {
+	if req.Birthday != nil && *req.Birthday != "" {
 		t, err := time.Parse("2006-01-02", *req.Birthday)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "birthday inválido (formato: YYYY-MM-DD)")
@@ -374,7 +382,7 @@ func (h *ContactHandler) UpdatePerson(c echo.Context) error {
 		Notes:     req.Notes,
 		IsPrimary: req.IsPrimary,
 	}
-	if req.Birthday != nil {
+	if req.Birthday != nil && *req.Birthday != "" {
 		t, err := time.Parse("2006-01-02", *req.Birthday)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "birthday inválido (formato: YYYY-MM-DD)")
@@ -588,4 +596,122 @@ func (h *ContactHandler) ListContactTags(c echo.Context) error {
 		return mapContactError(err)
 	}
 	return c.JSON(http.StatusOK, tags)
+}
+
+// ─── Comments (editable) ──────────────────────────────────────────────────────
+
+type commentRequest struct {
+	Body string `json:"body" validate:"required"`
+}
+
+// ListComments GET /contacts/:id/comments
+func (h *ContactHandler) ListComments(c echo.Context) error {
+	contactID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "id inválido")
+	}
+	comments, err := h.svc.ListComments(c.Request().Context(), contactID)
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusOK, comments)
+}
+
+// CreateComment POST /contacts/:id/comments
+func (h *ContactHandler) CreateComment(c echo.Context) error {
+	contactID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "id inválido")
+	}
+	var req commentRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	sess := mw.SessionFromContext(c)
+	comment, err := h.svc.CreateComment(c.Request().Context(), contactID, sess.UserID, req.Body)
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusCreated, comment)
+}
+
+// UpdateComment PUT /contacts/:id/comments/:comment_id
+func (h *ContactHandler) UpdateComment(c echo.Context) error {
+	commentID, err := uuid.Parse(c.Param("comment_id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "comment_id inválido")
+	}
+	var req commentRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	comment, err := h.svc.UpdateComment(c.Request().Context(), commentID, req.Body)
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusOK, comment)
+}
+
+// DeleteComment DELETE /contacts/:id/comments/:comment_id
+func (h *ContactHandler) DeleteComment(c echo.Context) error {
+	commentID, err := uuid.Parse(c.Param("comment_id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "comment_id inválido")
+	}
+	if err := h.svc.DeleteComment(c.Request().Context(), commentID); err != nil {
+		return mapContactError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ─── Industries (rubros) ──────────────────────────────────────────────────────
+
+type createIndustryRequest struct {
+	Name string `json:"name" validate:"required"`
+}
+
+// ListIndustries GET /industries
+func (h *ContactHandler) ListIndustries(c echo.Context) error {
+	industries, err := h.svc.ListIndustries(c.Request().Context(), companyFromCtx(c))
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusOK, industries)
+}
+
+// CreateIndustry POST /industries
+func (h *ContactHandler) CreateIndustry(c echo.Context) error {
+	var req createIndustryRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	industry, err := h.svc.CreateIndustry(c.Request().Context(), companyFromCtx(c), req.Name)
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusCreated, industry)
+}
+
+// ─── Postal codes ─────────────────────────────────────────────────────────────
+
+// LookupPostalCode GET /postal-codes/:cp
+func (h *ContactHandler) LookupPostalCode(c echo.Context) error {
+	cp := c.Param("cp")
+	if cp == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "código postal requerido")
+	}
+	matches, err := h.svc.LookupPostalCode(c.Request().Context(), cp)
+	if err != nil {
+		return mapContactError(err)
+	}
+	return c.JSON(http.StatusOK, matches)
 }

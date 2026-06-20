@@ -211,6 +211,35 @@ func (q *Queries) CreateContactBankAccount(ctx context.Context, arg CreateContac
 	return i, err
 }
 
+const createContactComment = `-- name: CreateContactComment :one
+
+INSERT INTO contact_comments (contact_id, user_id, body)
+VALUES ($1, $2, $3)
+RETURNING id, contact_id, user_id, body, created_at, updated_at, deleted_at
+`
+
+type CreateContactCommentParams struct {
+	ContactID uuid.UUID `db:"contact_id" json:"contact_id"`
+	UserID    uuid.UUID `db:"user_id" json:"user_id"`
+	Body      string    `db:"body" json:"body"`
+}
+
+// ─── Contact Comments (editable, soft-delete) ─────────────────────────────────
+func (q *Queries) CreateContactComment(ctx context.Context, arg CreateContactCommentParams) (ContactComment, error) {
+	row := q.db.QueryRow(ctx, createContactComment, arg.ContactID, arg.UserID, arg.Body)
+	var i ContactComment
+	err := row.Scan(
+		&i.ID,
+		&i.ContactID,
+		&i.UserID,
+		&i.Body,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const createContactNote = `-- name: CreateContactNote :one
 
 INSERT INTO contact_notes (contact_id, user_id, body)
@@ -469,6 +498,26 @@ func (q *Queries) GetContactByID(ctx context.Context, arg GetContactByIDParams) 
 	return i, err
 }
 
+const getContactCommentByID = `-- name: GetContactCommentByID :one
+SELECT id, contact_id, user_id, body, created_at, updated_at, deleted_at FROM contact_comments
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetContactCommentByID(ctx context.Context, id uuid.UUID) (ContactComment, error) {
+	row := q.db.QueryRow(ctx, getContactCommentByID, id)
+	var i ContactComment
+	err := row.Scan(
+		&i.ID,
+		&i.ContactID,
+		&i.UserID,
+		&i.Body,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getContactPersonByID = `-- name: GetContactPersonByID :one
 SELECT id, contact_id, name, role, email, phone, notes, birthday, is_primary, created_at, updated_at, deleted_at FROM contact_persons WHERE id = $1 AND deleted_at IS NULL
 `
@@ -570,6 +619,40 @@ func (q *Queries) ListContactBankAccounts(ctx context.Context, contactID uuid.UU
 			&i.AccountHolder,
 			&i.Currency,
 			&i.EncryptedCbu,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listContactComments = `-- name: ListContactComments :many
+SELECT id, contact_id, user_id, body, created_at, updated_at, deleted_at FROM contact_comments
+WHERE contact_id = $1 AND deleted_at IS NULL
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListContactComments(ctx context.Context, contactID uuid.UUID) ([]ContactComment, error) {
+	rows, err := q.db.Query(ctx, listContactComments, contactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ContactComment{}
+	for rows.Next() {
+		var i ContactComment
+		if err := rows.Scan(
+			&i.ID,
+			&i.ContactID,
+			&i.UserID,
+			&i.Body,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -702,6 +785,7 @@ WHERE company_id = $1
   AND ($2::text = '' OR search_vector @@ plainto_tsquery('simple', $2))
   AND ($3::text = '' OR $3 = ANY(kind))
   AND ($6::uuid IS NULL OR assigned_user_id = $6)
+  AND ($7::text IS NULL OR industry = $7)
 ORDER BY fantasy_name
 LIMIT $4 OFFSET $5
 `
@@ -713,6 +797,7 @@ type ListContactsParams struct {
 	Limit          int32       `db:"limit" json:"limit"`
 	Offset         int32       `db:"offset" json:"offset"`
 	AssignedUserID pgtype.UUID `db:"assigned_user_id" json:"assigned_user_id"`
+	Industry       *string     `db:"industry" json:"industry"`
 }
 
 type ListContactsRow struct {
@@ -750,6 +835,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		arg.Limit,
 		arg.Offset,
 		arg.AssignedUserID,
+		arg.Industry,
 	)
 	if err != nil {
 		return nil, err
@@ -869,6 +955,17 @@ WHERE id = $1 AND deleted_at IS NULL
 
 func (q *Queries) SoftDeleteContactBankAccount(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, softDeleteContactBankAccount, id)
+	return err
+}
+
+const softDeleteContactComment = `-- name: SoftDeleteContactComment :exec
+UPDATE contact_comments
+SET deleted_at = now(), updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) SoftDeleteContactComment(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, softDeleteContactComment, id)
 	return err
 }
 
@@ -1010,6 +1107,33 @@ func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (U
 		&i.UsualDiscountPct,
 		&i.AssignedUserID,
 		&i.LifecycleStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateContactComment = `-- name: UpdateContactComment :one
+UPDATE contact_comments
+SET body = $2, updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, contact_id, user_id, body, created_at, updated_at, deleted_at
+`
+
+type UpdateContactCommentParams struct {
+	ID   uuid.UUID `db:"id" json:"id"`
+	Body string    `db:"body" json:"body"`
+}
+
+func (q *Queries) UpdateContactComment(ctx context.Context, arg UpdateContactCommentParams) (ContactComment, error) {
+	row := q.db.QueryRow(ctx, updateContactComment, arg.ID, arg.Body)
+	var i ContactComment
+	err := row.Scan(
+		&i.ID,
+		&i.ContactID,
+		&i.UserID,
+		&i.Body,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,

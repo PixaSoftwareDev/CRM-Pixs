@@ -316,6 +316,33 @@ func (s *AuthService) DisableTOTP(ctx context.Context, userID uuid.UUID, code st
 	return nil
 }
 
+// ReloadPolicy refreshes an existing policy in place from the current DB state
+// for the given company. Call it after role/permission changes so they take
+// effect without restarting the server.
+func ReloadPolicy(ctx context.Context, q *sqlcgen.Queries, policy *rbac.Policy, companyID uuid.UUID) error {
+	roles, err := q.ListRoles(ctx, companyID)
+	if err != nil {
+		return errors.Wrap(err, "listing roles")
+	}
+	var entries []rbac.PolicyEntry
+	for _, role := range roles {
+		perms, err := q.GetRolePermissions(ctx, role.ID)
+		if err != nil {
+			return errors.Wrapf(err, "loading permissions for role %s", role.Name)
+		}
+		for _, p := range perms {
+			entries = append(entries, rbac.PolicyEntry{
+				RoleID:          role.ID.String(),
+				Module:          p.Module,
+				Action:          p.Action,
+				RestrictedToOwn: p.RestrictedToOwn,
+			})
+		}
+	}
+	policy.Replace(entries)
+	return nil
+}
+
 // LoadPolicy fetches all role permissions from DB and builds a fresh RBAC Policy.
 func LoadPolicy(ctx context.Context, q *sqlcgen.Queries, roles []sqlcgen.Role) (*rbac.Policy, error) {
 	var entries []rbac.PolicyEntry

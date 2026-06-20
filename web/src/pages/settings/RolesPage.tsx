@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Save } from 'lucide-react'
+import { Save, Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { SlideOver } from '../../components/ui/SlideOver'
+import { ConfirmModal } from '../../components/ui/Modal'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { ErrorState } from '../../components/ui/ErrorState'
 import { useUIStore } from '../../stores/ui'
 import { useAuthStore } from '../../stores/auth'
+import { ApiRequestError } from '../../lib/api/client'
 import { adminApi, type Permission, type Role } from '../../lib/api/admin'
 
 // Permission key → role_id → is_enabled
@@ -102,6 +106,34 @@ export function RolesPage() {
     onError: () => toast.error('Error al guardar permisos'),
   })
 
+  const canManage = can('settings', 'manage')
+
+  // ── Role create/edit/delete ──
+  const [roleForm, setRoleForm] = useState<{ open: boolean; role: Role | null }>({ open: false, role: null })
+  const [deleteRole, setDeleteRole] = useState<Role | null>(null)
+
+  const saveRole = useMutation({
+    mutationFn: (body: { id?: string; name: string; description: string }) =>
+      body.id
+        ? adminApi.roles.update(body.id, { name: body.name, description: body.description })
+        : adminApi.roles.create({ name: body.name, description: body.description }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-roles'] })
+      setRoleForm({ open: false, role: null })
+      toast.success('Perfil guardado')
+    },
+    onError: (e) => toast.error(e instanceof ApiRequestError ? e.error.message : 'No se pudo guardar el perfil'),
+  })
+  const removeRole = useMutation({
+    mutationFn: (id: string) => adminApi.roles.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-roles'] })
+      setDeleteRole(null)
+      toast.success('Perfil eliminado')
+    },
+    onError: () => toast.error('No se pudo eliminar el perfil'),
+  })
+
   const isLoading = loadRoles || loadPerms || loadRolePerms
   const isError = errRoles || errPerms
 
@@ -115,12 +147,22 @@ export function RolesPage() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-text">Roles y permisos</h1>
-        {can('roles', 'manage') && dirty && (
-          <Button variant="primary" size="md" onClick={() => save.mutate()} loading={save.isPending}>
-            <Save className="w-4 h-4 mr-1" /> Guardar cambios
-          </Button>
-        )}
+        <div>
+          <h1 className="text-2xl font-semibold text-text">Perfiles y permisos</h1>
+          <p className="text-sm text-text-secondary">Creá perfiles y habilitá o revocá permisos de cada uno.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canManage && (
+            <Button variant="secondary" size="md" onClick={() => setRoleForm({ open: true, role: null })}>
+              <Plus className="w-4 h-4 mr-1" /> Nuevo perfil
+            </Button>
+          )}
+          {canManage && dirty && (
+            <Button variant="primary" size="md" onClick={() => save.mutate()} loading={save.isPending}>
+              <Save className="w-4 h-4 mr-1" /> Guardar cambios
+            </Button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -136,7 +178,22 @@ export function RolesPage() {
                 {(roles ?? []).map((r) => (
                   <th key={r.id} className="px-3 py-3 font-semibold text-text text-center min-w-[100px]">
                     <div className="text-xs">{r.name}</div>
-                    {r.is_system && <div className="text-xs text-text-tertiary font-normal">sistema</div>}
+                    {r.is_system ? (
+                      <div className="text-xs text-text-tertiary font-normal">sistema</div>
+                    ) : (
+                      canManage && (
+                        <div className="mt-1 flex items-center justify-center gap-1">
+                          <button onClick={() => setRoleForm({ open: true, role: r })}
+                            className="text-text-tertiary hover:text-text" title="Editar perfil">
+                            <Pencil size={12} />
+                          </button>
+                          <button onClick={() => setDeleteRole(r)}
+                            className="text-text-tertiary hover:text-danger" title="Eliminar perfil">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )
+                    )}
                   </th>
                 ))}
               </tr>
@@ -163,8 +220,8 @@ export function RolesPage() {
                             <input
                               type="checkbox"
                               checked={matrix[key]?.[r.id] ?? false}
-                              onChange={() => can('roles', 'manage') && toggle(key, r.id)}
-                              disabled={!can('roles', 'manage')}
+                              onChange={() => canManage && toggle(key, r.id)}
+                              disabled={!canManage}
                               className="w-4 h-4 accent-brand cursor-pointer disabled:cursor-default"
                             />
                           </td>
@@ -186,6 +243,61 @@ export function RolesPage() {
           </Button>
         </div>
       )}
+
+      {roleForm.open && (
+        <RoleForm
+          role={roleForm.role}
+          saving={saveRole.isPending}
+          onClose={() => setRoleForm({ open: false, role: null })}
+          onSave={(name, description) => saveRole.mutate({ id: roleForm.role?.id, name, description })}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!deleteRole}
+        onClose={() => setDeleteRole(null)}
+        onConfirm={() => deleteRole && removeRole.mutate(deleteRole.id)}
+        loading={removeRole.isPending}
+        title="Eliminar perfil"
+        description={`Se eliminará el perfil "${deleteRole?.name}" y se quitará de los usuarios que lo tengan. Esta acción no se puede deshacer.`}
+      />
     </div>
+  )
+}
+
+function RoleForm({
+  role,
+  saving,
+  onClose,
+  onSave,
+}: {
+  role: Role | null
+  saving: boolean
+  onClose: () => void
+  onSave: (name: string, description: string) => void
+}) {
+  const [name, setName] = useState(role?.name ?? '')
+  const [description, setDescription] = useState(role?.description ?? '')
+  return (
+    <SlideOver open onClose={onClose} title={role ? 'Editar perfil' : 'Nuevo perfil'}>
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!name.trim()) return
+          onSave(name.trim(), description.trim())
+        }}
+      >
+        <Input label="Nombre del perfil *" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Vendedor" />
+        <Input label="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Para qué sirve este perfil" />
+        <p className="text-xs text-text-tertiary">
+          Después de crear el perfil, asigná sus permisos tildando la columna correspondiente en la grilla.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" size="md" loading={saving}>{role ? 'Guardar' : 'Crear perfil'}</Button>
+        </div>
+      </form>
+    </SlideOver>
   )
 }

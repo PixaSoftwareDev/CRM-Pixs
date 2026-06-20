@@ -57,6 +57,15 @@ export interface ContactNote {
   created_at: string
 }
 
+export interface ContactComment {
+  id: string
+  contact_id: string
+  user_id: string
+  body: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ContactTag {
   id: string
   name: string
@@ -68,6 +77,20 @@ export interface TimelineEntry {
   kind: string
   timestamp: string
   [key: string]: unknown
+}
+
+export interface Industry {
+  id: string
+  company_id: string
+  name: string
+  created_at: string
+}
+
+export interface PostalCodeMatch {
+  postal_code: string
+  locality: string
+  province: string
+  phone_prefix?: string | null
 }
 
 export type CreateContactInput = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at'>
@@ -84,6 +107,7 @@ export const contactsApi = {
   list: (params?: {
     q?: string
     kind?: string
+    industry?: string
     assigned_user_id?: string
     limit?: number
     offset?: number
@@ -91,6 +115,7 @@ export const contactsApi = {
     const qs = new URLSearchParams()
     if (params?.q) qs.set('q', params.q)
     if (params?.kind) qs.set('kind', params.kind)
+    if (params?.industry) qs.set('industry', params.industry)
     if (params?.assigned_user_id) qs.set('assigned_user_id', params.assigned_user_id)
     if (params?.limit) qs.set('limit', String(params.limit))
     if (params?.offset) qs.set('offset', String(params.offset))
@@ -124,6 +149,15 @@ export const contactsApi = {
     create: (contactId: string, body: string) =>
       api.post<ContactNote>(`/contacts/${contactId}/notes`, { body }),
   },
+  comments: {
+    list: (contactId: string) => api.get<ContactComment[]>(`/contacts/${contactId}/comments`),
+    create: (contactId: string, body: string) =>
+      api.post<ContactComment>(`/contacts/${contactId}/comments`, { body }),
+    update: (contactId: string, commentId: string, body: string) =>
+      api.put<ContactComment>(`/contacts/${contactId}/comments/${commentId}`, { body }),
+    delete: (contactId: string, commentId: string) =>
+      api.delete<void>(`/contacts/${contactId}/comments/${commentId}`),
+  },
   tags: {
     list: (contactId: string) => api.get<ContactTag[]>(`/contacts/${contactId}/tags`),
     add: (contactId: string, tagId: string) =>
@@ -140,4 +174,13 @@ export const tagsApi = {
   },
   create: (name: string, color?: string, area?: string) =>
     api.post<ContactTag>('/tags', { name, color, area }),
+}
+
+export const industriesApi = {
+  list: () => api.get<Industry[]>('/industries'),
+  create: (name: string) => api.post<Industry>('/industries', { name }),
+}
+
+export const postalCodesApi = {
+  lookup: (cp: string) => api.get<PostalCodeMatch[]>(`/postal-codes/${encodeURIComponent(cp)}`),
 }

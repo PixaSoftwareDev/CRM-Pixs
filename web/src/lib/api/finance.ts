@@ -657,6 +657,41 @@ export const financeApi = {
     alerts: (days?: number) =>
       api.get<AlertsSummary>(`/alerts${days ? '?days=' + days : ''}`),
   },
+
+  // Account statement (cuenta corriente) for a contact.
+  accountStatement: (contactId: string, currency?: string) => {
+    const q = currency ? `?currency=${encodeURIComponent(currency)}` : ''
+    return api.get<AccountStatement>(`/contacts/${contactId}/account-statement${q}`)
+  },
+}
+
+// ─── Account statement (cuenta corriente) ──────────────────────────────────────
+// NOTE: AgingReport has no JSON tags on the backend, so it serializes in PascalCase.
+
+export interface StatementEntry {
+  date: string
+  kind: 'invoice' | 'receipt'
+  reference: string
+  debit: string
+  credit: string
+  running_balance: string
+}
+
+export interface AgingReport {
+  Current: string
+  Bucket30: string
+  Bucket60: string
+  Bucket90: string
+  Bucket90P: string
+  Total: string
+}
+
+export interface AccountStatement {
+  contact_id: string
+  currency: string
+  entries: StatementEntry[]
+  balance: string
+  aging: AgingReport
 }
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────

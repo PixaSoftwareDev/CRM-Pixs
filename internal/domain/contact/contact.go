@@ -81,6 +81,18 @@ type ContactNote struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ContactComment is an editable comment on a contact. Unlike ContactNote
+// (immutable facts), comments can be edited and soft-deleted.
+type ContactComment struct {
+	ID        uuid.UUID  `json:"id"`
+	ContactID uuid.UUID  `json:"contact_id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
 // Tag is a label that can be applied to contacts.
 type Tag struct {
 	ID        uuid.UUID `json:"id"`
@@ -89,6 +101,24 @@ type Tag struct {
 	Color     *string   `json:"color"`
 	Area      *string   `json:"area"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// Industry is a company-scoped catalog entry (rubro) used to classify and
+// filter contacts. The chosen industry's name is also stored on the contact.
+type Industry struct {
+	ID        uuid.UUID `json:"id"`
+	CompanyID uuid.UUID `json:"company_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// PostalCode is a read-only reference entry resolving a CP to its province,
+// locality and (best-effort) telephone area prefix.
+type PostalCode struct {
+	PostalCode  string  `json:"postal_code"`
+	Locality    string  `json:"locality"`
+	Province    string  `json:"province"`
+	PhonePrefix *string `json:"phone_prefix"`
 }
 
 // ContactKind represents the roles a contact can have.

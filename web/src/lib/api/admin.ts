@@ -98,6 +98,11 @@ export const adminApi = {
   },
   roles: {
     list: () => api.get<Role[]>('/admin/roles'),
+    create: (body: { name: string; description?: string }) =>
+      api.post<Role>('/admin/roles', body),
+    update: (id: string, body: { name: string; description?: string }) =>
+      api.put<Role>(`/admin/roles/${id}`, body),
+    remove: (id: string) => api.delete<void>(`/admin/roles/${id}`),
     permissions: (role_id: string) =>
       api.get<RolePermissionRow[]>(`/admin/roles/${role_id}/permissions`),
     upsertPermission: (role_id: string, perm_id: string, restricted_to_own = false) =>

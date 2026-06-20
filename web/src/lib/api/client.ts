@@ -17,11 +17,13 @@ export class ApiRequestError extends Error {
 // Most domain endpoints live under /api/v1. Auth endpoints live under /auth.
 // `request` takes a full path starting with '/', so callers choose the prefix.
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      // For FormData let the browser set Content-Type (with the multipart boundary).
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
   })
@@ -87,4 +89,11 @@ export const api = {
 
   delete: <T>(path: string, options?: RequestInit) =>
     request<T>(withBase(path), { ...options, method: 'DELETE' }),
+
+  // postForm sends multipart/form-data (file uploads). Do not set Content-Type.
+  postForm: <T>(path: string, formData: FormData, options?: RequestInit) =>
+    request<T>(withBase(path), { ...options, method: 'POST', body: formData }),
 }
+
+// apiBase exposes the base path for building direct URLs (e.g. file downloads).
+export const apiBase = API_BASE

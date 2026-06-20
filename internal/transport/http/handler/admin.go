@@ -11,18 +11,32 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"pixs/internal/auth/argon2"
+	"pixs/internal/auth/rbac"
 	sqlcgen "pixs/internal/repository/sqlc"
+	svcidentity "pixs/internal/service/identity"
 	mw "pixs/internal/transport/http/middleware"
 )
 
 // AdminHandler handles administration routes (users, roles, permissions, company, audit).
 type AdminHandler struct {
-	q *sqlcgen.Queries
+	q      *sqlcgen.Queries
+	policy *rbac.Policy
 }
 
-// NewAdminHandler constructs an AdminHandler.
-func NewAdminHandler(q *sqlcgen.Queries) *AdminHandler {
-	return &AdminHandler{q: q}
+// NewAdminHandler constructs an AdminHandler. policy may be nil (e.g. in tests);
+// when set, role/permission changes refresh it in place so they apply live.
+func NewAdminHandler(q *sqlcgen.Queries, policy *rbac.Policy) *AdminHandler {
+	return &AdminHandler{q: q, policy: policy}
+}
+
+// reloadPolicy refreshes the RBAC policy from the DB so permission/role changes
+// take effect without restarting the server. Best-effort: logs nothing here,
+// the caller's success is independent of the reload.
+func (h *AdminHandler) reloadPolicy(c echo.Context) {
+	if h.policy == nil {
+		return
+	}
+	_ = svcidentity.ReloadPolicy(c.Request().Context(), h.q, h.policy, companyFromCtx(c))
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -228,6 +242,90 @@ func (h *AdminHandler) ListRoles(c echo.Context) error {
 	return c.JSON(http.StatusOK, roles)
 }
 
+type roleRequest struct {
+	Name        string `json:"name"        validate:"required"`
+	Description string `json:"description"`
+}
+
+// optString returns nil for an empty string, otherwise a pointer to it.
+func optString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// CreateRole POST /admin/roles
+func (h *AdminHandler) CreateRole(c echo.Context) error {
+	var req roleRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	role, err := h.q.CreateRole(c.Request().Context(), sqlcgen.CreateRoleParams{
+		CompanyID:   companyFromCtx(c),
+		Name:        req.Name,
+		Description: optString(req.Description),
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+			return echo.NewHTTPError(http.StatusConflict, "ya existe un perfil con ese nombre")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "error al crear el perfil")
+	}
+	h.reloadPolicy(c)
+	return c.JSON(http.StatusCreated, role)
+}
+
+// UpdateRole PUT /admin/roles/:id
+func (h *AdminHandler) UpdateRole(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "id inválido")
+	}
+	var req roleRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "datos inválidos")
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+	role, err := h.q.UpdateRole(c.Request().Context(), sqlcgen.UpdateRoleParams{
+		ID:          id,
+		CompanyID:   companyFromCtx(c),
+		Name:        req.Name,
+		Description: optString(req.Description),
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "perfil no encontrado o es de sistema")
+	}
+	h.reloadPolicy(c)
+	return c.JSON(http.StatusOK, role)
+}
+
+// DeleteRole DELETE /admin/roles/:id
+func (h *AdminHandler) DeleteRole(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "id inválido")
+	}
+	ctx := c.Request().Context()
+	// Remove dependent rows first (no ON DELETE CASCADE on these FKs).
+	if err := h.q.DeleteUserRolesByRole(ctx, id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "error al quitar asignaciones del perfil")
+	}
+	if err := h.q.DeleteRolePermissionsByRole(ctx, id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "error al quitar permisos del perfil")
+	}
+	if err := h.q.DeleteRole(ctx, sqlcgen.DeleteRoleParams{ID: id, CompanyID: companyFromCtx(c)}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "error al eliminar el perfil")
+	}
+	h.reloadPolicy(c)
+	return c.NoContent(http.StatusNoContent)
+}
+
 // ListPermissions GET /admin/permissions
 func (h *AdminHandler) ListPermissions(c echo.Context) error {
 	perms, err := h.q.ListPermissions(c.Request().Context())
@@ -271,6 +369,7 @@ func (h *AdminHandler) UpsertRolePermission(c echo.Context) error {
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "error al guardar permiso")
 	}
+	h.reloadPolicy(c)
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -290,6 +389,7 @@ func (h *AdminHandler) DeleteRolePermission(c echo.Context) error {
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "error al eliminar permiso")
 	}
+	h.reloadPolicy(c)
 	return c.NoContent(http.StatusNoContent)
 }
 

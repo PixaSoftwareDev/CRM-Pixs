@@ -42,6 +42,7 @@ WHERE company_id = $1
   AND ($2::text = '' OR search_vector @@ plainto_tsquery('simple', $2))
   AND ($3::text = '' OR $3 = ANY(kind))
   AND (sqlc.narg('assigned_user_id')::uuid IS NULL OR assigned_user_id = sqlc.narg('assigned_user_id'))
+  AND (sqlc.narg('industry')::text IS NULL OR industry = sqlc.narg('industry'))
 ORDER BY fantasy_name
 LIMIT $4 OFFSET $5;
 
@@ -152,6 +153,33 @@ RETURNING *;
 SELECT * FROM contact_notes
 WHERE contact_id = $1
 ORDER BY created_at DESC;
+
+-- ─── Contact Comments (editable, soft-delete) ─────────────────────────────────
+
+-- name: CreateContactComment :one
+INSERT INTO contact_comments (contact_id, user_id, body)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: ListContactComments :many
+SELECT * FROM contact_comments
+WHERE contact_id = $1 AND deleted_at IS NULL
+ORDER BY created_at DESC;
+
+-- name: GetContactCommentByID :one
+SELECT * FROM contact_comments
+WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: UpdateContactComment :one
+UPDATE contact_comments
+SET body = $2, updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING *;
+
+-- name: SoftDeleteContactComment :exec
+UPDATE contact_comments
+SET deleted_at = now(), updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL;
 
 -- ─── Contact Balances ──────────────────────────────────────────────────────────
 
