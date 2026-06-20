@@ -71,6 +71,7 @@ export const navItems: NavItem[] = [
     children: [
       { key: 'ajustes-perfil',       label: 'Mi perfil',   path: '/ajustes/perfil' },
       { key: 'ajustes-usuarios',     label: 'Usuarios',    path: '/ajustes/usuarios' },
+      { key: 'ajustes-roles',        label: 'Perfiles y permisos', path: '/ajustes/roles' },
       { key: 'ajustes-empresa',      label: 'Empresa',     path: '/ajustes/empresa' },
       { key: 'ajustes-catalogos',    label: 'Catálogos',   path: '/ajustes/catalogos' },
       { key: 'ajustes-cotizaciones', label: 'Cotizaciones',path: '/ajustes/cotizaciones' },

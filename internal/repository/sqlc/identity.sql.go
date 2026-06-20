@@ -219,6 +219,24 @@ func (q *Queries) DeleteRolePermission(ctx context.Context, arg DeleteRolePermis
 	return err
 }
 
+const deleteRolePermissionsByRole = `-- name: DeleteRolePermissionsByRole :exec
+DELETE FROM role_permissions WHERE role_id = $1
+`
+
+func (q *Queries) DeleteRolePermissionsByRole(ctx context.Context, roleID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteRolePermissionsByRole, roleID)
+	return err
+}
+
+const deleteUserRolesByRole = `-- name: DeleteUserRolesByRole :exec
+DELETE FROM user_roles WHERE role_id = $1
+`
+
+func (q *Queries) DeleteUserRolesByRole(ctx context.Context, roleID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserRolesByRole, roleID)
+	return err
+}
+
 const deleteUserTOTPBackupCodes = `-- name: DeleteUserTOTPBackupCodes :exec
 DELETE FROM totp_backup_codes WHERE user_id = $1
 `
@@ -1009,6 +1027,38 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateRole = `-- name: UpdateRole :one
+UPDATE roles SET name = $3, description = $4
+WHERE id = $1 AND company_id = $2 AND is_system = false
+RETURNING id, company_id, name, description, is_system, created_at
+`
+
+type UpdateRoleParams struct {
+	ID          uuid.UUID `db:"id" json:"id"`
+	CompanyID   uuid.UUID `db:"company_id" json:"company_id"`
+	Name        string    `db:"name" json:"name"`
+	Description *string   `db:"description" json:"description"`
+}
+
+func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error) {
+	row := q.db.QueryRow(ctx, updateRole,
+		arg.ID,
+		arg.CompanyID,
+		arg.Name,
+		arg.Description,
+	)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+		&i.CreatedAt,
 	)
 	return i, err
 }

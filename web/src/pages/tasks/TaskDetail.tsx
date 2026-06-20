@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Play, Square, UserCheck } from 'lucide-react'
+import { Play, Square, UserCheck, Download, FileText, Trash2 } from 'lucide-react'
 import { SlideOver } from '../../components/ui/SlideOver'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -16,6 +16,8 @@ import {
   taskPriorityDot,
 } from '../../lib/crm'
 import { tasksApi, taskTransitions } from '../../lib/api/tasks'
+import { documentsApi } from '../../lib/api/documents'
+import { FileDropzone } from '../../components/ui/FileDropzone'
 
 function elapsed(fromIso: string): string {
   const secs = Math.max(0, Math.floor((Date.now() - new Date(fromIso).getTime()) / 1000))
@@ -216,10 +218,78 @@ export function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () =>
           )}
 
           <CommentsSection taskId={taskId} />
+          <TaskDocumentsSection taskId={taskId} />
           <HistorySection taskId={taskId} />
         </div>
       )}
     </SlideOver>
+  )
+}
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function TaskDocumentsSection({ taskId }: { taskId: string }) {
+  const qc = useQueryClient()
+  const toast = useUIStore((s) => s.toast)
+  const key = ['task', taskId, 'documents']
+
+  const { data, isLoading } = useQuery({
+    queryKey: key,
+    queryFn: () => documentsApi.list('task', taskId),
+  })
+
+  const upload = useMutation({
+    mutationFn: (file: File) => documentsApi.upload('task', taskId, file),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Documento subido') },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'No se pudo subir'),
+  })
+  const del = useMutation({
+    mutationFn: (id: string) => documentsApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Documento eliminado') },
+    onError: () => toast.error('No se pudo eliminar'),
+  })
+
+  const docs = data ?? []
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium text-text">Documentos</p>
+      <div className="mb-3">
+        <FileDropzone onFile={(f) => upload.mutate(f)} pending={upload.isPending} compact />
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-12 w-full" />
+      ) : docs.length === 0 ? (
+        <p className="text-xs text-text-tertiary">Sin documentos adjuntos.</p>
+      ) : (
+        <ul className="space-y-2">
+          {docs.map((d) => (
+            <li key={d.id} className="flex items-center justify-between rounded-lg border border-border bg-surface p-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={15} className="shrink-0 text-text-tertiary" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-text">{d.file_name}</p>
+                  <p className="text-xs text-text-tertiary">{fmtBytes(d.size_bytes)}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <a href={documentsApi.downloadUrl(d.id)} target="_blank" rel="noreferrer"
+                  className="rounded p-1.5 text-text-tertiary hover:bg-surface-subtle hover:text-text" title="Descargar">
+                  <Download size={15} />
+                </a>
+                <Button variant="ghost" size="sm" onClick={() => del.mutate(d.id)}>
+                  <Trash2 size={13} />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

@@ -38,6 +38,13 @@ type Config struct {
 	// DevSeedAdminPassword is only used by the seed command in dev/staging.
 	DevSeedAdminPassword string `envconfig:"DEV_SEED_ADMIN_PASSWORD" default:"admin123!"`
 
+	// StorageDir is the local directory where uploaded document attachments are
+	// stored. Relative paths resolve from the process working directory.
+	StorageDir string `envconfig:"STORAGE_DIR" default:"./storage"`
+
+	// MaxUploadSizeMB caps the size of a single uploaded file. Default 25 MB.
+	MaxUploadSizeMB int `envconfig:"MAX_UPLOAD_SIZE_MB" default:"25"`
+
 	// --- Scraping / Leads module ---
 
 	// SerperAPIKey authenticates against the Serper.dev search API.

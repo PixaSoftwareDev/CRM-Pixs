@@ -261,6 +261,16 @@ type ContactBankAccount struct {
 	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
+type ContactComment struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	ContactID uuid.UUID          `db:"contact_id" json:"contact_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Body      string             `db:"body" json:"body"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
 type ContactNote struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	ContactID uuid.UUID          `db:"contact_id" json:"contact_id"`
@@ -293,6 +303,21 @@ type Currency struct {
 	Code   string `db:"code" json:"code"`
 	Name   string `db:"name" json:"name"`
 	Symbol string `db:"symbol" json:"symbol"`
+}
+
+type Document struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	CompanyID   uuid.UUID          `db:"company_id" json:"company_id"`
+	EntityType  string             `db:"entity_type" json:"entity_type"`
+	EntityID    uuid.UUID          `db:"entity_id" json:"entity_id"`
+	FileName    string             `db:"file_name" json:"file_name"`
+	ContentType string             `db:"content_type" json:"content_type"`
+	SizeBytes   int64              `db:"size_bytes" json:"size_bytes"`
+	StorageKey  string             `db:"storage_key" json:"storage_key"`
+	UploadedBy  uuid.UUID          `db:"uploaded_by" json:"uploaded_by"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
 type EmailVerificationToken struct {
@@ -343,6 +368,15 @@ type ExpenseCategory struct {
 	Name      string             `db:"name" json:"name"`
 	IsActive  bool               `db:"is_active" json:"is_active"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Industry struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	CompanyID uuid.UUID          `db:"company_id" json:"company_id"`
+	Name      string             `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
 type InvoiceItem struct {
@@ -598,6 +632,15 @@ type PipelineStage struct {
 	IsLoss    bool               `db:"is_loss" json:"is_loss"`
 	IsDefault bool               `db:"is_default" json:"is_default"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type PostalCode struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	PostalCode  string             `db:"postal_code" json:"postal_code"`
+	Locality    string             `db:"locality" json:"locality"`
+	Province    string             `db:"province" json:"province"`
+	PhonePrefix *string            `db:"phone_prefix" json:"phone_prefix"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Product struct {

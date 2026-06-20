@@ -26,6 +26,7 @@ import (
 	sqlcgen "pixs/internal/repository/sqlc"
 	svccalendar "pixs/internal/service/calendar"
 	svccontact "pixs/internal/service/contact"
+	svcdocument "pixs/internal/service/document"
 	svcfinance "pixs/internal/service/finance"
 	svcidentity "pixs/internal/service/identity"
 	svclead "pixs/internal/service/lead"
@@ -160,6 +161,9 @@ func run() error {
 		AllowCredentials: true,
 	}))
 
+	// Cap request bodies a bit above the max upload size to allow multipart overhead.
+	e.Use(middleware.BodyLimit(fmt.Sprintf("%dM", cfg.MaxUploadSizeMB+5)))
+
 	contactSvc := svccontact.NewContactService(db, cipher, logger)
 	calendarSvc := svccalendar.NewCalendarService(db, logger)
 
@@ -202,8 +206,9 @@ func run() error {
 	}
 
 	vaultSvc := svcvault.New(db, cipher, logger)
+	documentSvc := svcdocument.NewDocumentService(db, cfg.StorageDir, cfg.MaxUploadSizeMB, logger)
 
-	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, vaultSvc, logger)
+	registerRoutes(e, db, rdb, sessStore, q, policy, authSvc, contactSvc, calendarSvc, salesProjectTask, financeServices, leadServices, vaultSvc, documentSvc, logger)
 
 	// --- SPA static serving (must come after all API routes) ---
 	// The compiled frontend lives at web/dist relative to the working directory
@@ -252,6 +257,7 @@ func registerRoutes(
 	fin *financeServices,
 	leads *leadServices,
 	vaultSvc *svcvault.VaultService,
+	documentSvc *svcdocument.DocumentService,
 	logger *slog.Logger,
 ) {
 	e.GET("/health", healthHandler(db, rdb))
@@ -307,11 +313,26 @@ func registerRoutes(
 	registerFinanceRoutes(e, authMiddleware, policy, fin)
 	registerLeadRoutes(e, authMiddleware, policy, leads)
 	registerVaultRoutes(e, authMiddleware, policy, vaultSvc)
+	registerDocumentRoutes(e, authMiddleware, policy, documentSvc)
 	registerAdminRoutes(e, authMiddleware, policy, q)
 }
 
+func registerDocumentRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc, policy *rbac.Policy, documentSvc *svcdocument.DocumentService) {
+	h := handler.NewDocumentHandler(documentSvc)
+
+	canView := mw.RequirePermission(policy, "documents", "view")
+	canUpload := mw.RequirePermission(policy, "documents", "upload")
+	canDelete := mw.RequirePermission(policy, "documents", "delete")
+
+	docs := e.Group("/api/v1/documents", authMiddleware)
+	docs.GET("", h.ListDocuments, canView)
+	docs.POST("", h.UploadDocument, canUpload)
+	docs.GET("/:id/download", h.DownloadDocument, canView)
+	docs.DELETE("/:id", h.DeleteDocument, canDelete)
+}
+
 func registerAdminRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc, policy *rbac.Policy, q *sqlcgen.Queries) {
-	h := handler.NewAdminHandler(q)
+	h := handler.NewAdminHandler(q, policy)
 
 	canManageUsers := mw.RequirePermission(policy, "users", "manage")
 	canViewUsers   := canManageUsers // users/view is not seeded; manage implies view
@@ -330,6 +351,9 @@ func registerAdminRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc, polic
 
 	// Roles & Permissions
 	admin.GET("/roles", h.ListRoles, canViewUsers)
+	admin.POST("/roles", h.CreateRole, canManageRoles)
+	admin.PUT("/roles/:id", h.UpdateRole, canManageRoles)
+	admin.DELETE("/roles/:id", h.DeleteRole, canManageRoles)
 	admin.GET("/permissions", h.ListPermissions, canViewUsers)
 	admin.GET("/roles/:id/permissions", h.GetRolePermissions, canViewUsers)
 	admin.PUT("/roles/:id/permissions/:perm_id", h.UpsertRolePermission, canManageRoles)
@@ -733,6 +757,11 @@ func registerCRMRoutes(
 	contacts.GET("/:id/notes", contactH.ListNotes, canViewContacts)
 	contacts.POST("/:id/notes", contactH.CreateNote, canViewContacts) // any viewer can add notes
 
+	contacts.GET("/:id/comments", contactH.ListComments, canViewContacts)
+	contacts.POST("/:id/comments", contactH.CreateComment, canViewContacts) // any viewer can comment
+	contacts.PUT("/:id/comments/:comment_id", contactH.UpdateComment, canEditContacts)
+	contacts.DELETE("/:id/comments/:comment_id", contactH.DeleteComment, canEditContacts)
+
 	contacts.GET("/:id/tags", contactH.ListContactTags, canViewContacts)
 	contacts.POST("/:id/tags", contactH.AddContactTag, canEditContacts)
 	contacts.DELETE("/:id/tags/:tag_id", contactH.RemoveContactTag, canEditContacts)
@@ -741,6 +770,14 @@ func registerCRMRoutes(
 	tags := api.Group("/tags", canViewContacts)
 	tags.GET("", contactH.ListTags)
 	tags.POST("", contactH.CreateTag, canEditContacts)
+
+	// ─── Industries (rubros) ─────────────────────────────────────────────────────
+	industries := api.Group("/industries", canViewContacts)
+	industries.GET("", contactH.ListIndustries)
+	industries.POST("", contactH.CreateIndustry, canEditContacts)
+
+	// ─── Postal codes (reference lookup) ─────────────────────────────────────────
+	api.GET("/postal-codes/:cp", contactH.LookupPostalCode, canViewContacts)
 
 	// ─── Calendar ──────────────────────────────────────────────────────────────
 	canViewCalendar := mw.RequirePermission(policy, "calendar", "view")

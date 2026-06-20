@@ -11,6 +11,15 @@ import {
   Calendar,
   TrendingUp,
   DollarSign,
+  Download,
+  AlertTriangle,
+  CheckCircle2,
+  Users,
+  MessageSquare,
+  CreditCard,
+  Clock,
+  Tag as TagIcon,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -20,9 +29,10 @@ import { ConfirmModal } from '../../components/ui/Modal'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ErrorState } from '../../components/ui/ErrorState'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { FileDropzone } from '../../components/ui/FileDropzone'
 import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
-import { formatRelativeTime, formatDate, cn } from '../../lib/utils'
+import { formatRelativeTime, formatDate, formatMoney, cn } from '../../lib/utils'
 import {
   contactsApi,
   tagsApi,
@@ -32,6 +42,8 @@ import {
   type BankAccountInput,
   type TimelineEntry,
 } from '../../lib/api/contacts'
+import { financeApi } from '../../lib/api/finance'
+import { documentsApi } from '../../lib/api/documents'
 import {
   contactKindColor,
   contactKindLabel,
@@ -52,7 +64,7 @@ const VAT_CONDITION_LABELS: Record<string, string> = {
   final_consumer: 'Consumidor Final',
 }
 
-type Tab = 'personas' | 'cuentas' | 'notas' | 'timeline' | 'etiquetas'
+type Tab = 'financiero' | 'comentarios' | 'personas' | 'documentos' | 'cuentas' | 'timeline' | 'etiquetas'
 
 export function ContactDetailPage() {
   const { id = '' } = useParams()
@@ -60,7 +72,7 @@ export function ContactDetailPage() {
   const qc = useQueryClient()
   const can = useAuthStore((s) => s.can)
   const toast = useUIStore((s) => s.toast)
-  const [tab, setTab] = useState<Tab>('personas')
+  const [tab, setTab] = useState<Tab>('comentarios')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
@@ -111,12 +123,15 @@ export function ContactDetailPage() {
   const canEdit = can('contacts', 'edit') || can('contacts', 'update')
   const canDelete = can('contacts', 'delete')
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'personas', label: 'Personas' },
-    { key: 'cuentas', label: 'Cuentas bancarias' },
-    { key: 'notas', label: 'Notas' },
-    { key: 'timeline', label: 'Timeline' },
-    { key: 'etiquetas', label: 'Etiquetas' },
+  const isClient = contact.kind.includes('client')
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
+    ...(isClient ? [{ key: 'financiero' as Tab, label: 'Situación financiera', icon: DollarSign }] : []),
+    { key: 'comentarios', label: 'Comentarios', icon: MessageSquare },
+    { key: 'personas', label: 'Personas', icon: Users },
+    { key: 'documentos', label: 'Documentos', icon: FileText },
+    { key: 'cuentas', label: 'Cuentas bancarias', icon: CreditCard },
+    { key: 'timeline', label: 'Actividad', icon: Clock },
+    { key: 'etiquetas', label: 'Etiquetas', icon: TagIcon },
   ]
 
   return (
@@ -148,6 +163,7 @@ export function ContactDetailPage() {
                 Pipeline: {contactStage.name}
               </button>
             )}
+            {contact.kind.includes('client') && <DebtBadge contactId={id} onClick={() => setTab('financiero')} />}
           </div>
         </div>
         <div className="flex gap-2">
@@ -208,7 +224,9 @@ export function ContactDetailPage() {
       <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-3">
         <Field label="CUIT/CUIL" value={contact.cuit_cuil} />
         <Field label="Condición IVA" value={VAT_CONDITION_LABELS[contact.vat_condition ?? ''] ?? contact.vat_condition} />
-        <Field label="Ciudad" value={[contact.city, contact.province].filter(Boolean).join(', ')} />
+        <Field label="Rubro" value={contact.industry} />
+        <Field label="Localidad" value={[contact.city, contact.province].filter(Boolean).join(', ')} />
+        <Field label="Domicilio" value={[contact.fiscal_address, contact.postal_code].filter(Boolean).join(' · ')} />
         <Field label="Email" value={contact.email} />
         <Field label="Teléfono" value={contact.phone} />
         <Field label="Sitio web" value={contact.website} />
@@ -216,28 +234,34 @@ export function ContactDetailPage() {
 
       <div className="border-b border-border">
         <nav className="flex gap-1 overflow-x-auto" role="tablist">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                tab === t.key
-                  ? 'border-brand text-text'
-                  : 'border-transparent text-text-secondary hover:text-text',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+          {tabs.map((t) => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                  tab === t.key
+                    ? 'border-brand text-text'
+                    : 'border-transparent text-text-secondary hover:text-text',
+                )}
+              >
+                <Icon size={15} />
+                {t.label}
+              </button>
+            )
+          })}
         </nav>
       </div>
 
       {tab === 'personas' && <PersonsTab contactId={id} canEdit={canEdit} />}
+      {tab === 'financiero' && <FinancialTab contactId={id} />}
+      {tab === 'comentarios' && <CommentsTab contactId={id} canEdit={canEdit} />}
+      {tab === 'documentos' && <DocumentsTab contactId={id} canEdit={canEdit} />}
       {tab === 'cuentas' && <BankAccountsTab contactId={id} canEdit={canEdit} />}
-      {tab === 'notas' && <NotesTab contactId={id} canEdit={canEdit} />}
       {tab === 'timeline' && <TimelineTab contactId={id} />}
       {tab === 'etiquetas' && <TagsTab contactId={id} canEdit={canEdit} />}
 
@@ -412,7 +436,16 @@ function PersonForm({
         onSubmit={(e) => {
           e.preventDefault()
           if (!form.name.trim()) return
-          mutation.mutate(form)
+          const clean = (v?: string) => (v && v.trim() ? v.trim() : undefined)
+          mutation.mutate({
+            name: form.name.trim(),
+            role: clean(form.role),
+            email: clean(form.email),
+            phone: clean(form.phone),
+            notes: clean(form.notes),
+            birthday: clean(form.birthday),
+            is_primary: form.is_primary,
+          })
         }}
       >
         <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -571,69 +604,335 @@ function BankAccountForm({ contactId, onClose }: { contactId: string; onClose: (
   )
 }
 
-// ---------------- Notes ----------------
+// ---------------- Situación financiera ----------------
 
-function NotesTab({ contactId, canEdit }: { contactId: string; canEdit: boolean }) {
+function DebtBadge({ contactId, onClick }: { contactId: string; onClick: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['contact', contactId, 'statement', 'ARS'],
+    queryFn: () => financeApi.accountStatement(contactId, 'ARS'),
+  })
+  if (!data) return null
+  const balance = parseFloat(data.balance || '0')
+  const owes = balance > 0.009
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+        owes
+          ? 'border-danger/30 bg-danger/10 text-danger hover:bg-danger/20'
+          : 'border-success/30 bg-success/10 text-success hover:bg-success/20',
+      )}
+      title="Ver situación financiera"
+    >
+      {owes ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+      {owes ? `Debe ${formatMoney(data.balance, 'ARS')}` : 'Al día'}
+    </button>
+  )
+}
+
+function FinancialTab({ contactId }: { contactId: string }) {
+  const [currency, setCurrency] = useState('ARS')
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['contact', contactId, 'statement', currency],
+    queryFn: () => financeApi.accountStatement(contactId, currency),
+  })
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
+  if (!data) return null
+
+  const balance = parseFloat(data.balance || '0')
+  const owes = balance > 0.009
+  const aging = data.aging
+  const buckets = [
+    { label: 'Por vencer', value: aging.Current, overdue: false },
+    { label: '0–30 días', value: aging.Bucket30, overdue: true },
+    { label: '31–60 días', value: aging.Bucket60, overdue: true },
+    { label: '61–90 días', value: aging.Bucket90, overdue: true },
+    { label: '+90 días', value: aging.Bucket90P, overdue: true },
+  ]
+  const maxBucket = Math.max(1, ...buckets.map((b) => Math.abs(parseFloat(b.value || '0'))))
+
+  const downloadCsv = () => {
+    const rows = [
+      ['Fecha', 'Concepto', 'Debe', 'Haber', 'Saldo'],
+      ...data.entries.map((e) => [formatDate(e.date), e.reference, e.debit, e.credit, e.running_balance]),
+    ]
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `estado-cuenta-${currency}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Saldo destacado + acciones */}
+      <div className={cn(
+        'flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5',
+        owes ? 'border-danger/30 bg-danger/5' : 'border-success/30 bg-success/5',
+      )}>
+        <div className="flex items-center gap-4">
+          <div className={cn(
+            'flex h-12 w-12 items-center justify-center rounded-full',
+            owes ? 'bg-danger/15 text-danger' : 'bg-success/15 text-success',
+          )}>
+            {owes ? <AlertTriangle size={24} /> : <CheckCircle2 size={24} />}
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-text-tertiary">Saldo de cuenta corriente</p>
+            <p className={cn('text-3xl font-bold leading-tight', owes ? 'text-danger' : 'text-success')}>
+              {formatMoney(data.balance, currency)}
+            </p>
+            <p className="text-sm text-text-secondary">
+              {owes ? 'El cliente tiene deuda pendiente.' : 'El cliente está al día.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-text focus:border-brand focus:outline-none"
+          >
+            {currencyOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <Button variant="secondary" size="md" onClick={downloadCsv} disabled={data.entries.length === 0}>
+            <Download size={15} className="mr-1" /> Descargar
+          </Button>
+        </div>
+      </div>
+
+      {/* Aging con barra de proporción */}
+      <div>
+        <p className="mb-2 text-sm font-medium text-text">Antigüedad de la deuda</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {buckets.map((b) => {
+            const v = Math.abs(parseFloat(b.value || '0'))
+            const pct = Math.round((v / maxBucket) * 100)
+            return (
+              <div key={b.label} className="rounded-xl border border-border bg-surface p-3">
+                <p className="text-xs text-text-tertiary">{b.label}</p>
+                <p className="text-sm font-semibold text-text">{formatMoney(b.value, currency)}</p>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                  <div
+                    className={cn('h-full rounded-full', v === 0 ? '' : b.overdue ? 'bg-danger' : 'bg-success')}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Movimientos */}
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-subtle text-left text-xs text-text-tertiary">
+            <tr>
+              <th className="px-3 py-2">Fecha</th>
+              <th className="px-3 py-2">Concepto</th>
+              <th className="px-3 py-2 text-right">Debe</th>
+              <th className="px-3 py-2 text-right">Haber</th>
+              <th className="px-3 py-2 text-right">Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.entries.length === 0 ? (
+              <tr><td colSpan={5} className="px-3 py-6 text-center text-text-tertiary">Sin movimientos</td></tr>
+            ) : (
+              data.entries.map((e, i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2 text-text-secondary">{formatDate(e.date)}</td>
+                  <td className="px-3 py-2 text-text">{e.reference}</td>
+                  <td className="px-3 py-2 text-right text-text">{parseFloat(e.debit) ? formatMoney(e.debit, currency) : '—'}</td>
+                  <td className="px-3 py-2 text-right text-text">{parseFloat(e.credit) ? formatMoney(e.credit, currency) : '—'}</td>
+                  <td className="px-3 py-2 text-right font-medium text-text">{formatMoney(e.running_balance, currency)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ---------------- Comentarios ----------------
+
+function CommentsTab({ contactId, canEdit }: { contactId: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const toast = useUIStore((s) => s.toast)
   const [body, setBody] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editBody, setEditBody] = useState('')
 
+  const key = ['contact', contactId, 'comments']
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['contact', contactId, 'notes'],
-    queryFn: () => contactsApi.notes.list(contactId),
+    queryKey: key,
+    queryFn: () => contactsApi.comments.list(contactId),
   })
 
   const add = useMutation({
-    mutationFn: (text: string) => contactsApi.notes.create(contactId, text),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contact', contactId, 'notes'] })
-      setBody('')
-      toast.success('Nota agregada')
-    },
-    onError: () => toast.error('No se pudo guardar la nota'),
+    mutationFn: (text: string) => contactsApi.comments.create(contactId, text),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setBody(''); toast.success('Comentario agregado') },
+    onError: () => toast.error('No se pudo guardar el comentario'),
+  })
+  const edit = useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) => contactsApi.comments.update(contactId, id, text),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setEditingId(null); toast.success('Comentario actualizado') },
+    onError: () => toast.error('No se pudo actualizar'),
+  })
+  const del = useMutation({
+    mutationFn: (id: string) => contactsApi.comments.delete(contactId, id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Comentario eliminado') },
+    onError: () => toast.error('No se pudo eliminar'),
   })
 
   if (isLoading) return <Skeleton className="h-24 w-full" />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const notes = [...(data ?? [])].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  const comments = data ?? []
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 rounded-xl border border-border bg-surface p-4">
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Escribí un comentario…"
+          rows={3}
+          className="w-full rounded border border-border bg-surface p-3 text-base text-text placeholder:text-text-tertiary focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+        />
+        <div className="flex justify-end">
+          <Button variant="primary" size="md" loading={add.isPending} disabled={!body.trim()} onClick={() => add.mutate(body.trim())}>
+            Agregar comentario
+          </Button>
+        </div>
+      </div>
+      {comments.length === 0 ? (
+        <EmptyState title="Sin comentarios" description="Dejá un comentario sobre este cliente." />
+      ) : (
+        <ul className="space-y-2">
+          {comments.map((c) => (
+            <li key={c.id} className="rounded-xl border border-border bg-surface p-4">
+              {editingId === c.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    rows={3}
+                    className="w-full rounded border border-border bg-surface p-2 text-sm text-text focus:border-brand focus:outline-none"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancelar</Button>
+                    <Button variant="primary" size="sm" loading={edit.isPending} disabled={!editBody.trim()}
+                      onClick={() => edit.mutate({ id: c.id, text: editBody.trim() })}>Guardar</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="whitespace-pre-wrap text-sm text-text">{c.body}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-text-tertiary" title={formatDate(c.created_at)}>
+                      {formatRelativeTime(c.created_at)}
+                    </p>
+                    {canEdit && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => { setEditingId(c.id); setEditBody(c.body) }}>
+                          <Pencil size={13} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => del.mutate(c.id)}>
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
+}
+
+// ---------------- Documentos ----------------
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function DocumentsTab({ contactId, canEdit }: { contactId: string; canEdit: boolean }) {
+  const qc = useQueryClient()
+  const toast = useUIStore((s) => s.toast)
+  const key = ['contact', contactId, 'documents']
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: key,
+    queryFn: () => documentsApi.list('contact', contactId),
+  })
+
+  const upload = useMutation({
+    mutationFn: (file: File) => documentsApi.upload('contact', contactId, file),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Documento subido') },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'No se pudo subir el documento'),
+  })
+  const del = useMutation({
+    mutationFn: (id: string) => documentsApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Documento eliminado') },
+    onError: () => toast.error('No se pudo eliminar'),
+  })
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
+
+  const docs = data ?? []
 
   return (
     <div className="space-y-4">
       {canEdit && (
-        <div className="space-y-2 rounded-xl border border-border bg-surface p-4">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Escribí una nota sobre este contacto…"
-            rows={3}
-            className="w-full rounded border border-border bg-surface p-3 text-base text-text placeholder:text-text-tertiary focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          />
-          <div className="flex justify-end">
-            <Button
-              variant="primary"
-              size="md"
-              loading={add.isPending}
-              disabled={!body.trim()}
-              onClick={() => add.mutate(body.trim())}
-            >
-              Agregar nota
-            </Button>
-          </div>
-        </div>
+        <FileDropzone
+          onFile={(f) => upload.mutate(f)}
+          pending={upload.isPending}
+          hint="PDF, imágenes, planillas… hasta el límite configurado"
+        />
       )}
-      {notes.length === 0 ? (
-        <EmptyState title="Sin notas" description="Agregá una nota sobre este contacto." />
+      {docs.length === 0 ? (
+        <EmptyState title="Sin documentos" description="Adjuntá archivos relacionados a este contacto." />
       ) : (
         <ul className="space-y-2">
-          {notes.map((n) => (
-            <li key={n.id} className="rounded-xl border border-border bg-surface p-4">
-              <p className="whitespace-pre-wrap text-sm text-text">{n.body}</p>
-              <p className="mt-2 text-xs text-text-tertiary" title={formatDate(n.created_at)}>
-                {formatRelativeTime(n.created_at)}
-              </p>
+          {docs.map((d) => (
+            <li key={d.id} className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText size={18} className="shrink-0 text-text-tertiary" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-text">{d.file_name}</p>
+                  <p className="text-xs text-text-tertiary">
+                    {formatBytes(d.size_bytes)} · {formatRelativeTime(d.created_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <a href={documentsApi.downloadUrl(d.id)} target="_blank" rel="noreferrer"
+                  className="rounded p-2 text-text-tertiary hover:bg-surface-subtle hover:text-text" title="Descargar">
+                  <Download size={16} />
+                </a>
+                {canEdit && (
+                  <Button variant="ghost" size="sm" onClick={() => del.mutate(d.id)}>
+                    <Trash2 size={14} />
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
