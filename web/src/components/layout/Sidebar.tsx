@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../../stores/auth'
 import { useUIStore } from '../../stores/ui'
 import { navItems, type NavItem, type NavChild } from './nav'
@@ -27,18 +27,32 @@ export function Sidebar() {
         collapsed ? 'w-16' : 'w-60',
       )}
     >
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-4 border-b border-border">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-semibold">
-          P
-        </div>
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-text">PIXS</span>
-            <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-medium text-text-tertiary">
-              v0.1
-            </span>
-          </div>
+      {/* Logo + toggle */}
+      <div className={cn('flex h-16 items-center border-b border-border', collapsed ? 'justify-center px-2' : 'gap-2 px-4')}>
+        {collapsed ? (
+          <button
+            onClick={toggleSidebar}
+            title="Expandir menú"
+            aria-label="Expandir menú"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-semibold hover:opacity-90"
+          >
+            P
+          </button>
+        ) : (
+          <>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white font-semibold">
+              P
+            </div>
+            <span className="flex-1 text-lg font-semibold text-text">PIXS</span>
+            <button
+              onClick={toggleSidebar}
+              title="Contraer menú"
+              aria-label="Contraer menú"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-tertiary hover:bg-surface-raised hover:text-text"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          </>
         )}
       </div>
 
@@ -55,28 +69,25 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer: collapse + user */}
-      <div className="border-t border-border p-2 space-y-1">
-        <button
-          onClick={toggleSidebar}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-surface-raised"
-          aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
-        >
-          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-          {!collapsed && <span>Contraer</span>}
-        </button>
-        {!collapsed && user && (
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand text-sm font-semibold">
+      {/* Footer: user */}
+      {user && (
+        <div className="border-t border-border p-2">
+          <div className={cn('flex items-center rounded-lg', collapsed ? 'justify-center px-1 py-2' : 'gap-3 px-3 py-2')}>
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand text-sm font-semibold"
+              title={collapsed ? `${user.full_name} · ${user.email}` : undefined}
+            >
               {user.full_name.charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-text">{user.full_name}</p>
-              <p className="truncate text-xs text-text-tertiary">{user.email}</p>
-            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-text">{user.full_name}</p>
+                <p className="truncate text-xs text-text-tertiary">{user.email}</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   )
 }
