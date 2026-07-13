@@ -3,11 +3,11 @@ import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3"
 import * as schema from "./schema"
 
 /**
- * MODO DEMO — cliente Drizzle sobre SQLite (better-sqlite3), inicializado lazy.
+ * Cliente Drizzle sobre SQLite (better-sqlite3), inicializado lazy.
  *
- * ⚠️ Esto NO es la configuración real del proyecto (Postgres/Supabase). Es un
- * backend local desechable para poder correr y ver la app sin credenciales.
- * El archivo de la base vive en `demo.sqlite` (raíz del repo, gitignored).
+ * SQLite es la base del proyecto: sin servidor externo ni credenciales. El
+ * archivo vive en `demo.sqlite` (raíz del repo, gitignored) y cada quien genera
+ * el suyo con `db:push` + seed. Override del path con `SQLITE_PATH`.
  */
 type DB = BetterSQLite3Database<typeof schema>
 

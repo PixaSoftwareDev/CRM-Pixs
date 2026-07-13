@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getUser } from "@/lib/auth/session"
 import { logout } from "@/modules/auth/actions"
 
 const NAV = [
@@ -13,12 +13,9 @@ const NAV = [
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUser()
 
-  // Doble candado: el middleware ya protege, pero acá tenemos el user real.
+  // Doble candado: el proxy ya protege, pero acá tenemos el user real.
   if (!user) redirect("/login")
 
   return (

@@ -1,17 +1,14 @@
 import { redirect } from "next/navigation"
 import { db } from "@/db"
 import { auditLog } from "@/db/schema"
-import { createClient } from "@/lib/supabase/server"
+import { getUser } from "@/lib/auth/session"
 
 /**
  * Devuelve el usuario autenticado o redirige a /login.
  * Usar al inicio de toda Server Action / query que necesite sesión.
  */
 export async function requireUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect("/login")
   return user
 }

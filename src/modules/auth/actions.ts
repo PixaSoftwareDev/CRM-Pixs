@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation"
 import { z } from "zod"
-import { createClient } from "@/lib/supabase/server"
+import { signIn, signOut } from "@/lib/auth/session"
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -11,7 +11,7 @@ const loginSchema = z.object({
 
 export type LoginState = { error?: string }
 
-// Server Action: valida con Zod, autentica contra Supabase, redirige al dashboard.
+// Server Action: valida con Zod, autentica contra la sesión local, redirige al dashboard.
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -22,10 +22,8 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword(parsed.data)
-
-  if (error) {
+  const user = await signIn(parsed.data.email, parsed.data.password)
+  if (!user) {
     return { error: "Email o contraseña incorrectos" }
   }
 
@@ -33,7 +31,6 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 }
 
 export async function logout() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+  await signOut()
   redirect("/login")
 }

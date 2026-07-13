@@ -5,7 +5,7 @@ import { contacts } from "@/db/schema"
 export async function listContacts(search?: string) {
   if (search && search.trim().length > 0) {
     const q = `%${search.trim()}%`
-    // SQLite LIKE es case-insensitive para ASCII (modo demo; en Postgres era ILIKE).
+    // SQLite LIKE es case-insensitive para ASCII, así que alcanza para el buscador.
     return db
       .select()
       .from(contacts)

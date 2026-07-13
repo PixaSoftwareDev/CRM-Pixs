@@ -1,14 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Debe coincidir con SESSION_COOKIE de "@/lib/supabase/server". Se inlinea acá
-// para no arrastrar better-sqlite3 (módulo nativo) al runtime del proxy.
-const SESSION_COOKIE = "demo_session"
+import { SESSION_COOKIE } from "./constants"
 
 /**
- * MODO DEMO — protección de rutas por cookie de sesión (sin Supabase real).
- * Se invoca desde src/proxy.ts. No metas lógica pesada acá.
+ * Protección de rutas por cookie de sesión. Se invoca desde `src/proxy.ts`.
+ * Corre en el runtime del proxy (edge), así que no importa nada de la base
+ * (better-sqlite3 es nativo): solo mira la presencia de la cookie.
  */
-export async function updateSession(request: NextRequest) {
+export function guardSession(request: NextRequest) {
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value)
 
   const path = request.nextUrl.pathname

@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server"
-import { updateSession } from "@/lib/supabase/middleware"
+import { guardSession } from "@/lib/auth/guard"
 
 // Next 16 renombró la convención "middleware" a "proxy".
 export async function proxy(request: NextRequest) {
-  return updateSession(request)
+  return guardSession(request)
 }
 
 export const config = {

@@ -1,16 +1,28 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useRef } from "react"
+import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/auth/constants"
 import { type LoginState, login } from "@/modules/auth/actions"
 
 const initialState: LoginState = {}
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, initialState)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // Acceso rápido: completa las credenciales de demo y envía el formulario.
+  function quickLogin() {
+    const form = formRef.current
+    if (!form) return
+    ;(form.elements.namedItem("email") as HTMLInputElement).value = DEMO_EMAIL
+    ;(form.elements.namedItem("password") as HTMLInputElement).value = DEMO_PASSWORD
+    form.requestSubmit()
+  }
 
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
       <form
+        ref={formRef}
         action={formAction}
         className="w-full max-w-sm space-y-5 rounded-xl border border-black/[.08] bg-white p-8 shadow-sm dark:border-white/[.12] dark:bg-zinc-950"
       >
@@ -52,6 +64,20 @@ export default function LoginPage() {
         >
           {pending ? "Ingresando…" : "Ingresar"}
         </button>
+
+        <div className="space-y-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+          <button
+            type="button"
+            onClick={quickLogin}
+            disabled={pending}
+            className="w-full rounded-md border border-zinc-300 bg-transparent px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          >
+            Acceso rápido (demo)
+          </button>
+          <p className="text-center text-xs text-zinc-400">
+            {DEMO_EMAIL} · {DEMO_PASSWORD}
+          </p>
+        </div>
       </form>
     </div>
   )

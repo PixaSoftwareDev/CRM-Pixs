@@ -1,15 +1,14 @@
-# Pixs CRM — Modo demo (SQLite)
+# Pixs CRM — Correr en local
 
-> ⚠️ Esta rama corre en **modo demo con SQLite**, un backend local desechable.
-> **No es la configuración real** del proyecto (Postgres + Supabase). Sirve para
-> levantar la app y recorrerla sin credenciales ni base externa.
+La app corre sobre **SQLite** (base local, sin servidor ni credenciales externas) y
+**auth local por cookie**. No hay Supabase ni Postgres: alcanza con Node.
 
 ## Correr en local
 
 ```bash
 npm install
-npx drizzle-kit push --config drizzle.config.demo.ts   # crea las tablas en demo.sqlite
-npx tsx scripts/seed-demo.ts                            # siembra usuario + datos de ejemplo
+npm run db:push    # crea/actualiza las tablas en demo.sqlite
+npm run db:seed    # siembra el usuario admin + datos de ejemplo
 npm run dev
 ```
 
@@ -18,24 +17,25 @@ Abrí http://localhost:3000/login e ingresá con:
 - **Email:** `admin@pixs.com`
 - **Contraseña:** `demo1234`
 
+> También hay un botón **"Acceso rápido (demo)"** en el login que completa esas
+> credenciales y entra directo.
+
 Cada quien genera su propia base local: el archivo `demo.sqlite` está en
-`.gitignore`, así que no se comparte. Corré los dos comandos de arriba
-(`drizzle-kit push` + `seed-demo`) y tenés tus datos.
+`.gitignore`, así que no se comparte. Corré `db:push` + `db:seed` y tenés tus datos.
 
 ## Recrear la base desde cero
 
 ```bash
 rm -f demo.sqlite demo.sqlite-*
-npx drizzle-kit push --config drizzle.config.demo.ts
-npx tsx scripts/seed-demo.ts
+npm run db:push
+npm run db:seed
 ```
 
-## ¿Cómo difiere del proyecto real?
+## Notas
 
-- **DB:** SQLite (`better-sqlite3`) en vez de Postgres/Supabase.
-- **Auth:** sesión por cookie local (`src/lib/supabase/server.ts`), sin Supabase Auth.
-  Contraseña demo compartida `demo1234` (configurable con `DEMO_PASSWORD`).
-- **Búsqueda:** `LIKE` en vez de full-text (tsvector/GIN de Postgres).
-- Sin RLS, sin migraciones Postgres, sin Vault.
-
-El diseño real vive en `plan-tecnico.md` y `CLAUDE.md`.
+- **DB:** SQLite (`better-sqlite3`). El schema Drizzle (`src/db/schema/*`) es la
+  fuente de verdad; `npm run db:push` lo sincroniza con el archivo.
+- **Auth:** sesión por cookie httpOnly (`src/lib/auth/session.ts`). La contraseña
+  es compartida (`demo1234`), configurable con `DEMO_PASSWORD` / `DEMO_EMAIL`.
+- **Búsqueda:** `LIKE` de SQLite (case-insensitive para ASCII).
+- **Config opcional:** ver `.env.example` (cifrado, email/alertas, scraping).
