@@ -21,6 +21,8 @@ export const tasks = sqliteTable(
     orden: integer("orden").notNull().default(0), // para el ordenamiento en D&D
     asignadoA: text("asignado_a").references(() => users.id),
     venceAt: integer("vence_at", { mode: "timestamp" }),
+    // Fecha de cierre real: se setea al pasar a "hecho", se limpia al sacarla de ahí.
+    cerradoAt: integer("cerrado_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),

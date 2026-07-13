@@ -14,14 +14,15 @@ const iso = (d: Date) => d.toISOString().slice(0, 10)
 const addDays = (n: number) => iso(new Date(Date.now() + n * 86400000))
 
 async function main() {
-  // Usuario demo
+  // Usuarios del equipo. Alejo es el admin y con quien se loguea (admin@pixs.com).
   const userId = crypto.randomUUID()
-  await db.insert(schema.users).values({
-    id: userId,
-    nombre: "Admin Demo",
-    email: "admin@pixs.com",
-    rol: "admin",
-  })
+  const enzoId = crypto.randomUUID()
+  const guillermoId = crypto.randomUUID()
+  await db.insert(schema.users).values([
+    { id: userId, nombre: "Alejo", email: "admin@pixs.com", rol: "admin" },
+    { id: enzoId, nombre: "Enzo", email: "enzo@pixs.com", rol: "miembro" },
+    { id: guillermoId, nombre: "Guillermo", email: "guillermo@pixs.com", rol: "miembro" },
+  ])
 
   // Contactos
   const c1 = crypto.randomUUID()
@@ -59,8 +60,8 @@ async function main() {
   // Tareas del proyecto (kanban)
   await db.insert(schema.tasks).values([
     { projectId: p1, titulo: "Diseño de home", estado: "hecho", orden: 0, asignadoA: userId },
-    { projectId: p1, titulo: "Catálogo de productos", estado: "en_curso", orden: 0, asignadoA: userId },
-    { projectId: p1, titulo: "Pasarela de pago", estado: "backlog", orden: 0 },
+    { projectId: p1, titulo: "Catálogo de productos", estado: "en_curso", orden: 0, asignadoA: enzoId },
+    { projectId: p1, titulo: "Pasarela de pago", estado: "backlog", orden: 0, asignadoA: guillermoId },
     { projectId: p1, titulo: "Revisión responsive", estado: "revision", orden: 0 },
   ])
 
