@@ -1,0 +1,11 @@
+// Barrel de tablas Drizzle. Un dominio por archivo (§6).
+export * from "./activities"
+export * from "./audit"
+export * from "./contacts"
+export * from "./infra"
+export * from "./money"
+export * from "./opportunities"
+export * from "./projects"
+export * from "./scraping"
+export * from "./tasks"
+export * from "./users"
