@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { getUser } from "@/lib/auth/session"
 import { logout } from "@/modules/auth/actions"
 
@@ -7,6 +8,7 @@ const NAV = [
   { href: "/contactos", label: "Contactos" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/proyectos", label: "Proyectos" },
+  { href: "/tareas", label: "Tareas" },
   { href: "/infra", label: "Infra" },
   { href: "/finanzas", label: "Finanzas" },
   { href: "/captacion", label: "Captación" },
@@ -34,7 +36,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           ))}
         </nav>
         <div className="mt-auto space-y-2 border-t border-black/[.08] pt-3 dark:border-white/[.12]">
-          <div className="truncate px-3 text-xs text-zinc-500">{user.email}</div>
+          <div className="flex items-center justify-between gap-2 px-3">
+            <span className="truncate text-xs text-zinc-500">{user.email}</span>
+            <ThemeToggle className="-mr-1 shrink-0" />
+          </div>
           <form action={logout}>
             <button
               type="submit"
