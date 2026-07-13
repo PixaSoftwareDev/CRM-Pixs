@@ -9,7 +9,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { useActionState, useRef, useState, useTransition } from "react"
+import { useActionState, useId, useRef, useState, useTransition } from "react"
 import { Button, Input } from "@/components/ui"
 import { TASK_COLUMNS, type TaskColumn } from "@/db/schema"
 import type { FormState } from "@/lib/forms"
@@ -51,7 +51,7 @@ function Card({ task }: { task: TaskRow }) {
 function Column({ estado, items }: { estado: TaskColumn; items: TaskRow[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: estado })
   return (
-    <div className="flex w-64 shrink-0 flex-col">
+    <div className="flex min-w-[13rem] flex-1 flex-col">
       <div className="mb-2 px-1 text-sm font-medium text-zinc-500">
         {COLUMN_LABELS[estado]} <span className="text-zinc-400">· {items.length}</span>
       </div>
@@ -75,6 +75,8 @@ export function TaskBoard({ projectId, initial }: { projectId: string; initial: 
   const [, startTransition] = useTransition()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const formRef = useRef<HTMLFormElement>(null)
+  // id estable para dnd-kit: evita el mismatch de hidratación en sus ids internos.
+  const dndId = useId()
 
   const [, addAction, pending] = useActionState<FormState, FormData>(async (_p, fd) => {
     const res = await createTask(_p, fd)
@@ -106,7 +108,7 @@ export function TaskBoard({ projectId, initial }: { projectId: string; initial: 
           Agregar
         </Button>
       </form>
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-4">
           {TASK_COLUMNS.map((estado) => (
             <Column key={estado} estado={estado} items={items.filter((t) => t.estado === estado)} />

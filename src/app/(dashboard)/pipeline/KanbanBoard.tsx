@@ -10,7 +10,7 @@ import {
   useSensors,
 } from "@dnd-kit/core"
 import Link from "next/link"
-import { useState, useTransition } from "react"
+import { useId, useState, useTransition } from "react"
 import { Badge } from "@/components/ui"
 import { OPPORTUNITY_STATES, type OpportunityState } from "@/db/schema"
 import { cn, formatMoney } from "@/lib/utils"
@@ -55,7 +55,7 @@ function Column({ estado, items }: { estado: OpportunityState; items: Opportunit
   const { setNodeRef, isOver } = useDroppable({ id: estado })
   const total = items.reduce((s, o) => s + Number(o.valorEstimado ?? 0), 0)
   return (
-    <div className="flex w-64 shrink-0 flex-col">
+    <div className="flex min-w-[13rem] flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-1">
         <Badge tone={STATE_TONES[estado]}>{STATE_LABELS[estado]}</Badge>
         <span className="text-xs text-zinc-400">{items.length}</span>
@@ -82,6 +82,8 @@ export function KanbanBoard({ initial }: { initial: OpportunityWithContact[] }) 
   const [items, setItems] = useState(initial)
   const [, startTransition] = useTransition()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  // id estable para dnd-kit: evita el mismatch de hidratación en sus ids internos.
+  const dndId = useId()
 
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id)
@@ -105,7 +107,7 @@ export function KanbanBoard({ initial }: { initial: OpportunityWithContact[] }) 
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-4">
         {OPPORTUNITY_STATES.map((estado) => (
           <Column key={estado} estado={estado} items={items.filter((o) => o.estado === estado)} />
