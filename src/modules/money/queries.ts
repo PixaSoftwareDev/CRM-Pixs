@@ -1,6 +1,14 @@
 import { and, desc, eq, gte, lte, not, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { budgets, installments, projects, transactions, users } from "@/db/schema"
+import {
+  budgets,
+  contacts,
+  installments,
+  opportunities,
+  projects,
+  transactions,
+  users,
+} from "@/db/schema"
 
 export async function getProjectBudget(projectId: string) {
   const [budget] = await db
@@ -20,20 +28,25 @@ export async function getProjectBudget(projectId: string) {
   return { budget, cuotas }
 }
 
-/** Cuentas por cobrar: cuotas no pagadas, con contexto de proyecto. */
+/** Cuentas por cobrar: cuotas no pagadas, con proyecto y empresa (cliente). */
 export async function receivables() {
   return db
     .select({
       id: installments.id,
       monto: installments.monto,
+      moneda: budgets.moneda,
       venceAt: installments.venceAt,
       estado: installments.estado,
       proyecto: projects.nombre,
       projectId: projects.id,
+      empresa: contacts.nombre,
+      contactId: contacts.id,
     })
     .from(installments)
     .innerJoin(budgets, eq(installments.budgetId, budgets.id))
     .innerJoin(projects, eq(budgets.projectId, projects.id))
+    .innerJoin(opportunities, eq(projects.opportunityId, opportunities.id))
+    .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
     .where(not(eq(installments.estado, "pagada")))
     .orderBy(installments.venceAt)
 }

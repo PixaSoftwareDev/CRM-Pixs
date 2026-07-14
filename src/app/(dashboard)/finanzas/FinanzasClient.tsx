@@ -11,15 +11,37 @@ import type { UserOption } from "@/modules/users/queries"
 type Receivable = {
   id: string
   monto: string
+  moneda: string
   venceAt: string
   proyecto: string
   projectId: string
+  empresa: string
+  contactId: string
 }
 
 // dd/mm sin año para las filas (compacto); el filtro usa fechas ISO.
 function shortDate(fecha: string) {
   const [y, m, d] = fecha.split("-")
   return d && m ? `${d}/${m}/${y.slice(2)}` : fecha
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={cn("shrink-0 text-zinc-400 transition-transform", open && "rotate-90")}
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
 }
 
 export function FinanzasClient({
@@ -36,7 +58,17 @@ export function FinanzasClient({
   const [to, setTo] = useState("")
   const [persona, setPersona] = useState("")
   const [tipo, setTipo] = useState("")
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set())
   const [, startToggle] = useTransition()
+
+  function toggleEmpresa(id: string) {
+    setAbiertos((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Resync cuando el server revalida (tras crear/editar): sin esto habría que F5.
   useEffect(() => setItems(initial), [initial])
@@ -54,6 +86,25 @@ export function FinanzasClient({
       .map(([id, total]) => ({ id, nombre: nombres.get(id) ?? "—", total }))
       .sort((a, b) => b.total - a.total)
   }, [items, nombres])
+
+  // Cuentas por cobrar agrupadas por empresa; total por moneda y cuotas dentro.
+  const porEmpresa = useMemo(() => {
+    const acc = new Map<
+      string,
+      { contactId: string; empresa: string; cuotas: Receivable[]; totales: Map<string, number> }
+    >()
+    for (const c of cobrar) {
+      let g = acc.get(c.contactId)
+      if (!g) {
+        g = { contactId: c.contactId, empresa: c.empresa, cuotas: [], totales: new Map() }
+        acc.set(c.contactId, g)
+      }
+      g.cuotas.push(c)
+      g.totales.set(c.moneda, (g.totales.get(c.moneda) ?? 0) + Number(c.monto))
+    }
+    const suma = (m: Map<string, number>) => [...m.values()].reduce((s, n) => s + n, 0)
+    return [...acc.values()].sort((a, b) => suma(b.totales) - suma(a.totales))
+  }, [cobrar])
 
   const filtered = useMemo(() => {
     return items.filter((t) => {
@@ -221,31 +272,76 @@ export function FinanzasClient({
           )}
         </Card>
 
-        {/* Cuentas por cobrar */}
+        {/* Cuentas por cobrar — agrupadas por empresa, desplegables */}
         <Card>
           <h2 className="mb-3 text-sm font-semibold">Cuentas por cobrar</h2>
-          {cobrar.length === 0 ? (
+          {porEmpresa.length === 0 ? (
             <p className="text-sm text-zinc-400">Nada pendiente. 👌</p>
           ) : (
-            <ul className="space-y-2">
-              {cobrar.map((c) => {
-                const dias = daysUntil(c.venceAt)
-                const vencida = dias < 0
+            <div className="space-y-1.5">
+              {porEmpresa.map((g) => {
+                const abierto = abiertos.has(g.contactId)
+                const total = [...g.totales.entries()]
+                  .map(([moneda, monto]) => formatMoney(monto, moneda))
+                  .join(" · ")
+                const vencidas = g.cuotas.filter((c) => daysUntil(c.venceAt) < 0).length
                 return (
-                  <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                    <Link href={`/proyectos/${c.projectId}`} className="truncate hover:underline">
-                      {c.proyecto}
-                    </Link>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span>{formatMoney(c.monto)}</span>
-                      <Badge tone={vencida ? "red" : "amber"}>
-                        {vencida ? `−${Math.abs(dias)}d` : `${dias}d`}
-                      </Badge>
-                    </div>
-                  </li>
+                  <div
+                    key={g.contactId}
+                    className="rounded-lg border border-black/[.08] dark:border-white/[.12]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleEmpresa(g.contactId)}
+                      aria-expanded={abierto}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <ChevronIcon open={abierto} />
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{g.empresa}</div>
+                          <div className="text-xs text-zinc-400">
+                            {g.cuotas.length} cuota{g.cuotas.length === 1 ? "" : "s"}
+                            {vencidas > 0
+                              ? ` · ${vencidas} vencida${vencidas === 1 ? "" : "s"}`
+                              : ""}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold tracking-tight">{total}</span>
+                    </button>
+
+                    {abierto ? (
+                      <ul className="space-y-2 border-t border-black/[.06] px-3 py-2.5 dark:border-white/[.08]">
+                        {g.cuotas.map((c) => {
+                          const dias = daysUntil(c.venceAt)
+                          const vencida = dias < 0
+                          return (
+                            <li
+                              key={c.id}
+                              className="flex items-center justify-between gap-2 text-sm"
+                            >
+                              <div className="min-w-0">
+                                <div>{formatMoney(c.monto, c.moneda)}</div>
+                                <Link
+                                  href={`/proyectos/${c.projectId}`}
+                                  className="truncate text-xs text-zinc-400 hover:underline"
+                                >
+                                  {c.proyecto} · vence {shortDate(c.venceAt)}
+                                </Link>
+                              </div>
+                              <Badge tone={vencida ? "red" : "amber"}>
+                                {vencida ? `−${Math.abs(dias)}d` : `${dias}d`}
+                              </Badge>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
                 )
               })}
-            </ul>
+            </div>
           )}
         </Card>
       </div>
