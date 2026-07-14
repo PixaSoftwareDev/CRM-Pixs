@@ -1,12 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 
 /**
  * Modal centrado con overlay. Cierra con Escape, click en el fondo o la "✕".
  * El que lo usa controla el montaje ({open && <Modal .../>}); acá va la
  * animación de entrada y el bloqueo del scroll del body.
+ *
+ * Se renderiza vía portal en <body> para que ningún ancestro con `overflow`
+ * o `transform` (p. ej. listas con overflow-hidden) lo recorte o reubique.
  */
 export function Modal({
   title,
@@ -22,8 +26,10 @@ export function Modal({
   className?: string
 }) {
   const [shown, setShown] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     // Un tick después de montar para disparar la transición de entrada.
     const raf = requestAnimationFrame(() => setShown(true))
     const onKey = (e: KeyboardEvent) => {
@@ -39,7 +45,9 @@ export function Modal({
     }
   }, [onClose])
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
       <button
         type="button"
@@ -88,6 +96,7 @@ export function Modal({
         </div>
         <div className="px-6 py-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
