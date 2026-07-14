@@ -1,7 +1,8 @@
 /**
- * PRODUCCIÓN — siembra únicamente el usuario admin, sin datos de ejemplo.
- * El login valida el email contra la tabla `users` + la contraseña compartida
- * `DEMO_PASSWORD` (env). Ejecutar una sola vez tras `npm run db:push`.
+ * PRODUCCIÓN — siembra el equipo (Alejo admin + Enzo + Guillermo), sin datos de
+ * ejemplo. El login valida el email contra la tabla `users` + la contraseña
+ * compartida `DEMO_PASSWORD` (env). Es idempotente: inserta el que falte y
+ * corrige nombre/rol del que ya exista. Se puede correr varias veces sin riesgo.
  *
  * Uso:
  *   SQLITE_PATH=./data/pixs.sqlite \
@@ -17,23 +18,36 @@ const sqlite = new Database(process.env.SQLITE_PATH ?? "demo.sqlite")
 sqlite.pragma("foreign_keys = ON")
 const db = drizzle(sqlite, { schema })
 
+// El admin (con quien se loguea) usa DEMO_EMAIL; el resto son miembros del equipo.
+const ADMIN_EMAIL = process.env.DEMO_EMAIL ?? "admin@pixs.com"
+const ADMIN_NOMBRE = process.env.ADMIN_NOMBRE ?? "Alejo"
+
+const TEAM = [
+  { nombre: ADMIN_NOMBRE, email: ADMIN_EMAIL, rol: "admin" as const },
+  { nombre: "Enzo", email: "enzo@pixs.com", rol: "miembro" as const },
+  { nombre: "Guillermo", email: "guillermo@pixs.com", rol: "miembro" as const },
+]
+
 async function main() {
-  const email = process.env.DEMO_EMAIL ?? "admin@pixs.com"
-  const nombre = process.env.ADMIN_NOMBRE ?? "Admin"
+  for (const u of TEAM) {
+    const [existing] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, u.email))
+      .limit(1)
 
-  const existing = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email))
-    .limit(1)
-  if (existing.length > 0) {
-    console.log(`El usuario admin ya existe (${email}); no se hace nada.`)
-    return
+    if (existing) {
+      await db
+        .update(schema.users)
+        .set({ nombre: u.nombre, rol: u.rol })
+        .where(eq(schema.users.id, existing.id))
+      console.log(`Actualizado: ${u.nombre} <${u.email}> (${u.rol})`)
+    } else {
+      await db.insert(schema.users).values(u)
+      console.log(`Creado: ${u.nombre} <${u.email}> (${u.rol})`)
+    }
   }
-
-  await db.insert(schema.users).values({ nombre, email, rol: "admin" })
-  console.log(`Usuario admin creado: ${email}`)
-  console.log("Contraseña: la definida en DEMO_PASSWORD (env). Cambiala antes de exponer la app.")
+  console.log("Contraseña de acceso: la definida en DEMO_PASSWORD (env), compartida por el equipo.")
 }
 
 main().catch((err) => {
