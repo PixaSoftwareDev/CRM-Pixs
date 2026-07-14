@@ -57,6 +57,11 @@ export const transactions = sqliteTable(
     categoria: text("categoria"),
     realizadoPor: text("realizado_por").references(() => users.id),
     projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    // Si el ingreso proviene de marcar una cuota como pagada, queda vinculado a
+    // ella: así al revertir el pago se borra el movimiento y la caja no duplica.
+    installmentId: text("installment_id").references(() => installments.id, {
+      onDelete: "cascade",
+    }),
     fecha: text("fecha").notNull(),
     comprobanteUrl: text("comprobante_url"),
     descripcion: text("descripcion"),

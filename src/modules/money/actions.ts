@@ -62,9 +62,14 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
   return { ok: true }
 }
 
-/** Marca una cuota como pagada (o revierte). */
+/**
+ * Marca una cuota como pagada (o revierte). Al pagar, registra el ingreso en la
+ * caja vinculado a la cuota; al revertir, borra ese ingreso. Así el cobro
+ * aparece en Finanzas y no se duplica.
+ */
 export async function toggleInstallment(id: string, projectId: string, pagar: boolean) {
   const user = await requireUser()
+
   await db
     .update(installments)
     .set({
@@ -72,6 +77,31 @@ export async function toggleInstallment(id: string, projectId: string, pagar: bo
       pagadaAt: pagar ? new Date() : null,
     })
     .where(eq(installments.id, id))
+
+  // Movimiento en caja: uno solo por cuota (borro cualquiera previo por las dudas).
+  await db.delete(transactions).where(eq(transactions.installmentId, id))
+  if (pagar) {
+    const [cuota] = await db
+      .select({ monto: installments.monto, moneda: budgets.moneda })
+      .from(installments)
+      .innerJoin(budgets, eq(installments.budgetId, budgets.id))
+      .where(eq(installments.id, id))
+      .limit(1)
+    if (cuota) {
+      await db.insert(transactions).values({
+        tipo: "ingreso",
+        monto: cuota.monto,
+        moneda: cuota.moneda,
+        categoria: "Cobro de proyecto",
+        projectId,
+        installmentId: id,
+        fecha: new Date().toISOString().slice(0, 10),
+        realizadoPor: user.id,
+        descripcion: "Cobro de cuota",
+      })
+    }
+  }
+
   await audit({ userId: user.id, accion: "update", entityType: "installment", entityId: id })
   revalidatePath(`/proyectos/${projectId}`)
   revalidatePath("/finanzas")
