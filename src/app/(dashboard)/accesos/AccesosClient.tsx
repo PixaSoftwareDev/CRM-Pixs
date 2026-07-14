@@ -7,12 +7,15 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
+  GridIcon,
   KeyIcon,
+  ListIcon,
   UserIcon,
 } from "@/components/icons"
 import { KebabMenu } from "@/components/KebabMenu"
 import { Modal } from "@/components/Modal"
 import { Badge, Button, EmptyState, Field, Input, Select, Textarea } from "@/components/ui"
+import { ViewToggle } from "@/components/ViewToggle"
 import { CREDENTIAL_TYPES, type CredentialType } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
 import {
@@ -56,6 +59,17 @@ export function AccesosClient({
   const [q, setQ] = useState("")
   const [projectFilter, setProjectFilter] = useState("")
   const [tipoFilter, setTipoFilter] = useState("")
+  const [view, setView] = useState<"card" | "list">("card")
+
+  useEffect(() => {
+    const saved = localStorage.getItem("accesos_view")
+    if (saved === "card" || saved === "list") setView(saved)
+  }, [])
+
+  function changeView(v: "card" | "list") {
+    setView(v)
+    localStorage.setItem("accesos_view", v)
+  }
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -182,6 +196,14 @@ export function AccesosClient({
           <span className="text-sm text-zinc-500">
             {filtered.length} {filtered.length === 1 ? "acceso" : "accesos"}
           </span>
+          <ViewToggle
+            value={view}
+            onChange={changeView}
+            options={[
+              { value: "card", label: "Tarjetas", icon: <GridIcon /> },
+              { value: "list", label: "Lista", icon: <ListIcon /> },
+            ]}
+          />
           <Button size="sm" onClick={openNew}>
             + Nuevo acceso
           </Button>
@@ -194,12 +216,25 @@ export function AccesosClient({
             ? "Todavía no cargaste accesos. Sumá servidores, bases, paneles o servicios."
             : "Ningún acceso coincide con los filtros."}
         </EmptyState>
-      ) : (
+      ) : view === "card" ? (
         <div className="grid animate-slide-up gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
             <CredentialCard
               key={c.id}
               cred={c}
+              view="card"
+              onEdit={() => openEdit(c)}
+              onDelete={() => remove(c)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="animate-slide-up overflow-hidden rounded-xl border border-black/[.08] dark:border-white/[.12]">
+          {filtered.map((c) => (
+            <CredentialCard
+              key={c.id}
+              cred={c}
+              view="list"
               onEdit={() => openEdit(c)}
               onDelete={() => remove(c)}
             />
@@ -304,10 +339,12 @@ export function AccesosClient({
 
 function CredentialCard({
   cred,
+  view,
   onEdit,
   onDelete,
 }: {
   cred: CredentialRow
+  view: "card" | "list"
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -351,6 +388,62 @@ function CredentialCard({
         setShown(true)
       }
     })
+  }
+
+  const secretControls = tieneSecreto ? (
+    <>
+      <IconBtn label={shown ? "Ocultar" : "Mostrar"} onClick={toggle} disabled={loading}>
+        {shown ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+      </IconBtn>
+      <IconBtn label={copied ? "Copiado" : "Copiar"} onClick={copy} disabled={loading}>
+        <CopyIcon size={16} className={cn(copied && "text-green-600 dark:text-green-400")} />
+      </IconBtn>
+    </>
+  ) : null
+
+  // Vista lista: fila compacta.
+  if (view === "list") {
+    return (
+      <div className="flex items-center gap-3 border-b border-black/[.06] bg-white px-4 py-3 transition-colors last:border-0 hover:bg-zinc-50 dark:border-white/[.08] dark:bg-zinc-900 dark:hover:bg-zinc-800/50">
+        <Badge tone={CREDENTIAL_TYPE_TONE[cred.tipo]}>{CREDENTIAL_TYPE_LABELS[cred.tipo]}</Badge>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium leading-tight" title={cred.titulo}>
+            {cred.titulo}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">
+            {cred.usuario ? <span className="truncate">{cred.usuario}</span> : null}
+            {cred.usuario && cred.proyectoNombre ? <span className="text-zinc-300">·</span> : null}
+            {cred.proyectoNombre ? (
+              <span className="truncate text-zinc-400">{cred.proyectoNombre}</span>
+            ) : null}
+            {!cred.usuario && !cred.proyectoNombre ? (
+              <span className="text-zinc-400">—</span>
+            ) : null}
+          </div>
+        </div>
+        {tieneSecreto && shown ? (
+          <code className="hidden max-w-[10rem] truncate rounded bg-black/[.04] px-2 py-1 text-xs sm:block dark:bg-white/[.08]">
+            {secret ?? "…"}
+          </code>
+        ) : null}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {secretControls}
+          {cred.url ? (
+            <a
+              href={cred.url}
+              target="_blank"
+              rel="noreferrer"
+              title="Abrir"
+              aria-label="Abrir enlace"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-black/[.05] hover:text-blue-600 dark:hover:bg-white/[.08] dark:hover:text-blue-400"
+            >
+              <ExternalLinkIcon size={16} />
+            </a>
+          ) : null}
+          <KebabMenu onEdit={onEdit} onDelete={onDelete} />
+        </div>
+      </div>
+    )
   }
 
   return (
