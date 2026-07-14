@@ -54,7 +54,7 @@ export function ContactActions({
           onClose={() => setEditing(false)}
         >
           <form action={action} className="space-y-4">
-            <ContactFields defaults={contact} />
+            <ContactFields defaults={state.values ?? contact} />
             {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
             <div className="flex justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
               <Button type="button" variant="ghost" onClick={() => setEditing(false)}>

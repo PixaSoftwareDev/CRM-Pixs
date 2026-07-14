@@ -7,23 +7,41 @@ import { contacts } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import { cleanContact, contactSchema } from "./schemas"
 
-export type ActionState = { error?: string; ok?: boolean; id?: string }
+export type ContactValues = {
+  nombre: string
+  personaContacto: string
+  email: string
+  telefono: string
+  sitioWeb: string
+  notas: string
+}
 
-function parse(formData: FormData) {
-  return contactSchema.safeParse({
-    nombre: formData.get("nombre"),
-    empresa: formData.get("empresa") ?? "",
-    email: formData.get("email") ?? "",
-    telefono: formData.get("telefono") ?? "",
-    sitioWeb: formData.get("sitioWeb") ?? "",
-    notas: formData.get("notas") ?? "",
-  })
+// `values` conserva lo tipeado para repoblar el form si la validación falla
+// (React 19 resetea el <form> al terminar el action; sin esto se borraría todo).
+export type ActionState = { error?: string; ok?: boolean; id?: string; values?: ContactValues }
+
+function rawValues(formData: FormData): ContactValues {
+  const str = (k: string) => String(formData.get(k) ?? "")
+  return {
+    nombre: str("nombre"),
+    personaContacto: str("personaContacto"),
+    email: str("email"),
+    telefono: str("telefono"),
+    sitioWeb: str("sitioWeb"),
+    notas: str("notas"),
+  }
+}
+
+function parse(values: ContactValues) {
+  return contactSchema.safeParse(values)
 }
 
 export async function createContact(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser()
-  const parsed = parse(formData)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
+  const values = rawValues(formData)
+  const parsed = parse(values)
+  if (!parsed.success)
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos", values }
 
   const [row] = await db
     .insert(contacts)
@@ -41,8 +59,10 @@ export async function updateContact(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireUser()
-  const parsed = parse(formData)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
+  const values = rawValues(formData)
+  const parsed = parse(values)
+  if (!parsed.success)
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos", values }
 
   await db
     .update(contacts)

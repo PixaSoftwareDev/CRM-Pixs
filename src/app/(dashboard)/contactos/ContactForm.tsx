@@ -30,7 +30,7 @@ export function ContactForm() {
           onClose={() => setOpen(false)}
         >
           <form action={action} className="space-y-4">
-            <ContactFields />
+            <ContactFields defaults={state.values} />
 
             {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
 
