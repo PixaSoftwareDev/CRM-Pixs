@@ -14,6 +14,7 @@ import {
 import { Modal } from "@/components/Modal"
 import { Button } from "@/components/ui"
 import type { DocumentEntity } from "@/db/schema"
+import { asset } from "@/lib/basePath"
 import { cn, formatDate } from "@/lib/utils"
 import { deleteDocument, uploadDocument } from "@/modules/documents/actions"
 import type { DocumentRow } from "@/modules/documents/queries"
@@ -107,7 +108,7 @@ export function DocumentsClient({
 
   function open(doc: DocumentRow) {
     if (isPreviewable(doc.mimeType)) setPreview(doc)
-    else window.open(`/api/documentos/${doc.id}?download=1`, "_blank")
+    else window.open(asset(`/api/documentos/${doc.id}?download=1`), "_blank")
   }
 
   return (
@@ -169,7 +170,7 @@ export function DocumentsClient({
                 </button>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <a
-                    href={`/api/documentos/${doc.id}?download=1`}
+                    href={asset(`/api/documentos/${doc.id}?download=1`)}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-black/[.05] hover:text-zinc-700 dark:hover:bg-white/[.08] dark:hover:text-zinc-200"
                     title="Descargar"
                     aria-label={`Descargar ${doc.nombre}`}
@@ -202,20 +203,20 @@ export function DocumentsClient({
           <div className="space-y-3">
             {preview.mimeType === "application/pdf" ? (
               <iframe
-                src={`/api/documentos/${preview.id}`}
+                src={asset(`/api/documentos/${preview.id}`)}
                 title={preview.nombre}
                 className="h-[72vh] w-full rounded-lg border border-black/[.08] dark:border-white/[.12]"
               />
             ) : (
               // biome-ignore lint/performance/noImgElement: contenido dinámico servido por nuestra API, no optimizable por next/image
               <img
-                src={`/api/documentos/${preview.id}`}
+                src={asset(`/api/documentos/${preview.id}`)}
                 alt={preview.nombre}
                 className="mx-auto max-h-[72vh] rounded-lg"
               />
             )}
             <div className="flex justify-end">
-              <a href={`/api/documentos/${preview.id}?download=1`}>
+              <a href={asset(`/api/documentos/${preview.id}?download=1`)}>
                 <Button size="sm" variant="secondary">
                   <DownloadIcon size={15} />
                   Descargar

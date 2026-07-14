@@ -1,5 +1,6 @@
 import { Card, PageHeader } from "@/components/ui"
 import { requireUser } from "@/lib/auth"
+import { asset } from "@/lib/basePath"
 import { formatMoney } from "@/lib/utils"
 import { financeSummary, listTransactions, receivables } from "@/modules/money/queries"
 import { listProjects } from "@/modules/projects/queries"
@@ -25,7 +26,7 @@ export default async function FinanzasPage() {
         <PageHeader title="Finanzas" subtitle="Ingresos, gastos, reintegros y cuentas por cobrar" />
         <div className="flex gap-2">
           <a
-            href="/api/finanzas/export"
+            href={asset("/api/finanzas/export")}
             className="inline-flex h-9 items-center rounded-md border border-zinc-300 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-zinc-700 dark:hover:bg-white/[.06]"
           >
             Export CSV

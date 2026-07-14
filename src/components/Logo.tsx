@@ -1,3 +1,4 @@
+import { asset } from "@/lib/basePath"
 import { cn } from "@/lib/utils"
 
 /**
@@ -11,10 +12,14 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <>
       {/* biome-ignore lint/performance/noImgElement: logo estático, next/image no aporta acá */}
-      <img src="/pixs_negra.png" alt="Pixs" className={cn("block w-auto dark:hidden", className)} />
+      <img
+        src={asset("/pixs_negra.png")}
+        alt="Pixs"
+        className={cn("block w-auto dark:hidden", className)}
+      />
       {/* biome-ignore lint/performance/noImgElement: idem, variante dark */}
       <img
-        src="/pixs_blanca.png"
+        src={asset("/pixs_blanca.png")}
         alt="Pixs"
         className={cn("hidden w-auto dark:block", className)}
       />
@@ -25,6 +30,6 @@ export function Wordmark({ className }: { className?: string }) {
 export function LogoMark({ className }: { className?: string }) {
   return (
     // biome-ignore lint/performance/noImgElement: logo estático, next/image no aporta acá
-    <img src="/logo-p.png" alt="Pixs" className={cn("object-contain", className)} />
+    <img src={asset("/logo-p.png")} alt="Pixs" className={cn("object-contain", className)} />
   )
 }
