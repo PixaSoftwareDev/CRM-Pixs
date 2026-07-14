@@ -18,15 +18,21 @@ const RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
     email: { type: "STRING", description: "Email de contacto de la empresa, o cadena vacía" },
+    telefono: {
+      type: "STRING",
+      description:
+        "Teléfono o celular/WhatsApp de contacto, tal como aparece (con código de área). Vacío si no hay.",
+    },
     contactoNombre: { type: "STRING", description: "Nombre de una persona de contacto, o vacío" },
     contactoArea: { type: "STRING", description: "Área/cargo del contacto, o vacío" },
     descripcion: { type: "STRING", description: "Qué hace la empresa, 1-2 frases" },
   },
-  required: ["email", "contactoNombre", "contactoArea", "descripcion"],
+  required: ["email", "telefono", "contactoNombre", "contactoArea", "descripcion"],
 }
 
 type Extraction = {
   email: string
+  telefono: string
   contactoNombre: string
   contactoArea: string
   descripcion: string
@@ -67,7 +73,7 @@ async function extractWithGemini(
         {
           parts: [
             {
-              text: `Del siguiente texto del sitio web de la empresa "${nombre}", extraé datos profesionales de contacto. Si un dato no aparece, devolvé cadena vacía. Texto:\n\n${texto}`,
+              text: `Del siguiente texto del sitio web de la empresa "${nombre}", extraé datos profesionales de contacto: email, teléfono o celular/WhatsApp (con código de área, tal como figura), persona de contacto y una breve descripción. Si un dato no aparece, devolvé cadena vacía. Texto:\n\n${texto}`,
             },
           ],
         },
@@ -111,6 +117,7 @@ export async function enrichLead(leadId: string) {
     .update(scrapingLeads)
     .set({
       email: data.email || lead.email,
+      telefono: data.telefono || lead.telefono,
       contactoNombre: data.contactoNombre || null,
       contactoArea: data.contactoArea || null,
       descripcion: data.descripcion || lead.descripcion,

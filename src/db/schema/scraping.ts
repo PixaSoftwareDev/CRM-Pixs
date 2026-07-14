@@ -40,6 +40,7 @@ export const scrapingLeads = sqliteTable(
     contactoNombre: text("contacto_nombre"),
     contactoArea: text("contacto_area"),
     sitioWeb: text("sitio_web"),
+    direccion: text("direccion"),
     descripcion: text("descripcion"),
     datosExtra: text("datos_extra", { mode: "json" }),
     estado: text("estado").notNull().default("nuevo").$type<LeadState>(),

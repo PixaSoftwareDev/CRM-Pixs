@@ -95,21 +95,43 @@ const LEAD_TONE = {
   duplicado: "amber",
 } as const
 
-export function LeadRow({
-  lead,
-}: {
-  lead: {
-    id: string
-    nombre: string
-    email: string | null
-    telefono: string | null
-    sitioWeb: string | null
-    descripcion: string | null
-    estado: "nuevo" | "aprobado" | "descartado" | "duplicado"
-  }
-}) {
+type Lead = {
+  id: string
+  nombre: string
+  email: string | null
+  telefono: string | null
+  sitioWeb: string | null
+  direccion: string | null
+  contactoNombre: string | null
+  contactoArea: string | null
+  descripcion: string | null
+  estado: "nuevo" | "aprobado" | "descartado" | "duplicado"
+}
+
+export function LeadRow({ lead }: { lead: Lead }) {
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
+  const [ver, setVer] = useState(false)
+
+  const accionable = lead.estado === "nuevo" || lead.estado === "duplicado"
+
+  function enriquecer() {
+    start(async () => {
+      const res = await enrichLeadAction(lead.id)
+      if (res.error) setErr(res.error)
+    })
+  }
+  function aprobar() {
+    start(async () => {
+      const res = await approveLeadAction(lead.id)
+      if (res && "error" in res) setErr(res.error as string)
+      else setVer(false)
+    })
+  }
+  function descartar() {
+    start(() => void discardLeadAction(lead.id))
+    setVer(false)
+  }
 
   return (
     <div className="flex items-start justify-between gap-3 border-b border-black/[.06] py-3 text-sm last:border-0 dark:border-white/[.08]">
@@ -119,52 +141,99 @@ export function LeadRow({
           <Badge tone={LEAD_TONE[lead.estado]}>{lead.estado}</Badge>
         </div>
         <div className="mt-0.5 truncate text-xs text-zinc-500">
-          {[lead.email, lead.telefono, lead.sitioWeb].filter(Boolean).join(" · ") || "—"}
+          {[lead.telefono, lead.email, lead.sitioWeb].filter(Boolean).join(" · ") || "Sin contacto"}
         </div>
-        {lead.descripcion ? (
-          <div className="mt-0.5 truncate text-xs text-zinc-400">{lead.descripcion}</div>
+        {lead.direccion ? (
+          <div className="mt-0.5 truncate text-xs text-zinc-400">{lead.direccion}</div>
         ) : null}
         {err ? <div className="mt-0.5 text-xs text-red-600">{err}</div> : null}
       </div>
-      {lead.estado === "nuevo" || lead.estado === "duplicado" ? (
-        <div className="flex shrink-0 gap-1">
-          {lead.sitioWeb ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={() =>
-                start(async () => {
-                  const res = await enrichLeadAction(lead.id)
-                  if (res.error) setErr(res.error)
-                })
-              }
-            >
-              Enriquecer
-            </Button>
-          ) : null}
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                const res = await approveLeadAction(lead.id)
-                if (res && "error" in res) setErr(res.error as string)
-              })
-            }
-          >
+      <div className="flex shrink-0 gap-1">
+        <Button size="sm" variant="ghost" onClick={() => setVer(true)}>
+          Ver
+        </Button>
+        {accionable ? (
+          <Button size="sm" disabled={pending} onClick={aprobar}>
             Aprobar
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => start(() => void discardLeadAction(lead.id))}
-          >
-            Descartar
-          </Button>
-        </div>
+        ) : null}
+      </div>
+
+      {ver ? (
+        <Modal
+          title={lead.nombre}
+          description={`Lead ${lead.estado}`}
+          onClose={() => setVer(false)}
+        >
+          <div className="space-y-3 text-sm">
+            <DetailRow label="Teléfono / celular" value={lead.telefono} />
+            <DetailRow label="Email" value={lead.email} />
+            <DetailRow
+              label="Persona de contacto"
+              value={[lead.contactoNombre, lead.contactoArea].filter(Boolean).join(" — ") || null}
+            />
+            <DetailRow label="Sitio web" value={lead.sitioWeb} href={lead.sitioWeb} />
+            <DetailRow label="Dirección" value={lead.direccion} />
+            <DetailRow label="Descripción" value={lead.descripcion} />
+
+            {!lead.telefono && lead.sitioWeb ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                Sin teléfono. Probá “Enriquecer”: lee el sitio web y suele encontrar
+                teléfono/celular, email y contacto.
+              </p>
+            ) : null}
+            {err ? <p className="text-xs text-red-600">{err}</p> : null}
+
+            {accionable ? (
+              <div className="flex flex-wrap justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+                <Button size="sm" variant="ghost" disabled={pending} onClick={descartar}>
+                  Descartar
+                </Button>
+                {lead.sitioWeb ? (
+                  <Button size="sm" variant="secondary" disabled={pending} onClick={enriquecer}>
+                    {pending ? "Enriqueciendo…" : "Enriquecer"}
+                  </Button>
+                ) : null}
+                <Button size="sm" disabled={pending} onClick={aprobar}>
+                  Aprobar → cliente
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </Modal>
       ) : null}
+    </div>
+  )
+}
+
+function DetailRow({
+  label,
+  value,
+  href,
+}: {
+  label: string
+  value: string | null
+  href?: string | null
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 border-b border-black/[.05] pb-2 last:border-0 dark:border-white/[.06]">
+      <span className="text-xs text-zinc-400">{label}</span>
+      {value ? (
+        href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {value}
+          </a>
+        ) : (
+          <span className="break-words">{value}</span>
+        )
+      ) : (
+        <span className="text-zinc-400">—</span>
+      )}
     </div>
   )
 }

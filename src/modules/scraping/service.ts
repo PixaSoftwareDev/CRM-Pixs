@@ -32,7 +32,7 @@ export async function runCampaign(campaignId: string) {
         nombre: p.nombre,
         telefono: p.telefono,
         sitioWeb: p.sitioWeb,
-        descripcion: p.direccion,
+        direccion: p.direccion,
         estado: dup ? "duplicado" : "nuevo",
       })
     }
@@ -85,6 +85,8 @@ export async function approveLead(leadId: string) {
   if (!lead) throw new Error("Lead no encontrado")
   if (lead.contactId) return { contactId: lead.contactId }
 
+  const notas = [lead.descripcion, lead.direccion].filter(Boolean).join(" · ") || null
+
   const [contact] = await db
     .insert(contacts)
     .values({
@@ -92,7 +94,8 @@ export async function approveLead(leadId: string) {
       email: lead.email,
       telefono: lead.telefono,
       sitioWeb: lead.sitioWeb,
-      notas: lead.descripcion,
+      personaContacto: lead.contactoNombre,
+      notas,
       source: "scraping",
     })
     .returning({ id: contacts.id })

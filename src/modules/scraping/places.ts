@@ -155,7 +155,13 @@ export async function searchPlaces(query: string, cantidad = 20): Promise<PlaceR
     results.push({
       nombre: t.name,
       sitioWeb: t.website || t["contact:website"] || undefined,
-      telefono: t.phone || t["contact:phone"] || undefined,
+      telefono:
+        t.phone ||
+        t["contact:phone"] ||
+        t["contact:mobile"] ||
+        t.mobile ||
+        t["phone:mobile"] ||
+        undefined,
       direccion,
     })
     if (results.length >= cantidad) break
