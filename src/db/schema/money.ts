@@ -60,6 +60,9 @@ export const transactions = sqliteTable(
     fecha: text("fecha").notNull(),
     comprobanteUrl: text("comprobante_url"),
     descripcion: text("descripcion"),
+    // Reintegro: si un gasto pagado de su bolsillo por alguien ya fue devuelto.
+    reintegrado: integer("reintegrado", { mode: "boolean" }).notNull().default(false),
+    reintegradoAt: integer("reintegrado_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),

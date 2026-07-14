@@ -2,6 +2,8 @@ import { desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { contacts, opportunities, projects, projectTechInfo } from "@/db/schema"
 
+export type ProjectListRow = Awaited<ReturnType<typeof listProjects>>[number]
+
 export async function listProjects() {
   return db
     .select({
@@ -10,6 +12,7 @@ export async function listProjects() {
       estado: projects.estado,
       fechaInicio: projects.fechaInicio,
       createdAt: projects.createdAt,
+      contactId: contacts.id,
       contactoNombre: contacts.nombre,
       valor: opportunities.valorEstimado,
       moneda: opportunities.moneda,

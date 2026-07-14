@@ -11,19 +11,22 @@ export default async function PipelinePage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <PageHeader title="Pipeline" subtitle="Oportunidades — arrastrá entre estados" />
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <PageHeader title="Oportunidades" subtitle="Arrastrá las tarjetas entre estados" />
         <NewOpportunity contactos={contactos.map((c) => ({ id: c.id, nombre: c.nombre }))} />
       </div>
 
       {contactos.length === 0 ? (
         <EmptyState>
-          Primero creá un contacto en <strong>Contactos</strong> para poder abrir oportunidades.
+          Primero creá un cliente en <strong>Clientes</strong> para poder abrir oportunidades.
         </EmptyState>
       ) : opps.length === 0 ? (
         <EmptyState>Todavía no hay oportunidades. Creá la primera.</EmptyState>
       ) : (
-        <KanbanBoard initial={opps} />
+        <KanbanBoard
+          initial={opps}
+          contactos={contactos.map((c) => ({ id: c.id, nombre: c.nombre }))}
+        />
       )}
     </div>
   )

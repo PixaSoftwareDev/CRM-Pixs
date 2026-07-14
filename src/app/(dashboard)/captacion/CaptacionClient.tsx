@@ -1,6 +1,8 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useActionState, useState, useTransition } from "react"
+import { Modal } from "@/components/Modal"
 import { Badge, Button, Field, Input } from "@/components/ui"
 import type { FormState } from "@/lib/forms"
 import {
@@ -12,44 +14,54 @@ import {
 } from "@/modules/scraping/actions"
 
 export function NewCampaign() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState<FormState, FormData>(async (p, fd) => {
     const res = await createCampaign(p, fd)
-    if (res.ok) setOpen(false)
+    if (res.ok) {
+      setOpen(false)
+      router.refresh()
+    }
     return res
   }, {})
 
-  if (!open) return <Button onClick={() => setOpen(true)}>+ Nueva campaña</Button>
-
   return (
-    <form
-      action={action}
-      className="w-full max-w-md space-y-3 rounded-xl border border-black/[.08] bg-white p-4 dark:border-white/[.12] dark:bg-zinc-950"
-    >
-      <Field label="Nombre">
-        <Input name="nombre" required placeholder="Estudios contables CABA" />
-      </Field>
-      <Field label="Qué buscar (query)">
-        <Input name="query" required placeholder="estudio contable" />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Ubicación">
-          <Input name="ubicacion" placeholder="Buenos Aires" />
-        </Field>
-        <Field label="Cantidad (máx 20)">
-          <Input name="cantidad" type="number" min="1" max="20" defaultValue="20" />
-        </Field>
-      </div>
-      {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Creando…" : "Crear"}
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
+    <>
+      <Button onClick={() => setOpen(true)}>+ Nueva campaña</Button>
+      {open ? (
+        <Modal
+          title="Nueva campaña"
+          description="Recolección de leads por scraping"
+          onClose={() => setOpen(false)}
+        >
+          <form action={action} className="space-y-4">
+            <Field label="Nombre">
+              <Input name="nombre" required placeholder="Estudios contables CABA" />
+            </Field>
+            <Field label="Qué buscar (query)">
+              <Input name="query" required placeholder="estudio contable" />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Ubicación">
+                <Input name="ubicacion" placeholder="Buenos Aires" />
+              </Field>
+              <Field label="Cantidad (máx 20)">
+                <Input name="cantidad" type="number" min="1" max="20" defaultValue="20" />
+              </Field>
+            </div>
+            {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+            <div className="flex justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Creando…" : "Crear campaña"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+    </>
   )
 }
 

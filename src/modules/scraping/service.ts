@@ -89,7 +89,6 @@ export async function approveLead(leadId: string) {
     .insert(contacts)
     .values({
       nombre: lead.nombre,
-      empresa: lead.nombre,
       email: lead.email,
       telefono: lead.telefono,
       sitioWeb: lead.sitioWeb,
@@ -101,7 +100,7 @@ export async function approveLead(leadId: string) {
   await db.insert(opportunities).values({
     contactId: contact!.id,
     titulo: `Prospecto: ${lead.nombre}`,
-    estado: "posible",
+    estado: "nuevo",
     scrapingCampaignId: lead.campaignId,
   })
 

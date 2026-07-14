@@ -16,6 +16,8 @@ const serverSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
+  // Enriquecimiento de leads con Gemini (Google AI Studio). Opcional.
+  GEMINI_API_KEY: z.string().min(1).optional(),
 })
 
 let cached: z.infer<typeof serverSchema> | undefined

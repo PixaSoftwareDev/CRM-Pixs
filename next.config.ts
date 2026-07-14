@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: fileURLToPath(new URL(".", import.meta.url)),
   },
+  experimental: {
+    // Subida de documentos: el default de Server Actions es 1MB; permitimos
+    // hasta 20MB (más un margen de overhead multipart). Ver módulo documents.
+    serverActions: { bodySizeLimit: "22mb" },
+  },
 }
 
 export default nextConfig

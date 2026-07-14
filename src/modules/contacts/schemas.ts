@@ -2,7 +2,7 @@ import { z } from "zod"
 
 export const contactSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio").max(200),
-  empresa: z.string().max(200).optional().or(z.literal("")),
+  personaContacto: z.string().max(200).optional().or(z.literal("")),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   telefono: z.string().max(50).optional().or(z.literal("")),
   sitioWeb: z.string().url("URL inválida").optional().or(z.literal("")),
@@ -16,7 +16,7 @@ export function cleanContact(input: ContactInput) {
   const nullify = (v?: string) => (v && v.length > 0 ? v : null)
   return {
     nombre: input.nombre,
-    empresa: nullify(input.empresa),
+    personaContacto: nullify(input.personaContacto),
     email: nullify(input.email),
     telefono: nullify(input.telefono),
     sitioWeb: nullify(input.sitioWeb),

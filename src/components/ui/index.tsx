@@ -25,7 +25,7 @@ export function Button({
         "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:opacity-60 disabled:pointer-events-none",
         size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 text-sm",
         variant === "primary" &&
-          "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200",
+          "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm shadow-blue-600/20 hover:from-blue-500 hover:to-violet-500",
         variant === "secondary" &&
           "border border-zinc-300 hover:bg-black/[.04] dark:border-zinc-700 dark:hover:bg-white/[.06]",
         variant === "ghost" && "hover:bg-black/[.04] dark:hover:bg-white/[.06]",
@@ -41,7 +41,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        "h-9 w-full rounded-md border border-zinc-300 bg-transparent px-3 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700",
+        "h-9 w-full rounded-md border border-zinc-300 bg-transparent px-3 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:focus:border-blue-400",
         className,
       )}
       {...props}
@@ -53,7 +53,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700",
+        "w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:focus:border-blue-400",
         className,
       )}
       {...props}
@@ -66,7 +66,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
     <select
       className={cn(
         // bg/text explícitos: en oscuro, transparente dejaba el menú de opciones ilegible.
-        "h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
+        "h-9 w-full rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-blue-400",
         className,
       )}
       {...props}

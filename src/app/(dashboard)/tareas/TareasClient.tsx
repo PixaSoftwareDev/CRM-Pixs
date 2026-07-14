@@ -3,17 +3,25 @@
 import {
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   PointerSensor,
   useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
 import { useId, useMemo, useState, useTransition } from "react"
+import { BoardIcon, ListIcon } from "@/components/icons"
+import { KebabMenu } from "@/components/KebabMenu"
+import { KANBAN_CARD, KanbanBoardShell, KanbanColumn } from "@/components/kanban"
+import { Modal } from "@/components/Modal"
 import { Badge, Button, EmptyState, Field, Input, Select, Textarea } from "@/components/ui"
-import { TASK_COLUMNS, type TaskColumn } from "@/db/schema"
+import { ViewToggle } from "@/components/ViewToggle"
+import { TASK_COLORS, TASK_COLUMNS, type TaskColor, type TaskColumn } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
 import { createTaskFromBoard, deleteTask, setTaskStatus, updateTask } from "@/modules/tasks/actions"
+import { parseAsignados, serializeAsignados } from "@/modules/tasks/assignees"
+import { TASK_COLOR_STYLES } from "@/modules/tasks/colors"
 import type { GlobalTaskRow, ProjectOption, UserOption } from "@/modules/tasks/queries"
 
 const STATUS_LABELS: Record<TaskColumn, string> = {
@@ -41,8 +49,9 @@ type NewTaskForm = {
   projectId: string
   titulo: string
   descripcion: string
+  color: TaskColor | null
   estado: TaskColumn
-  asignadoA: string
+  asignados: string[]
   createdAt: string
   venceAt: string
 }
@@ -51,8 +60,9 @@ const EMPTY_FORM: NewTaskForm = {
   projectId: "",
   titulo: "",
   descripcion: "",
+  color: null,
   estado: "backlog",
-  asignadoA: "",
+  asignados: [],
   createdAt: "",
   venceAt: "",
 }
@@ -129,8 +139,9 @@ export function TareasClient({
       projectId: task.projectId,
       titulo: task.titulo,
       descripcion: task.descripcion ?? "",
+      color: task.color,
       estado: task.estado,
-      asignadoA: task.asignadoA ?? "",
+      asignados: parseAsignados(task.asignados),
       createdAt: toInputDate(task.createdAt),
       venceAt: toInputDate(task.venceAt),
     })
@@ -149,13 +160,14 @@ export function TareasClient({
       projectId: form.projectId,
       titulo,
       descripcion: form.descripcion.trim() || undefined,
+      color: form.color,
       estado: form.estado,
-      asignadoA: form.asignadoA || undefined,
+      asignados: form.asignados,
       createdAt: form.createdAt || undefined,
       venceAt: form.venceAt || undefined,
     }
     const proyectoNombre = proyectos.find((p) => p.id === form.projectId)?.nombre ?? ""
-    const asignadoNombre = usuarios.find((u) => u.id === form.asignadoA)?.nombre ?? null
+    const asignadosJson = serializeAsignados(form.asignados)
     const venceAt = form.venceAt ? new Date(`${form.venceAt}T12:00:00`) : null
     const createdAt = form.createdAt ? new Date(`${form.createdAt}T12:00:00`) : new Date()
 
@@ -173,9 +185,9 @@ export function TareasClient({
                   ...t,
                   titulo,
                   descripcion: form.descripcion.trim() || null,
+                  color: form.color,
                   estado: form.estado,
-                  asignadoA: form.asignadoA || null,
-                  asignadoNombre,
+                  asignados: asignadosJson,
                   projectId: form.projectId,
                   proyectoNombre,
                   venceAt,
@@ -198,14 +210,14 @@ export function TareasClient({
         id: res.id,
         titulo,
         descripcion: form.descripcion.trim() || null,
+        color: form.color,
         estado: form.estado,
         venceAt,
         cerradoAt: form.estado === "hecho" ? new Date() : null,
         createdAt: res.createdAt ?? createdAt,
         projectId: form.projectId,
         proyectoNombre,
-        asignadoA: form.asignadoA || null,
-        asignadoNombre,
+        asignados: asignadosJson,
       }
       setItems((cur) => [nueva, ...cur])
       setShowForm(false)
@@ -228,22 +240,14 @@ export function TareasClient({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-md border border-zinc-300 p-0.5 dark:border-zinc-700">
-          <Button
-            variant={view === "tablero" ? "primary" : "ghost"}
-            size="sm"
-            onClick={() => setView("tablero")}
-          >
-            Tablero
-          </Button>
-          <Button
-            variant={view === "lista" ? "primary" : "ghost"}
-            size="sm"
-            onClick={() => setView("lista")}
-          >
-            Lista
-          </Button>
-        </div>
+        <ViewToggle
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "tablero", label: "Tablero", icon: <BoardIcon /> },
+            { value: "lista", label: "Lista", icon: <ListIcon /> },
+          ]}
+        />
 
         <Select
           className="w-auto min-w-44"
@@ -288,17 +292,14 @@ export function TareasClient({
       </div>
 
       {showForm ? (
-        <form
-          onSubmit={submitForm}
-          className="mb-5 rounded-xl border border-black/[.08] bg-zinc-50 p-4 dark:border-white/[.12] dark:bg-zinc-900/40"
+        <Modal
+          title={editingId ? "Editar tarea" : "Nueva tarea"}
+          description="Asigná proyecto, responsable y fechas"
+          onClose={() => setShowForm(false)}
+          className="max-w-2xl"
         >
-          <div className="mb-3 text-sm font-semibold">
-            {editingId ? "Editar tarea" : "Nueva tarea"}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Título" className="sm:col-span-2 lg:col-span-4">
-              {/* biome-ignore lint/a11y/noAutofocus: foco al abrir el formulario */}
+          <form onSubmit={submitForm} className="space-y-4">
+            <Field label="Título">
               <Input
                 autoFocus
                 placeholder="¿Qué hay que hacer?"
@@ -307,55 +308,74 @@ export function TareasClient({
               />
             </Field>
 
-            <Field label="Proyecto">
-              <Select
-                value={form.projectId}
-                onChange={(e) => setField("projectId", e.target.value)}
-              >
-                {proyectos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Proyecto">
+                <Select
+                  value={form.projectId}
+                  onChange={(e) => setField("projectId", e.target.value)}
+                >
+                  {proyectos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
-            <Field label="Responsable">
-              <Select
-                value={form.asignadoA}
-                onChange={(e) => setField("asignadoA", e.target.value)}
-              >
-                <option value="">Sin asignar</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium">Responsables</span>
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {usuarios.map((u) => {
+                    const on = form.asignados.includes(u.id)
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() =>
+                          setField(
+                            "asignados",
+                            on
+                              ? form.asignados.filter((x) => x !== u.id)
+                              : [...form.asignados, u.id],
+                          )
+                        }
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-sm transition-colors",
+                          on
+                            ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900"
+                            : "border-black/[.12] text-zinc-600 hover:border-zinc-400 dark:border-white/[.18] dark:text-zinc-300",
+                        )}
+                      >
+                        {u.nombre}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-            <Field label="Estado">
-              <Select
-                value={form.estado}
-                onChange={(e) => setField("estado", e.target.value as TaskColumn)}
-              >
-                {TASK_COLUMNS.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+              <Field label="Estado">
+                <Select
+                  value={form.estado}
+                  onChange={(e) => setField("estado", e.target.value as TaskColumn)}
+                >
+                  {TASK_COLUMNS.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABELS[s]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
-            <Field label="Resolución estimada">
-              <Input
-                type="date"
-                value={form.venceAt}
-                onChange={(e) => setField("venceAt", e.target.value)}
-              />
-            </Field>
+              <Field label="Resolución estimada">
+                <Input
+                  type="date"
+                  value={form.venceAt}
+                  onChange={(e) => setField("venceAt", e.target.value)}
+                />
+              </Field>
+            </div>
 
-            <Field label="Descripción" className="sm:col-span-2 lg:col-span-3">
+            <Field label="Descripción">
               <Textarea
                 rows={2}
                 placeholder="Detalles, contexto, links…"
@@ -364,34 +384,84 @@ export function TareasClient({
               />
             </Field>
 
-            <Field label="Fecha de creación">
-              <Input
-                type="date"
-                value={form.createdAt}
-                onChange={(e) => setField("createdAt", e.target.value)}
-              />
-            </Field>
-          </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Fecha de creación">
+                <Input
+                  type="date"
+                  value={form.createdAt}
+                  onChange={(e) => setField("createdAt", e.target.value)}
+                />
+              </Field>
 
-          {newError ? <p className="mt-3 text-sm text-red-600">{newError}</p> : null}
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium">Color</span>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setField("color", null)}
+                    aria-label="Sin color"
+                    title="Sin color"
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full border text-zinc-400 transition-transform hover:scale-110",
+                      form.color === null
+                        ? "border-zinc-900 ring-2 ring-zinc-900/20 dark:border-white dark:ring-white/20"
+                        : "border-black/[.12] dark:border-white/[.18]",
+                    )}
+                  >
+                    <span className="h-3.5 w-px rotate-45 bg-current" />
+                  </button>
+                  {TASK_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setField("color", c)}
+                      aria-label={TASK_COLOR_STYLES[c].label}
+                      title={TASK_COLOR_STYLES[c].label}
+                      className={cn(
+                        "h-7 w-7 rounded-full transition-transform hover:scale-110",
+                        TASK_COLOR_STYLES[c].swatch,
+                        form.color === c
+                          ? "ring-2 ring-offset-2 ring-zinc-900 ring-offset-white dark:ring-white dark:ring-offset-zinc-950"
+                          : "",
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          <div className="mt-4 flex gap-2">
-            <Button type="submit" size="sm" disabled={creating}>
-              {creating ? "Guardando…" : editingId ? "Guardar cambios" : "Crear tarea"}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </form>
+            {newError ? <p className="text-sm text-red-600">{newError}</p> : null}
+
+            <div className="flex justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+              <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? "Guardando…" : editingId ? "Guardar cambios" : "Crear tarea"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       ) : null}
 
       {filtered.length === 0 ? (
         <EmptyState>No hay tareas que coincidan con los filtros.</EmptyState>
       ) : view === "tablero" ? (
-        <Board items={filtered} onMove={changeStatus} onEdit={openEdit} onDelete={removeTask} />
+        <Board
+          items={filtered}
+          usuarios={usuarios}
+          onMove={changeStatus}
+          onEdit={openEdit}
+          onDelete={removeTask}
+        />
       ) : (
-        <List items={filtered} onChange={changeStatus} onEdit={openEdit} onDelete={removeTask} />
+        <List
+          items={filtered}
+          usuarios={usuarios}
+          onChange={changeStatus}
+          onEdit={openEdit}
+          onDelete={removeTask}
+        />
       )}
     </div>
   )
@@ -404,17 +474,58 @@ type RowActions = {
   onDelete: (task: GlobalTaskRow) => void
 }
 
+/** Mapa id → nombre para resolver los responsables de cada tarea. */
+function usuariosMap(usuarios: UserOption[]) {
+  return new Map(usuarios.map((u) => [u.id, u.nombre]))
+}
+
+/** Nombres de los responsables de una tarea, resueltos contra el mapa. */
+function asignadoNombres(asignados: string | null | undefined, nombres: Map<string, string>) {
+  return parseAsignados(asignados)
+    .map((id) => nombres.get(id))
+    .filter((n): n is string => !!n)
+}
+
+/** Chips con los responsables de una tarea (uno, varios o ninguno). */
+function AssigneeChips({
+  asignados,
+  nombres,
+}: {
+  asignados: string | null | undefined
+  nombres: Map<string, string>
+}) {
+  const items = asignadoNombres(asignados, nombres)
+  if (items.length === 0) return null
+  return (
+    <>
+      {items.map((n) => (
+        <span key={n} className="rounded-full bg-black/[.04] px-1.5 py-0.5 dark:bg-white/[.08]">
+          {n}
+        </span>
+      ))}
+    </>
+  )
+}
+
 function Board({
   items,
+  usuarios,
   onMove,
   onEdit,
   onDelete,
-}: { items: GlobalTaskRow[]; onMove: (id: string, estado: TaskColumn) => void } & RowActions) {
+}: {
+  items: GlobalTaskRow[]
+  usuarios: UserOption[]
+  onMove: (id: string, estado: TaskColumn) => void
+} & RowActions) {
+  const nombres = useMemo(() => usuariosMap(usuarios), [usuarios])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   // id estable para dnd-kit: evita el mismatch de hidratación en sus ids internos.
   const dndId = useId()
 
   function onDragEnd(e: DragEndEvent) {
+    setActiveId(null)
     const id = String(e.active.id)
     const target = e.over?.id as TaskColumn | undefined
     if (!target) return
@@ -423,19 +534,35 @@ function Board({
     onMove(id, target)
   }
 
+  const activeTask = activeId ? items.find((t) => t.id === activeId) : null
+
   return (
-    <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
-      <div className="flex gap-3 overflow-x-auto pb-4">
+    <DndContext
+      id={dndId}
+      sensors={sensors}
+      onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={onDragEnd}
+    >
+      <KanbanBoardShell>
         {TASK_COLUMNS.map((estado) => (
           <BoardColumn
             key={estado}
             estado={estado}
             items={items.filter((t) => t.estado === estado)}
+            nombres={nombres}
             onEdit={onEdit}
             onDelete={onDelete}
           />
         ))}
-      </div>
+      </KanbanBoardShell>
+      <DragOverlay>
+        {activeTask ? (
+          <div className={cn(KANBAN_CARD, "cursor-grabbing shadow-lg")}>
+            <BoardCardBody task={activeTask} nombres={nombres} />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   )
 }
@@ -443,57 +570,41 @@ function Board({
 function BoardColumn({
   estado,
   items,
+  nombres,
   onEdit,
   onDelete,
-}: { estado: TaskColumn; items: GlobalTaskRow[] } & RowActions) {
-  const { setNodeRef, isOver } = useDroppable({ id: estado })
+}: {
+  estado: TaskColumn
+  items: GlobalTaskRow[]
+  nombres: Map<string, string>
+} & RowActions) {
   return (
-    <div className="flex min-w-[13rem] flex-1 flex-col">
-      <div className="mb-2 px-1 text-sm font-medium text-zinc-500">
-        {STATUS_LABELS[estado]} <span className="text-zinc-400">· {items.length}</span>
-      </div>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "flex min-h-32 flex-1 flex-col gap-2 rounded-lg bg-zinc-100/60 p-2 dark:bg-zinc-900/40",
-          isOver && "ring-2 ring-zinc-400",
-        )}
-      >
-        {items.map((t) => (
-          <BoardCard key={t.id} task={t} onEdit={onEdit} onDelete={onDelete} />
-        ))}
-      </div>
-    </div>
+    <KanbanColumn
+      id={estado}
+      count={items.length}
+      header={<span className="text-sm font-medium text-zinc-500">{STATUS_LABELS[estado]}</span>}
+    >
+      {items.map((t) => (
+        <BoardCard key={t.id} task={t} nombres={nombres} onEdit={onEdit} onDelete={onDelete} />
+      ))}
+    </KanbanColumn>
   )
 }
 
-function BoardCard({ task, onEdit, onDelete }: { task: GlobalTaskRow } & RowActions) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
+/** Contenido visual de la tarjeta (reutilizado por el DragOverlay). */
+function BoardCardBody({ task, nombres }: { task: GlobalTaskRow; nombres: Map<string, string> }) {
   return (
-    <div
-      ref={setNodeRef}
-      style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
-      className={cn(
-        "group relative cursor-grab rounded-lg border border-black/[.08] bg-white p-3 text-sm shadow-sm dark:border-white/[.12] dark:bg-zinc-900",
-        isDragging && "opacity-50",
-      )}
-      {...listeners}
-      {...attributes}
-    >
-      <div className="absolute right-1.5 top-1.5">
-        <TaskMenu onEdit={() => onEdit(task)} onDelete={() => onDelete(task)} />
-      </div>
+    <>
+      {task.color ? (
+        <div className={cn("mb-2 h-1.5 w-10 rounded-full", TASK_COLOR_STYLES[task.color].bar)} />
+      ) : null}
       <div className="pr-6 font-medium leading-snug">{task.titulo}</div>
       {task.descripcion ? (
         <div className="mt-1 line-clamp-2 text-xs text-zinc-500">{task.descripcion}</div>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
         <span>{task.proyectoNombre}</span>
-        {task.asignadoNombre ? (
-          <span className="rounded-full bg-black/[.04] px-1.5 py-0.5 dark:bg-white/[.08]">
-            {task.asignadoNombre}
-          </span>
-        ) : null}
+        <AssigneeChips asignados={task.asignados} nombres={nombres} />
       </div>
       {task.estado === "hecho" && task.cerradoAt ? (
         <div className="mt-1.5 text-xs text-green-600 dark:text-green-400">
@@ -509,6 +620,34 @@ function BoardCard({ task, onEdit, onDelete }: { task: GlobalTaskRow } & RowActi
           Vence {formatDate(task.venceAt)}
         </div>
       ) : null}
+    </>
+  )
+}
+
+function BoardCard({
+  task,
+  nombres,
+  onEdit,
+  onDelete,
+}: { task: GlobalTaskRow; nombres: Map<string, string> } & RowActions) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
+  return (
+    // Sin transform en el nodo original: el arrastre lo muestra el DragOverlay,
+    // así no se extiende el área de scroll (evita el "scroll infinito").
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "group relative cursor-grab hover:shadow-md",
+        KANBAN_CARD,
+        isDragging && "opacity-40",
+      )}
+      {...listeners}
+      {...attributes}
+    >
+      <div className="absolute right-1.5 top-1.5">
+        <KebabMenu onEdit={() => onEdit(task)} onDelete={() => onDelete(task)} />
+      </div>
+      <BoardCardBody task={task} nombres={nombres} />
     </div>
   )
 }
@@ -518,79 +657,20 @@ function isOverdue(task: GlobalTaskRow) {
   return task.estado !== "hecho" && !!task.venceAt && new Date(task.venceAt) < new Date()
 }
 
-// Menú "⋮" con acciones (Editar / Eliminar). Detiene la propagación para no
-// disparar el drag&drop de la tarjeta.
-function TaskMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
-  const [open, setOpen] = useState(false)
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
-
-  return (
-    <div className="relative" onPointerDown={stop}>
-      <button
-        type="button"
-        aria-label="Acciones de la tarea"
-        onClick={(e) => {
-          stop(e)
-          setOpen((o) => !o)
-        }}
-        className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:bg-black/[.05] hover:text-zinc-700 dark:hover:bg-white/[.08] dark:hover:text-zinc-200"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <circle cx="12" cy="5" r="1.6" />
-          <circle cx="12" cy="12" r="1.6" />
-          <circle cx="12" cy="19" r="1.6" />
-        </svg>
-      </button>
-      {open ? (
-        <>
-          <button
-            type="button"
-            aria-label="Cerrar menú"
-            className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setOpen(false)}
-            onPointerDown={stop}
-          />
-          <div className="absolute right-0 top-7 z-20 w-36 overflow-hidden rounded-md border border-black/[.08] bg-white py-1 text-sm shadow-lg dark:border-white/[.12] dark:bg-zinc-900">
-            <button
-              type="button"
-              onClick={(e) => {
-                stop(e)
-                setOpen(false)
-                onEdit()
-              }}
-              className="block w-full px-3 py-1.5 text-left hover:bg-black/[.04] dark:hover:bg-white/[.06]"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                stop(e)
-                setOpen(false)
-                onDelete()
-              }}
-              className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
-            >
-              Eliminar
-            </button>
-          </div>
-        </>
-      ) : null}
-    </div>
-  )
-}
-
 // ---------- Lista (tabla) ----------
 
 function List({
   items,
+  usuarios,
   onChange,
   onEdit,
   onDelete,
 }: {
   items: GlobalTaskRow[]
+  usuarios: UserOption[]
   onChange: (id: string, estado: TaskColumn) => void
 } & RowActions) {
+  const nombres = useMemo(() => usuariosMap(usuarios), [usuarios])
   return (
     <div className="overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
       <table className="w-full min-w-[720px] text-sm">
@@ -612,7 +692,17 @@ function List({
               key={t.id}
               className="border-b border-black/[.05] last:border-0 dark:border-white/[.08]"
             >
-              <td className="px-4 py-2 font-medium">{t.titulo}</td>
+              <td className="px-4 py-2 font-medium">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 shrink-0 rounded-full",
+                      t.color ? TASK_COLOR_STYLES[t.color].bar : "bg-transparent",
+                    )}
+                  />
+                  {t.titulo}
+                </div>
+              </td>
               <td className="px-4 py-2 text-zinc-500">{t.proyectoNombre}</td>
               <td className="px-4 py-2">
                 <Select
@@ -627,7 +717,9 @@ function List({
                   ))}
                 </Select>
               </td>
-              <td className="px-4 py-2 text-zinc-500">{t.asignadoNombre ?? "—"}</td>
+              <td className="px-4 py-2 text-zinc-500">
+                {asignadoNombres(t.asignados, nombres).join(", ") || "—"}
+              </td>
               <td className="px-4 py-2 text-zinc-400">{formatDate(t.createdAt)}</td>
               <td className="px-4 py-2 text-zinc-400">{formatDate(t.venceAt)}</td>
               <td className="px-4 py-2">
@@ -638,7 +730,7 @@ function List({
                 )}
               </td>
               <td className="px-2 py-2 text-right">
-                <TaskMenu onEdit={() => onEdit(t)} onDelete={() => onDelete(t)} />
+                <KebabMenu onEdit={() => onEdit(t)} onDelete={() => onDelete(t)} />
               </td>
             </tr>
           ))}

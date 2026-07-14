@@ -1,7 +1,9 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
 /**
- * Contacto: la persona/empresa. Persiste para siempre (§3 del plan).
+ * Cliente: el negocio/empresa con el que trabajás. Guarda sus datos de contacto
+ * y con quién hablás (`personaContacto`). Sus oportunidades y proyectos cuelgan
+ * de acá. La tabla se llama `contacts` por historia; en la UI es "Cliente".
  * `source` = sello de origen (manual | scraping | referido...).
  */
 export const contacts = sqliteTable(
@@ -11,7 +13,7 @@ export const contacts = sqliteTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     nombre: text("nombre").notNull(),
-    empresa: text("empresa"),
+    personaContacto: text("persona_contacto"),
     email: text("email"),
     telefono: text("telefono"),
     sitioWeb: text("sitio_web"),

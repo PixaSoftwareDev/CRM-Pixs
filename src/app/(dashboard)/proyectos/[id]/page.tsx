@@ -1,18 +1,17 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { DocumentsCard } from "@/components/documents/DocumentsCard"
 import { Timeline } from "@/components/Timeline"
-import { Badge, Card, PageHeader } from "@/components/ui"
+import { Badge, Card } from "@/components/ui"
 import { getProject, getTechInfo } from "@/modules/projects/queries"
-import { listTasks } from "@/modules/tasks/queries"
 import { ProjectPayments } from "./ProjectPayments"
-import { TaskBoard } from "./TaskBoard"
 import { TechInfoForm } from "./TechInfoForm"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProyectoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [project, tasks, tech] = await Promise.all([getProject(id), listTasks(id), getTechInfo(id)])
+  const [project, tech] = await Promise.all([getProject(id), getTechInfo(id)])
   if (!project) notFound()
 
   return (
@@ -20,15 +19,18 @@ export default async function ProyectoPage({ params }: { params: Promise<{ id: s
       <Link href="/proyectos" className="text-sm text-zinc-500 hover:underline">
         ← Proyectos
       </Link>
-      <div className="mt-2 mb-6 flex items-center justify-between gap-4">
-        <PageHeader title={project.nombre} subtitle={project.contactoNombre} />
+      <div className="mt-2 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{project.nombre}</h1>
+          <Link
+            href={`/contactos/${project.contactId}`}
+            className="text-sm text-zinc-500 hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
+          >
+            {project.contactoNombre}
+          </Link>
+        </div>
         <Badge tone="green">{project.estado}</Badge>
       </div>
-
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold">Tareas</h2>
-        <TaskBoard projectId={id} initial={tasks} />
-      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -52,6 +54,10 @@ export default async function ProyectoPage({ params }: { params: Promise<{ id: s
         </Card>
 
         <ProjectPayments projectId={id} />
+      </div>
+
+      <div className="mt-6">
+        <DocumentsCard entityType="project" entityId={id} />
       </div>
 
       <Card className="mt-6">

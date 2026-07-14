@@ -4,9 +4,10 @@ import { eq, max } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
-import { TASK_COLUMNS, type TaskColumn, tasks } from "@/db/schema"
+import { TASK_COLORS, TASK_COLUMNS, type TaskColumn, tasks } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import type { FormState } from "@/lib/forms"
+import { serializeAsignados } from "./assignees"
 
 const createSchema = z.object({
   projectId: z.string().uuid(),
@@ -40,8 +41,9 @@ const createFromBoardSchema = z.object({
   projectId: z.string().uuid("Elegí un proyecto"),
   titulo: z.string().min(1, "Escribí un título").max(200),
   descripcion: z.string().max(2000).optional(),
+  color: z.enum(TASK_COLORS).nullable().optional(),
   estado: z.enum(TASK_COLUMNS).default("backlog"),
-  asignadoA: z.string().uuid().optional(),
+  asignados: z.array(z.string().uuid()).optional(),
   // Fechas ISO (yyyy-mm-dd) desde inputs date; se guardan como timestamp.
   createdAt: z.string().optional(),
   venceAt: z.string().optional(),
@@ -79,8 +81,9 @@ export async function createTaskFromBoard(
       projectId: data.projectId,
       titulo: data.titulo,
       descripcion: data.descripcion || null,
+      color: data.color ?? null,
       estado: data.estado,
-      asignadoA: data.asignadoA || null,
+      asignados: serializeAsignados(data.asignados),
       venceAt: toDate(data.venceAt) ?? null,
       cerradoAt: data.estado === "hecho" ? new Date() : null,
       createdAt,
@@ -120,8 +123,9 @@ export async function updateTask(input: UpdateTaskInput): Promise<{ ok: boolean;
       projectId: data.projectId,
       titulo: data.titulo,
       descripcion: data.descripcion || null,
+      color: data.color ?? null,
       estado: data.estado,
-      asignadoA: data.asignadoA || null,
+      asignados: serializeAsignados(data.asignados),
       venceAt: toDate(data.venceAt) ?? null,
       createdAt: toDate(data.createdAt) ?? undefined,
       cerradoAt,

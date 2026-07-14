@@ -1,12 +1,9 @@
 import type { OpportunityState } from "@/db/schema"
 
 export const STATE_LABELS: Record<OpportunityState, string> = {
-  consultado: "Consultado",
-  posible: "Posible",
-  pendiente: "Pendiente",
-  confirmado: "Confirmado",
-  en_desarrollo: "En desarrollo",
-  finalizado: "Finalizado",
+  nuevo: "Nuevo",
+  en_proceso: "En proceso",
+  ganado: "Ganado",
   perdido: "Perdido",
 }
 
@@ -14,11 +11,8 @@ export const STATE_TONES: Record<
   OpportunityState,
   "neutral" | "blue" | "green" | "amber" | "red" | "violet"
 > = {
-  consultado: "neutral",
-  posible: "blue",
-  pendiente: "amber",
-  confirmado: "green",
-  en_desarrollo: "violet",
-  finalizado: "green",
+  nuevo: "neutral",
+  en_proceso: "blue",
+  ganado: "green",
   perdido: "red",
 }

@@ -18,8 +18,11 @@ export default async function CaptacionPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <PageHeader title="Captación" subtitle="Scraping → bandeja de leads → pipeline" />
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          title="Captación"
+          subtitle="OpenStreetMap → bandeja de leads → oportunidades (enriquecido con Gemini)"
+        />
         <NewCampaign />
       </div>
 

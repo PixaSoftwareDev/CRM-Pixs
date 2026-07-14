@@ -86,6 +86,7 @@ const txSchema = z.object({
   fecha: z.string().min(1),
   descripcion: z.string().max(500).optional(),
   projectId: z.string().uuid().optional().or(z.literal("")),
+  realizadoPor: z.string().uuid().optional().or(z.literal("")),
 })
 
 export async function createTransaction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -98,6 +99,7 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
     fecha: formData.get("fecha"),
     descripcion: formData.get("descripcion") || undefined,
     projectId: formData.get("projectId") || "",
+    realizadoPor: formData.get("realizadoPor") || "",
   })
   if (!parsed.success) return { error: "Datos inválidos" }
 
@@ -109,9 +111,22 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
     fecha: parsed.data.fecha,
     descripcion: parsed.data.descripcion,
     projectId: parsed.data.projectId ? parsed.data.projectId : null,
-    realizadoPor: user.id, // atribución: "quién hizo el gasto"
+    // Quién lo pagó: el elegido en el form, o el usuario actual por defecto.
+    realizadoPor: parsed.data.realizadoPor ? parsed.data.realizadoPor : user.id,
   })
   await audit({ userId: user.id, accion: "create", entityType: "transaction" })
+  revalidatePath("/finanzas")
+  return { ok: true }
+}
+
+/** Marca un gasto como reintegrado (devuelto a quien lo pagó) o lo revierte. */
+export async function toggleReintegro(id: string, devuelto: boolean): Promise<FormState> {
+  const user = await requireUser()
+  await db
+    .update(transactions)
+    .set({ reintegrado: devuelto, reintegradoAt: devuelto ? new Date() : null })
+    .where(eq(transactions.id, id))
+  await audit({ userId: user.id, accion: "update", entityType: "transaction", entityId: id })
   revalidatePath("/finanzas")
   return { ok: true }
 }

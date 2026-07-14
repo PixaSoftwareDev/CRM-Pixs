@@ -1,6 +1,6 @@
 import { desc, eq, like, or } from "drizzle-orm"
 import { db } from "@/db"
-import { contacts } from "@/db/schema"
+import { contacts, opportunities, projects } from "@/db/schema"
 
 export async function listContacts(search?: string) {
   if (search && search.trim().length > 0) {
@@ -9,7 +9,9 @@ export async function listContacts(search?: string) {
     return db
       .select()
       .from(contacts)
-      .where(or(like(contacts.nombre, q), like(contacts.empresa, q), like(contacts.email, q)))
+      .where(
+        or(like(contacts.nombre, q), like(contacts.personaContacto, q), like(contacts.email, q)),
+      )
       .orderBy(desc(contacts.createdAt))
   }
   return db.select().from(contacts).orderBy(desc(contacts.createdAt))
@@ -18,4 +20,29 @@ export async function listContacts(search?: string) {
 export async function getContact(id: string) {
   const [row] = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1)
   return row ?? null
+}
+
+export type ContactOpportunity = Awaited<ReturnType<typeof listContactOpportunities>>[number]
+
+/**
+ * Oportunidades del contacto con su proyecto asociado (si la oportunidad se
+ * ganó). Un contacto puede tener varias: así se ven todos sus negocios y
+ * proyectos desde su ficha.
+ */
+export async function listContactOpportunities(contactId: string) {
+  return db
+    .select({
+      id: opportunities.id,
+      titulo: opportunities.titulo,
+      estado: opportunities.estado,
+      valorEstimado: opportunities.valorEstimado,
+      moneda: opportunities.moneda,
+      projectId: projects.id,
+      projectNombre: projects.nombre,
+      projectEstado: projects.estado,
+    })
+    .from(opportunities)
+    .leftJoin(projects, eq(projects.opportunityId, opportunities.id))
+    .where(eq(opportunities.contactId, contactId))
+    .orderBy(desc(opportunities.createdAt))
 }

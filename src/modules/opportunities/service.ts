@@ -6,8 +6,8 @@ import { addActivity } from "@/modules/activities"
 /**
  * Cambia el estado de una oportunidad (drag entre columnas del pipeline).
  * Registra el cambio en el timeline y actualiza estado_cambiado_at para medir
- * tiempo por etapa. Al pasar a "confirmado" se dispara la creación del proyecto
- * (se engancha en la Fase 2 mediante onConfirmed).
+ * tiempo por etapa. Al pasar a "ganado" se dispara la creación del proyecto
+ * (se engancha mediante onConfirmed).
  */
 export async function moveOpportunity(input: {
   id: string
@@ -45,7 +45,7 @@ export async function moveOpportunity(input: {
     autorId: input.autorId,
   })
 
-  if (input.estado === "confirmado" && input.onConfirmed) {
+  if (input.estado === "ganado" && input.onConfirmed) {
     await input.onConfirmed(input.id)
   }
 }

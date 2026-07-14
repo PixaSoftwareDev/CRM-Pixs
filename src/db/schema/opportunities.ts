@@ -2,18 +2,10 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import { contacts } from "./contacts"
 
 /**
- * Estados del pipeline (§3). "pendiente" = presupuesto enviado, esperando respuesta.
- * El orden define las columnas del kanban.
+ * Estados de una oportunidad. Embudo simple: Nuevo → En proceso → Ganado/Perdido.
+ * "ganado" dispara la creación del proyecto. El orden define las columnas del kanban.
  */
-export const OPPORTUNITY_STATES = [
-  "consultado",
-  "posible",
-  "pendiente",
-  "confirmado",
-  "en_desarrollo",
-  "finalizado",
-  "perdido",
-] as const
+export const OPPORTUNITY_STATES = ["nuevo", "en_proceso", "ganado", "perdido"] as const
 
 export type OpportunityState = (typeof OPPORTUNITY_STATES)[number]
 
@@ -31,7 +23,7 @@ export const opportunities = sqliteTable(
       .notNull()
       .references(() => contacts.id, { onDelete: "cascade" }),
     titulo: text("titulo").notNull(),
-    estado: text("estado").notNull().default("consultado").$type<OpportunityState>(),
+    estado: text("estado").notNull().default("nuevo").$type<OpportunityState>(),
     motivoPerdida: text("motivo_perdida"),
     valorEstimado: text("valor_estimado"),
     probabilidad: text("probabilidad"),

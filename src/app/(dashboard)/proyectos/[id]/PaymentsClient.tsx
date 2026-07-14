@@ -1,6 +1,8 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useActionState, useState, useTransition } from "react"
+import { Modal } from "@/components/Modal"
 import { Button, Field, Input, Select } from "@/components/ui"
 import type { FormState } from "@/lib/forms"
 import { cn, daysUntil, formatDate, formatMoney } from "@/lib/utils"
@@ -14,50 +16,60 @@ type Cuota = {
 }
 
 export function BudgetForm({ projectId }: { projectId: string }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState<FormState, FormData>(async (p, fd) => {
     const res = await createBudget(p, fd)
-    if (res.ok) setOpen(false)
+    if (res.ok) {
+      setOpen(false)
+      router.refresh()
+    }
     return res
   }, {})
 
-  if (!open)
-    return (
+  return (
+    <>
       <Button size="sm" onClick={() => setOpen(true)}>
         + Presupuesto
       </Button>
-    )
-
-  return (
-    <form action={action} className="space-y-3">
-      <input type="hidden" name="projectId" value={projectId} />
-      <Field label="Monto total">
-        <Input name="montoTotal" type="number" step="0.01" min="0" required />
-      </Field>
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="Cuotas">
-          <Input name="cuotas" type="number" min="1" max="60" defaultValue="1" required />
-        </Field>
-        <Field label="Moneda">
-          <Select name="moneda" defaultValue="ARS">
-            <option value="ARS">ARS</option>
-            <option value="USD">USD</option>
-          </Select>
-        </Field>
-      </div>
-      <Field label="Primer vencimiento">
-        <Input name="primerVencimiento" type="date" required />
-      </Field>
-      {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
-      <div className="flex gap-2">
-        <Button size="sm" type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Crear"}
-        </Button>
-        <Button size="sm" variant="ghost" type="button" onClick={() => setOpen(false)}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
+      {open ? (
+        <Modal
+          title="Nuevo presupuesto"
+          description="Monto total y plan de cuotas"
+          onClose={() => setOpen(false)}
+        >
+          <form action={action} className="space-y-4">
+            <input type="hidden" name="projectId" value={projectId} />
+            <Field label="Monto total">
+              <Input name="montoTotal" type="number" step="0.01" min="0" required />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Cuotas">
+                <Input name="cuotas" type="number" min="1" max="60" defaultValue="1" required />
+              </Field>
+              <Field label="Moneda">
+                <Select name="moneda" defaultValue="ARS">
+                  <option value="ARS">ARS</option>
+                  <option value="USD">USD</option>
+                </Select>
+              </Field>
+            </div>
+            <Field label="Primer vencimiento">
+              <Input name="primerVencimiento" type="date" required />
+            </Field>
+            {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+            <div className="flex justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+              <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Guardando…" : "Crear presupuesto"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+    </>
   )
 }
 

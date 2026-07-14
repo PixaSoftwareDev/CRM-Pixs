@@ -17,7 +17,7 @@ export async function listOpportunities() {
       estadoCambiadoAt: opportunities.estadoCambiadoAt,
       contactId: opportunities.contactId,
       contactoNombre: contacts.nombre,
-      empresa: contacts.empresa,
+      personaContacto: contacts.personaContacto,
     })
     .from(opportunities)
     .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
@@ -38,7 +38,7 @@ export async function getOpportunity(id: string) {
       estadoCambiadoAt: opportunities.estadoCambiadoAt,
       contactId: opportunities.contactId,
       contactoNombre: contacts.nombre,
-      empresa: contacts.empresa,
+      personaContacto: contacts.personaContacto,
     })
     .from(opportunities)
     .innerJoin(contacts, eq(opportunities.contactId, contacts.id))

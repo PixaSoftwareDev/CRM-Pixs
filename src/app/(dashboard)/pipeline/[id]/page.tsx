@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Timeline } from "@/components/Timeline"
-import { Badge, Card, PageHeader } from "@/components/ui"
+import { Badge, Card } from "@/components/ui"
 import { formatMoney } from "@/lib/utils"
 import { STATE_LABELS, STATE_TONES } from "@/modules/opportunities/labels"
 import { getOpportunity } from "@/modules/opportunities/queries"
@@ -14,20 +14,41 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
   if (!opp) notFound()
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="animate-slide-up">
       <Link href="/pipeline" className="text-sm text-zinc-500 hover:underline">
-        ← Pipeline
+        ← Oportunidades
       </Link>
-      <div className="mt-2 mb-6 flex items-center justify-between gap-4">
-        <PageHeader
-          title={opp.titulo}
-          subtitle={`${opp.contactoNombre}${opp.empresa ? ` · ${opp.empresa}` : ""}`}
-        />
-        <Badge tone={STATE_TONES[opp.estado]}>{STATE_LABELS[opp.estado]}</Badge>
+
+      {/* Hero */}
+      <div className="mt-3 overflow-hidden rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.12] dark:bg-zinc-900">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">{opp.titulo}</h1>
+            <p className="mt-1 text-zinc-500">
+              <Link
+                href={`/contactos/${opp.contactId}`}
+                className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
+              >
+                {opp.contactoNombre}
+              </Link>
+              {opp.personaContacto ? (
+                <span className="text-zinc-400"> · {opp.personaContacto}</span>
+              ) : null}
+            </p>
+          </div>
+          <Badge tone={STATE_TONES[opp.estado]}>{STATE_LABELS[opp.estado]}</Badge>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
-        <Card className="space-y-3 self-start">
+      {/* Actividad (izq) + detalle (der, sticky) */}
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <Card className="min-w-0">
+          <h2 className="mb-3 text-sm font-semibold">Actividad</h2>
+          <Timeline entityType="opportunity" entityId={opp.id} revalidate={`/pipeline/${opp.id}`} />
+        </Card>
+
+        <Card className="space-y-4 lg:sticky lg:top-8">
+          <h2 className="text-sm font-semibold">Detalle</h2>
           <Detail
             label="Valor estimado"
             value={opp.valorEstimado ? formatMoney(opp.valorEstimado, opp.moneda) : "—"}
@@ -37,18 +58,16 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
             <Detail label="Motivo de pérdida" value={opp.motivoPerdida} />
           ) : null}
           <Detail
-            label="Contacto"
+            label="Cliente"
             value={
-              <Link href={`/contactos/${opp.contactId}`} className="text-blue-600 hover:underline">
+              <Link
+                href={`/contactos/${opp.contactId}`}
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
                 {opp.contactoNombre}
               </Link>
             }
           />
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 text-sm font-semibold">Actividad</h2>
-          <Timeline entityType="opportunity" entityId={opp.id} revalidate={`/pipeline/${opp.id}`} />
         </Card>
       </div>
     </div>

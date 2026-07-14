@@ -1,5 +1,6 @@
 "use server"
 
+import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/db"
 import { type OpportunityState, opportunities } from "@/db/schema"
@@ -46,6 +47,49 @@ export async function createOpportunity(
   await audit({ userId: user.id, accion: "create", entityType: "opportunity", entityId: row?.id })
   revalidatePath("/pipeline")
   return { ok: true, id: row?.id }
+}
+
+/** Edita los datos de una oportunidad (no el estado, que se mueve por el kanban). */
+export async function updateOpportunity(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser()
+  const id = String(formData.get("id") ?? "")
+  const parsed = opportunitySchema.safeParse({
+    contactId: formData.get("contactId"),
+    titulo: formData.get("titulo"),
+    valorEstimado: formData.get("valorEstimado") || undefined,
+    probabilidad: formData.get("probabilidad") || undefined,
+    moneda: formData.get("moneda") || "ARS",
+  })
+  if (!id) return { error: "Falta el id de la oportunidad" }
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
+
+  await db
+    .update(opportunities)
+    .set({
+      contactId: parsed.data.contactId,
+      titulo: parsed.data.titulo,
+      valorEstimado: parsed.data.valorEstimado?.toString() ?? null,
+      probabilidad: parsed.data.probabilidad?.toString() ?? null,
+      moneda: parsed.data.moneda,
+      updatedAt: new Date(),
+    })
+    .where(eq(opportunities.id, id))
+
+  await audit({ userId: user.id, accion: "update", entityType: "opportunity", entityId: id })
+  revalidatePath("/pipeline")
+  revalidatePath(`/pipeline/${id}`)
+  return { ok: true, id }
+}
+
+/** Elimina una oportunidad. Si tiene proyecto asociado, el FK lo borra en cascada. */
+export async function deleteOpportunity(id: string) {
+  const user = await requireUser()
+  await db.delete(opportunities).where(eq(opportunities.id, id))
+  await audit({ userId: user.id, accion: "delete", entityType: "opportunity", entityId: id })
+  revalidatePath("/pipeline")
 }
 
 /** Mueve una oportunidad de estado (usado por el drag&drop del kanban). */

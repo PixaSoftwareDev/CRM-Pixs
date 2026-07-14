@@ -38,6 +38,8 @@ export async function receivables() {
     .orderBy(installments.venceAt)
 }
 
+export type TransactionRow = Awaited<ReturnType<typeof listTransactions>>[number]
+
 export async function listTransactions(opts?: { from?: string; to?: string }) {
   const conds = []
   if (opts?.from) conds.push(gte(transactions.fecha, opts.from))
@@ -52,6 +54,8 @@ export async function listTransactions(opts?: { from?: string; to?: string }) {
       fecha: transactions.fecha,
       descripcion: transactions.descripcion,
       autor: users.nombre,
+      realizadoPor: transactions.realizadoPor,
+      reintegrado: transactions.reintegrado,
       projectId: transactions.projectId,
     })
     .from(transactions)

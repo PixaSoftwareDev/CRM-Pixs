@@ -44,3 +44,6 @@ next-env.d.ts
 # Modo demo (SQLite local)
 demo.sqlite
 demo.sqlite-*
+
+# Documentos subidos (binarios en filesystem)
+storage/

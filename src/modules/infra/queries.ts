@@ -1,52 +1,21 @@
-import { desc, eq, like, or } from "drizzle-orm"
+import { desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { databases, servers } from "@/db/schema"
 
+export type ServerRow = typeof servers.$inferSelect
+export type DatabaseRow = typeof databases.$inferSelect
+
 /**
- * Búsqueda sobre servers. En modo demo (SQLite) no hay full-text/GIN: cae a
- * LIKE sobre los campos de texto relevantes.
+ * Todos los servidores. El filtrado (texto, estado, proveedor) se hace en el
+ * cliente para que sea en vivo; en modo demo (SQLite) no hay full-text/GIN.
  */
-export async function searchServers(q?: string) {
-  if (q && q.trim()) {
-    const term = `%${q.trim()}%`
-    return db
-      .select()
-      .from(servers)
-      .where(
-        or(
-          like(servers.nombre, term),
-          like(servers.proveedor, term),
-          like(servers.ipHostname, term),
-          like(servers.descripcion, term),
-          like(servers.os, term),
-        ),
-      )
-      .orderBy(desc(servers.createdAt))
-  }
+export async function listServers() {
   return db.select().from(servers).orderBy(desc(servers.createdAt))
 }
 
-export async function searchDatabases(q?: string) {
-  if (q && q.trim()) {
-    const term = `%${q.trim()}%`
-    return db
-      .select()
-      .from(databases)
-      .where(
-        or(
-          like(databases.nombre, term),
-          like(databases.motor, term),
-          like(databases.host, term),
-          like(databases.descripcion, term),
-        ),
-      )
-      .orderBy(desc(databases.createdAt))
-  }
+/** Todas las bases; el filtrado (texto, entorno, motor) va en el cliente. */
+export async function listDatabases() {
   return db.select().from(databases).orderBy(desc(databases.createdAt))
-}
-
-export async function listServersMinimal() {
-  return db.select({ id: servers.id, nombre: servers.nombre }).from(servers)
 }
 
 export async function getServer(id: string) {

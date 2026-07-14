@@ -10,14 +10,13 @@ export async function listTasks(projectId: string) {
       id: tasks.id,
       titulo: tasks.titulo,
       descripcion: tasks.descripcion,
+      color: tasks.color,
       estado: tasks.estado,
       orden: tasks.orden,
       venceAt: tasks.venceAt,
-      asignadoA: tasks.asignadoA,
-      asignadoNombre: users.nombre,
+      asignados: tasks.asignados,
     })
     .from(tasks)
-    .leftJoin(users, eq(tasks.asignadoA, users.id))
     .where(eq(tasks.projectId, projectId))
     .orderBy(asc(tasks.orden))
 }
@@ -31,18 +30,17 @@ export async function listAllTasks() {
       id: tasks.id,
       titulo: tasks.titulo,
       descripcion: tasks.descripcion,
+      color: tasks.color,
       estado: tasks.estado,
       venceAt: tasks.venceAt,
       cerradoAt: tasks.cerradoAt,
       createdAt: tasks.createdAt,
       projectId: tasks.projectId,
       proyectoNombre: projects.nombre,
-      asignadoA: tasks.asignadoA,
-      asignadoNombre: users.nombre,
+      asignados: tasks.asignados,
     })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
-    .leftJoin(users, eq(tasks.asignadoA, users.id))
     .orderBy(desc(tasks.createdAt))
 }
 
