@@ -7,6 +7,9 @@ import { type LoginState, login } from "@/modules/auth/actions"
 
 const initialState: LoginState = {}
 
+// El acceso rápido y las credenciales visibles son solo para desarrollo/demo.
+const SHOW_DEMO = process.env.NODE_ENV !== "production"
+
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, initialState)
   const formRef = useRef<HTMLFormElement>(null)
@@ -80,19 +83,21 @@ export default function LoginPage() {
           {pending ? "Ingresando…" : "Ingresar"}
         </button>
 
-        <div className="space-y-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
-          <button
-            type="button"
-            onClick={quickLogin}
-            disabled={pending}
-            className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-white/[.06]"
-          >
-            Acceso rápido (demo)
-          </button>
-          <p className="text-center text-xs text-zinc-400">
-            {DEMO_EMAIL} · {DEMO_PASSWORD}
-          </p>
-        </div>
+        {SHOW_DEMO ? (
+          <div className="space-y-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+            <button
+              type="button"
+              onClick={quickLogin}
+              disabled={pending}
+              className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-white/[.06]"
+            >
+              Acceso rápido (demo)
+            </button>
+            <p className="text-center text-xs text-zinc-400">
+              {DEMO_EMAIL} · {DEMO_PASSWORD}
+            </p>
+          </div>
+        ) : null}
       </form>
     </div>
   )
