@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
@@ -68,7 +69,7 @@ export function Sidebar({ email }: { email: string }) {
       {NAV.map(({ href, label, Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`)
         return (
-          <a
+          <Link
             key={href}
             href={href}
             title={compact ? label : undefined}
@@ -85,7 +86,7 @@ export function Sidebar({ email }: { email: string }) {
               size={compact ? 20 : 18}
             />
             {compact ? null : <span>{label}</span>}
-          </a>
+          </Link>
         )
       })}
     </nav>
