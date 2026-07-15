@@ -13,6 +13,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useActionState, useEffect, useId, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import { KebabMenu } from "@/components/KebabMenu"
 import { KANBAN_CARD, KanbanBoardShell, KanbanColumn } from "@/components/kanban"
 import { Modal } from "@/components/Modal"
@@ -116,6 +117,7 @@ export function KanbanBoard({
   contactos: Contacto[]
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [items, setItems] = useState(initial)
   const [editing, setEditing] = useState<OpportunityWithContact | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -163,8 +165,13 @@ export function KanbanBoard({
     })
   }
 
-  function handleDelete(opp: OpportunityWithContact) {
-    if (!window.confirm(`¿Eliminar la oportunidad "${opp.titulo}"?`)) return
+  async function handleDelete(opp: OpportunityWithContact) {
+    const ok = await confirm({
+      title: "Eliminar oportunidad",
+      message: `¿Eliminar la oportunidad "${opp.titulo}"? Esta acción no se puede deshacer.`,
+      danger: true,
+    })
+    if (!ok) return
     const prev = items
     setItems((cur) => cur.filter((o) => o.id !== opp.id))
     startTransition(async () => {

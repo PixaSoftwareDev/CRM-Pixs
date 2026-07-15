@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useActionState, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import { KebabMenu } from "@/components/KebabMenu"
 import { Modal } from "@/components/Modal"
 import { Button } from "@/components/ui"
@@ -24,6 +25,7 @@ export function ContactActions({
   className?: string
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState(false)
   const [, startTransition] = useTransition()
   const [state, action, pending] = useActionState<ActionState, FormData>(async (prev, fd) => {
@@ -35,8 +37,13 @@ export function ContactActions({
     return res
   }, {})
 
-  function handleDelete() {
-    if (!window.confirm(`¿Eliminar el cliente "${contact.nombre}"?`)) return
+  async function handleDelete() {
+    const ok = await confirm({
+      title: "Eliminar cliente",
+      message: `¿Eliminar el cliente "${contact.nombre}"? Esta acción no se puede deshacer.`,
+      danger: true,
+    })
+    if (!ok) return
     startTransition(async () => {
       await deleteContact(contact.id)
       if (onDeletedHref) router.push(onDeletedHref)

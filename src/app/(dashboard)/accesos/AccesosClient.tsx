@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import {
   CopyIcon,
   ExternalLinkIcon,
@@ -55,6 +56,7 @@ export function AccesosClient({
   proyectos: ProjectOption[]
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [items, setItems] = useState(initial)
   const [q, setQ] = useState("")
   const [projectFilter, setProjectFilter] = useState("")
@@ -147,7 +149,13 @@ export function AccesosClient({
     })
   }
 
-  function remove(c: CredentialRow) {
+  async function remove(c: CredentialRow) {
+    const ok = await confirm({
+      title: "Eliminar acceso",
+      message: `¿Eliminar "${c.titulo}"? Esta acción no se puede deshacer.`,
+      danger: true,
+    })
+    if (!ok) return
     const prev = items
     setItems((cur) => cur.filter((x) => x.id !== c.id))
     if (editingId === c.id) setShowForm(false)

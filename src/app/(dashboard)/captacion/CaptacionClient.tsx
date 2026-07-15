@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useActionState, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import { TrashIcon } from "@/components/icons"
 import { Modal } from "@/components/Modal"
 import { Badge, Button, Field, Input } from "@/components/ui"
@@ -111,6 +112,7 @@ type Lead = {
 }
 
 export function LeadRow({ lead }: { lead: Lead }) {
+  const confirm = useConfirm()
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const [ver, setVer] = useState(false)
@@ -134,8 +136,13 @@ export function LeadRow({ lead }: { lead: Lead }) {
     start(() => void discardLeadAction(lead.id))
     setVer(false)
   }
-  function eliminar() {
-    if (!window.confirm(`¿Eliminar el lead "${lead.nombre}"? Esto no se puede deshacer.`)) return
+  async function eliminar() {
+    const ok = await confirm({
+      title: "Eliminar lead",
+      message: `¿Eliminar el lead "${lead.nombre}"? Esta acción no se puede deshacer.`,
+      danger: true,
+    })
+    if (!ok) return
     start(() => void deleteLeadAction(lead.id))
     setVer(false)
   }

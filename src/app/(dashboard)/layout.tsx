@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { ConfirmProvider } from "@/components/ConfirmDialog"
 import { Sidebar } from "@/components/Sidebar"
 import { getUser } from "@/lib/auth/session"
 
@@ -11,7 +12,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-full flex-1 flex-col md:flex-row">
       <Sidebar email={user.email} />
-      <main className="flex-1 animate-fade-in p-4 md:p-8">{children}</main>
+      <main className="flex-1 animate-fade-in p-4 md:p-8">
+        <ConfirmProvider>{children}</ConfirmProvider>
+      </main>
     </div>
   )
 }

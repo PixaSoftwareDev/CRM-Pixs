@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import {
   DownloadIcon,
   FileIcon,
@@ -52,6 +53,7 @@ export function DocumentsClient({
   initial: DocumentRow[]
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [items, setItems] = useState(initial)
   const [error, setError] = useState<string>()
   const [uploading, startUpload] = useTransition()
@@ -93,7 +95,13 @@ export function DocumentsClient({
     })
   }
 
-  function remove(doc: DocumentRow) {
+  async function remove(doc: DocumentRow) {
+    const ok = await confirm({
+      title: "Eliminar documento",
+      message: `¿Eliminar "${doc.nombre}"? Esta acción no se puede deshacer.`,
+      danger: true,
+    })
+    if (!ok) return
     const prev = items
     setItems((cur) => cur.filter((d) => d.id !== doc.id))
     if (preview?.id === doc.id) setPreview(null)
