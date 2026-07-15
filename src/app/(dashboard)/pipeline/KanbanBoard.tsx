@@ -37,8 +37,9 @@ type Contacto = { id: string; nombre: string }
 function CardBody({ opp }: { opp: OpportunityWithContact }) {
   return (
     <>
+      {/* Producto (título de la oportunidad) en secundario; la empresa va arriba grande. */}
       <div className="mt-1 text-xs text-zinc-500">
-        {opp.contactoNombre}
+        {opp.titulo}
         {opp.personaContacto ? ` · ${opp.personaContacto}` : ""}
       </div>
       {opp.valorEstimado ? (
@@ -75,7 +76,7 @@ function Card({
           className="font-medium hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
-          {opp.titulo}
+          {opp.contactoNombre}
         </Link>
         <KebabMenu onEdit={() => onEdit(opp)} onDelete={() => onDelete(opp)} />
       </div>
@@ -215,7 +216,7 @@ export function KanbanBoard({
         <DragOverlay>
           {activeOpp ? (
             <div className={cn(KANBAN_CARD, "cursor-grabbing shadow-lg")}>
-              <div className="font-medium">{activeOpp.titulo}</div>
+              <div className="font-medium">{activeOpp.contactoNombre}</div>
               <CardBody opp={activeOpp} />
             </div>
           ) : null}

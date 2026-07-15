@@ -105,10 +105,10 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
               className="block h-full rounded-xl border border-black/[.08] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-zinc-400 hover:shadow-md dark:border-white/[.12] dark:bg-zinc-900 dark:hover:border-zinc-500"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{p.nombre}</span>
+                <span className="truncate font-medium">{p.contactoNombre}</span>
                 <Badge tone={ESTADO_TONE[p.estado]}>{p.estado}</Badge>
               </div>
-              <div className="text-sm text-zinc-500">{p.contactoNombre}</div>
+              <div className="truncate text-sm text-zinc-500">{p.nombre}</div>
               {p.valor ? (
                 <div className="mt-2 text-xs text-zinc-400">{formatMoney(p.valor, p.moneda)}</div>
               ) : null}
@@ -127,8 +127,8 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
               )}
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{p.nombre}</div>
-                <div className="truncate text-xs text-zinc-500">{p.contactoNombre}</div>
+                <div className="truncate font-medium">{p.contactoNombre}</div>
+                <div className="truncate text-xs text-zinc-500">{p.nombre}</div>
               </div>
               {p.valor ? (
                 <span className="hidden shrink-0 text-xs text-zinc-400 sm:block">

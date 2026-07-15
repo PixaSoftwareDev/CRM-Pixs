@@ -170,8 +170,9 @@ export default async function DashboardPage() {
                 const vencida = dias < 0
                 return (
                   <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
-                    <Link href={`/proyectos/${c.projectId}`} className="truncate hover:underline">
-                      {c.proyecto}
+                    <Link href={`/proyectos/${c.projectId}`} className="min-w-0 hover:underline">
+                      <div className="truncate font-medium">{c.empresa}</div>
+                      <div className="truncate text-xs text-zinc-400">{c.proyecto}</div>
                     </Link>
                     <div className="flex shrink-0 items-center gap-2">
                       <span>{formatMoney(c.monto)}</span>
@@ -223,8 +224,8 @@ export default async function DashboardPage() {
               {cold.map((o) => (
                 <li key={o.id} className="flex items-center justify-between gap-2 text-sm">
                   <Link href={`/pipeline/${o.id}`} className="min-w-0 truncate hover:underline">
-                    {o.titulo}
-                    <span className="text-zinc-400"> · {o.contactoNombre}</span>
+                    {o.contactoNombre}
+                    <span className="text-zinc-400"> · {o.titulo}</span>
                   </Link>
                   <span className="shrink-0 text-xs text-zinc-400">
                     {formatDate(o.estadoCambiadoAt)}
