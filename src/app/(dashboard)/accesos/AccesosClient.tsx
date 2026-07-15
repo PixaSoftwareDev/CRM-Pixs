@@ -424,7 +424,17 @@ function CredentialCard({
             {cred.proyectoNombre ? (
               <span className="truncate text-zinc-400">{cred.proyectoNombre}</span>
             ) : null}
-            {!cred.usuario && !cred.proyectoNombre ? (
+            {cred.notas ? (
+              <>
+                {cred.usuario || cred.proyectoNombre ? (
+                  <span className="text-zinc-300">·</span>
+                ) : null}
+                <span className="truncate text-zinc-400" title={cred.notas}>
+                  {cred.notas}
+                </span>
+              </>
+            ) : null}
+            {!cred.usuario && !cred.proyectoNombre && !cred.notas ? (
               <span className="text-zinc-400">—</span>
             ) : null}
           </div>
