@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation"
 import { useActionState, useState, useTransition } from "react"
+import { TrashIcon } from "@/components/icons"
 import { Modal } from "@/components/Modal"
 import { Badge, Button, Field, Input } from "@/components/ui"
 import type { FormState } from "@/lib/forms"
 import {
   approveLeadAction,
   createCampaign,
+  deleteLeadAction,
   discardLeadAction,
   enrichLeadAction,
   runCampaignAction,
@@ -132,6 +134,11 @@ export function LeadRow({ lead }: { lead: Lead }) {
     start(() => void discardLeadAction(lead.id))
     setVer(false)
   }
+  function eliminar() {
+    if (!window.confirm(`¿Eliminar el lead "${lead.nombre}"? Esto no se puede deshacer.`)) return
+    start(() => void deleteLeadAction(lead.id))
+    setVer(false)
+  }
 
   return (
     <div className="flex items-start justify-between gap-3 border-b border-black/[.06] py-3 text-sm last:border-0 dark:border-white/[.08]">
@@ -148,7 +155,7 @@ export function LeadRow({ lead }: { lead: Lead }) {
         ) : null}
         {err ? <div className="mt-0.5 text-xs text-red-600">{err}</div> : null}
       </div>
-      <div className="flex shrink-0 gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <Button size="sm" variant="ghost" onClick={() => setVer(true)}>
           Ver
         </Button>
@@ -157,6 +164,16 @@ export function LeadRow({ lead }: { lead: Lead }) {
             Aprobar
           </Button>
         ) : null}
+        <button
+          type="button"
+          onClick={eliminar}
+          disabled={pending}
+          title="Eliminar lead"
+          aria-label={`Eliminar ${lead.nombre}`}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+        >
+          <TrashIcon size={16} />
+        </button>
       </div>
 
       {ver ? (
@@ -184,21 +201,32 @@ export function LeadRow({ lead }: { lead: Lead }) {
             ) : null}
             {err ? <p className="text-xs text-red-600">{err}</p> : null}
 
-            {accionable ? (
-              <div className="flex flex-wrap justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
-                <Button size="sm" variant="ghost" disabled={pending} onClick={descartar}>
-                  Descartar
-                </Button>
-                {lead.sitioWeb ? (
-                  <Button size="sm" variant="secondary" disabled={pending} onClick={enriquecer}>
-                    {pending ? "Enriqueciendo…" : "Enriquecer"}
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={eliminar}
+                className="mr-auto text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+              >
+                Eliminar
+              </Button>
+              {accionable ? (
+                <>
+                  <Button size="sm" variant="ghost" disabled={pending} onClick={descartar}>
+                    Descartar
                   </Button>
-                ) : null}
-                <Button size="sm" disabled={pending} onClick={aprobar}>
-                  Aprobar → cliente
-                </Button>
-              </div>
-            ) : null}
+                  {lead.sitioWeb ? (
+                    <Button size="sm" variant="secondary" disabled={pending} onClick={enriquecer}>
+                      {pending ? "Enriqueciendo…" : "Enriquecer"}
+                    </Button>
+                  ) : null}
+                  <Button size="sm" disabled={pending} onClick={aprobar}>
+                    Aprobar → cliente
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </div>
         </Modal>
       ) : null}

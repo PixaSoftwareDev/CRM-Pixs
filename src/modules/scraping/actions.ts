@@ -76,6 +76,15 @@ export async function discardLeadAction(id: string) {
   return { ok: true }
 }
 
+/** Elimina definitivamente un lead de la bandeja. */
+export async function deleteLeadAction(id: string) {
+  const user = await requireUser()
+  await db.delete(scrapingLeads).where(eq(scrapingLeads.id, id))
+  await audit({ userId: user.id, accion: "delete", entityType: "scraping_lead", entityId: id })
+  revalidatePath("/captacion")
+  return { ok: true }
+}
+
 export async function enrichLeadAction(id: string) {
   await requireUser()
   try {
