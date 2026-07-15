@@ -5,7 +5,8 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useDraggable,
   useSensor,
   useSensors,
@@ -122,7 +123,12 @@ export function KanbanBoard({
   const [editing, setEditing] = useState<OpportunityWithContact | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  // Mouse: arrastra al mover 6px. Touch: mantené presionado 200ms para arrastrar,
+  // así en móvil un deslizamiento normal scrollea el tablero en vez de agarrar una tarjeta.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
   // id estable para dnd-kit: evita el mismatch de hidratación en sus ids internos.
   const dndId = useId()
 

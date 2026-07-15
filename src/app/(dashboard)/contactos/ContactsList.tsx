@@ -28,7 +28,7 @@ export function ContactsList({ contactos }: { contactos: Contact[] }) {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-zinc-500">
           {contactos.length} {contactos.length === 1 ? "cliente" : "clientes"}
         </span>

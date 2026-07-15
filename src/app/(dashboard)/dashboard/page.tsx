@@ -45,8 +45,8 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Inicio" subtitle="Tu panel de control — qué necesita atención hoy" />
 
-      {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs — 2 por fila ya en móvil para no apilar 4 tarjetas altas */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           label="Clientes"
           value={String(counts.clientes)}
