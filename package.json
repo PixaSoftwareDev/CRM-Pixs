@@ -8,6 +8,7 @@
     "start": "next start",
     "api:dev": "tsx watch --tsconfig server/tsconfig.json --env-file=.env server/index.ts",
     "api:start": "tsx --tsconfig server/tsconfig.json --env-file=.env server/index.ts",
+    "api:token": "tsx --tsconfig server/tsconfig.json --env-file=.env server/scripts/mint-service-token.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
