@@ -76,6 +76,7 @@ export function AccesosClient({
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<Form>(EMPTY)
+  const [showSecret, setShowSecret] = useState(false)
   const [error, setError] = useState<string>()
   const [saving, startSave] = useTransition()
   const [, startDelete] = useTransition()
@@ -100,6 +101,7 @@ export function AccesosClient({
 
   function openNew() {
     setError(undefined)
+    setShowSecret(false)
     setEditingId(null)
     setForm({ ...EMPTY, projectId: projectFilter })
     setShowForm(true)
@@ -107,6 +109,7 @@ export function AccesosClient({
 
   function openEdit(c: CredentialRow) {
     setError(undefined)
+    setShowSecret(false)
     setEditingId(c.id)
     setForm({
       titulo: c.titulo,
@@ -291,13 +294,25 @@ export function AccesosClient({
                   editingId ? "Contraseña / token (vacío = sin cambios)" : "Contraseña / token"
                 }
               >
-                <Input
-                  type="password"
-                  value={form.secreto}
-                  onChange={(e) => setField("secreto", e.target.value)}
-                  autoComplete="new-password"
-                  placeholder={editingId ? "••••••••" : ""}
-                />
+                <div className="relative">
+                  <Input
+                    type={showSecret ? "text" : "password"}
+                    value={form.secreto}
+                    onChange={(e) => setField("secreto", e.target.value)}
+                    autoComplete="new-password"
+                    placeholder={editingId ? "••••••••" : ""}
+                    className="pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret((v) => !v)}
+                    title={showSecret ? "Ocultar" : "Mostrar"}
+                    aria-label={showSecret ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-zinc-400 transition-colors hover:text-zinc-700 dark:hover:text-zinc-200"
+                  >
+                    {showSecret ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                </div>
               </Field>
               <Field label="URL">
                 <Input

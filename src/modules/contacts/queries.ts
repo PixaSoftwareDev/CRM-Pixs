@@ -1,6 +1,17 @@
-import { desc, eq, like, or } from "drizzle-orm"
+import { asc, desc, eq, like, or } from "drizzle-orm"
 import { db } from "@/db"
-import { contacts, opportunities, projects } from "@/db/schema"
+import { contactPeople, contacts, opportunities, projects } from "@/db/schema"
+
+export type ContactPersonRow = Awaited<ReturnType<typeof listContactPeople>>[number]
+
+/** Personas de contacto de un cliente, más antiguas primero. */
+export async function listContactPeople(contactId: string) {
+  return db
+    .select()
+    .from(contactPeople)
+    .where(eq(contactPeople.contactId, contactId))
+    .orderBy(asc(contactPeople.createdAt))
+}
 
 export async function listContacts(search?: string) {
   if (search && search.trim().length > 0) {

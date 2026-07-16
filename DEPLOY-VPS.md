@@ -130,15 +130,66 @@ La app queda en **`http://<IP_DEL_SERVIDOR>/crmpixs`**.
 
 ---
 
+## 7. Backend REST (Express + JWT) — proceso `pixs-api`
+
+El CRM incluye una **API REST** aparte (carpeta `server/`) que expone todas las
+operaciones vía HTTP con **JWT**, para clientes externos (bots, integraciones).
+Comparte la MISMA base SQLite y el MISMO `storage/` que la app Next, así que
+corre desde la misma raíz del repo. No toca la app web; es aditivo.
+
+```bash
+cd /root/CRM-Pixs
+
+# 1) Variables del backend en el .env (además de las que ya tenés):
+cat >> .env <<EOF
+
+# Backend REST
+JWT_SECRET=$(openssl rand -base64 48)
+API_PORT=3002
+API_CORS_ORIGIN=https://<TU_DOMINIO>       # o http://<IP>; coma-separado si hay varios
+EOF
+
+# 2) Levantar como segundo proceso PM2 (tsx ya está en devDependencies → usar npm ci sin --omit=dev)
+pm2 start npm --name pixs-api -- run api:start
+pm2 save
+```
+
+Nginx — exponer la API bajo `/crmpixs/api` (dentro del MISMO `server { ... }`):
+
+```nginx
+    # --- Pixs API (REST + JWT → 127.0.0.1:3002) ---
+    location /crmpixs/api/ {
+        proxy_pass http://127.0.0.1:3002/api/;   # conserva el prefijo /api
+        client_max_body_size 25m;                # subida de comprobantes/documentos
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+```
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+La API queda en `https://<dominio>/crmpixs/api`. Probar:
+`curl -X POST https://<dominio>/crmpixs/api/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@pixs.com","password":"<TU_PASS>"}'`
+→ devuelve `{ token, user }`. Con `Authorization: Bearer <token>` se accede al resto
+(`/contacts`, `/opportunities`, `/dashboard/summary`, etc.).
+
+> Rollback: `pm2 delete pixs-api` + quitar el `location` de nginx. La app web sigue intacta.
+
+---
+
 ## Actualizar a una versión nueva
 
 ```bash
 cd /root/CRM-Pixs
 git pull
 npm ci
-SQLITE_PATH=/root/CRM-Pixs/data/pixs.sqlite npm run db:push   # aplica cambios de schema
+SQLITE_PATH=/root/CRM-Pixs/data/pixs.sqlite npm run db:push   # aplica cambios de schema (crea contact_people, etc.)
 npm run build
 pm2 restart pixs
+pm2 restart pixs-api        # reiniciá también el backend REST
 ```
 
 ## Notas

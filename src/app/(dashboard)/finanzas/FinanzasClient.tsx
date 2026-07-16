@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { PaperclipIcon } from "@/components/icons"
 import { Badge, Card, EmptyState, Input, Select } from "@/components/ui"
+import { asset } from "@/lib/basePath"
 import { cn, daysUntil, formatMoney } from "@/lib/utils"
 import { toggleReintegro } from "@/modules/money/actions"
 import type { TransactionRow } from "@/modules/money/queries"
@@ -228,6 +230,18 @@ export function FinanzasClient({
                         <span>{shortDate(t.fecha)}</span>
                         {t.categoria ? <span>· {t.categoria}</span> : null}
                         {t.autor ? <span>· {t.autor}</span> : null}
+                        {t.comprobanteId ? (
+                          <a
+                            href={asset(`/api/documentos/${t.comprobanteId}`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={t.comprobanteNombre ?? "Ver comprobante"}
+                            className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            <PaperclipIcon />
+                            comprobante
+                          </a>
+                        ) : null}
                         {t.tipo === "gasto" && t.realizadoPor ? (
                           t.reintegrado ? (
                             <Badge tone="green">devuelto</Badge>

@@ -398,3 +398,11 @@ export function ExternalLinkIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
+
+export function PaperclipIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg {...nav(size, className)} aria-hidden="true">
+      <path d="M21 8.5l-9.2 9.2a4 4 0 0 1-5.66-5.66l9.2-9.2a2.5 2.5 0 0 1 3.54 3.54l-9.2 9.2a1 1 0 0 1-1.42-1.42l8.5-8.5" />
+    </svg>
+  )
+}

@@ -3,6 +3,7 @@ import { db } from "@/db"
 import {
   budgets,
   contacts,
+  documents,
   installments,
   opportunities,
   projects,
@@ -70,9 +71,14 @@ export async function listTransactions(opts?: { from?: string; to?: string }) {
       realizadoPor: transactions.realizadoPor,
       reintegrado: transactions.reintegrado,
       projectId: transactions.projectId,
+      // Comprobante adjunto (opcional): id del documento + su tipo, para linkear.
+      comprobanteId: documents.id,
+      comprobanteNombre: documents.nombre,
+      comprobanteMime: documents.mimeType,
     })
     .from(transactions)
     .leftJoin(users, eq(transactions.realizadoPor, users.id))
+    .leftJoin(documents, eq(documents.id, transactions.comprobanteUrl))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(transactions.fecha))
 }

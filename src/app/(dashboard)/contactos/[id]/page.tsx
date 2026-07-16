@@ -6,9 +6,10 @@ import { Timeline } from "@/components/Timeline"
 import { Badge, Card } from "@/components/ui"
 import type { ProjectState } from "@/db/schema"
 import { formatDate, formatMoney } from "@/lib/utils"
-import { getContact, listContactOpportunities } from "@/modules/contacts/queries"
+import { getContact, listContactOpportunities, listContactPeople } from "@/modules/contacts/queries"
 import { STATE_LABELS, STATE_TONES } from "@/modules/opportunities/labels"
 import { ContactActions } from "../ContactActions"
+import { ContactPeople } from "../ContactPeople"
 import { Avatar } from "../contact-ui"
 
 export const dynamic = "force-dynamic"
@@ -22,7 +23,11 @@ const PROJECT_TONE: Record<ProjectState, "green" | "amber" | "blue" | "red"> = {
 
 export default async function ContactoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [c, oportunidades] = await Promise.all([getContact(id), listContactOpportunities(id)])
+  const [c, oportunidades, personas] = await Promise.all([
+    getContact(id),
+    listContactOpportunities(id),
+    listContactPeople(id),
+  ])
   if (!c) notFound()
 
   const tel = c.telefono?.replace(/[^\d+]/g, "")
@@ -144,6 +149,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ id: s
               </ul>
             )}
           </Card>
+
+          {/* Personas de contacto (varias por empresa) */}
+          <ContactPeople contactId={c.id} people={personas} />
 
           {/* Documentos */}
           <DocumentsCard entityType="contact" entityId={c.id} />

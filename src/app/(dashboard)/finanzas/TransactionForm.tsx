@@ -1,10 +1,11 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useActionState, useState } from "react"
+import { useActionState, useRef, useState } from "react"
 import { Modal } from "@/components/Modal"
 import { Button, Field, Input, Select, Textarea } from "@/components/ui"
 import type { FormState } from "@/lib/forms"
+import { ALLOWED_DOCUMENT_TYPES } from "@/modules/documents/shared"
 import { createTransaction } from "@/modules/money/actions"
 
 export function TransactionForm({
@@ -18,10 +19,13 @@ export function TransactionForm({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [comprobante, setComprobante] = useState<string | null>(null)
   const [state, action, pending] = useActionState<FormState, FormData>(async (p, fd) => {
     const res = await createTransaction(p, fd)
     if (res.ok) {
       setOpen(false)
+      setComprobante(null)
       router.refresh()
     }
     return res
@@ -79,6 +83,49 @@ export function TransactionForm({
             </div>
             <Field label="Descripción">
               <Textarea name="descripcion" rows={2} />
+            </Field>
+            <Field label="Comprobante (opcional)">
+              <input
+                ref={fileRef}
+                type="file"
+                name="comprobante"
+                accept={Object.keys(ALLOWED_DOCUMENT_TYPES).join(",")}
+                className="hidden"
+                onChange={(e) => setComprobante(e.target.files?.[0]?.name ?? null)}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {comprobante ? "Cambiar archivo" : "Adjuntar comprobante"}
+                </Button>
+                {comprobante ? (
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs text-zinc-500">
+                    <span className="truncate" title={comprobante}>
+                      {comprobante}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (fileRef.current) fileRef.current.value = ""
+                        setComprobante(null)
+                      }}
+                      className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                      aria-label="Quitar comprobante"
+                      title="Quitar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-zinc-400">
+                    Factura o ticket · PDF, imagen u Office (hasta 20 MB)
+                  </span>
+                )}
+              </div>
             </Field>
             {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
             <div className="flex justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">

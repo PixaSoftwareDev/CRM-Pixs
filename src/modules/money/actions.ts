@@ -4,9 +4,11 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
-import { budgets, installments, transactions } from "@/db/schema"
+import { budgets, documents, installments, transactions } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import type { FormState } from "@/lib/forms"
+import { saveDocumentFile } from "@/lib/storage"
+import { ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_SIZE } from "@/modules/documents/shared"
 
 /** Crea el presupuesto de un proyecto con N cuotas iguales. */
 const budgetSchema = z.object({
@@ -133,18 +135,57 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
   })
   if (!parsed.success) return { error: "Datos inválidos" }
 
-  await db.insert(transactions).values({
-    tipo: parsed.data.tipo,
-    monto: parsed.data.monto.toString(),
-    moneda: parsed.data.moneda,
-    categoria: parsed.data.categoria,
-    fecha: parsed.data.fecha,
-    descripcion: parsed.data.descripcion,
-    projectId: parsed.data.projectId ? parsed.data.projectId : null,
-    // Quién lo pagó: el elegido en el form, o el usuario actual por defecto.
-    realizadoPor: parsed.data.realizadoPor ? parsed.data.realizadoPor : user.id,
-  })
-  await audit({ userId: user.id, accion: "create", entityType: "transaction" })
+  // Comprobante opcional (factura/ticket). Se valida antes de tocar la base.
+  const file = formData.get("comprobante")
+  const tieneComprobante = file instanceof File && file.size > 0
+  if (tieneComprobante) {
+    if (file.size > MAX_DOCUMENT_SIZE) return { error: "El comprobante supera los 20 MB" }
+    if (!ALLOWED_DOCUMENT_TYPES[file.type]) {
+      return { error: "Comprobante no permitido (PDF, imágenes, Office, texto o ZIP)" }
+    }
+  }
+
+  const [tx] = await db
+    .insert(transactions)
+    .values({
+      tipo: parsed.data.tipo,
+      monto: parsed.data.monto.toString(),
+      moneda: parsed.data.moneda,
+      categoria: parsed.data.categoria,
+      fecha: parsed.data.fecha,
+      descripcion: parsed.data.descripcion,
+      projectId: parsed.data.projectId ? parsed.data.projectId : null,
+      // Quién lo pagó: el elegido en el form, o el usuario actual por defecto.
+      realizadoPor: parsed.data.realizadoPor ? parsed.data.realizadoPor : user.id,
+    })
+    .returning({ id: transactions.id })
+
+  // El comprobante reusa la infra de documentos: cuelga del movimiento y se
+  // sirve por /api/documentos/[id]. El id del doc queda en comprobante_url.
+  if (tieneComprobante && tx) {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const storedName = await saveDocumentFile(buffer, file.name)
+    const [doc] = await db
+      .insert(documents)
+      .values({
+        entityType: "transaction",
+        entityId: tx.id,
+        nombre: file.name,
+        storedName,
+        mimeType: file.type,
+        tamano: file.size,
+        subidoPor: user.id,
+      })
+      .returning({ id: documents.id })
+    if (doc) {
+      await db
+        .update(transactions)
+        .set({ comprobanteUrl: doc.id })
+        .where(eq(transactions.id, tx.id))
+    }
+  }
+
+  await audit({ userId: user.id, accion: "create", entityType: "transaction", entityId: tx?.id })
   revalidatePath("/finanzas")
   return { ok: true }
 }
