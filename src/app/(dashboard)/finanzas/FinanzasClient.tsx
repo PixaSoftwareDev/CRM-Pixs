@@ -179,8 +179,15 @@ export function FinanzasClient({
   const totalPagar = reintegros.reduce((s, r) => s + r.total, 0)
   const totalCobrar = cuotas.reduce((s, c) => s + Number(c.monto), 0)
 
-  // Al cambiar el filtro se vuelve a la primera tanda.
-  useEffect(() => setLimite(PAGE), [filtro, persona])
+  // Al cambiar un filtro se vuelve a la primera tanda.
+  function cambiarFiltro(v: Filtro) {
+    setFiltro(v)
+    setLimite(PAGE)
+  }
+  function cambiarPersona(v: string) {
+    setPersona(v)
+    setLimite(PAGE)
+  }
 
   // Movimientos filtrados (todos) y agrupados por recencia (solo los visibles).
   const filtrados = useMemo(
@@ -350,7 +357,7 @@ export function FinanzasClient({
             <div className="flex items-center gap-2">
               <Select
                 value={persona}
-                onChange={(e) => setPersona(e.target.value)}
+                onChange={(e) => cambiarPersona(e.target.value)}
                 aria-label="Filtrar por persona"
                 className="h-7 w-auto text-xs"
               >
@@ -372,7 +379,7 @@ export function FinanzasClient({
                   <button
                     key={v}
                     type="button"
-                    onClick={() => setFiltro(v)}
+                    onClick={() => cambiarFiltro(v)}
                     className={cn(
                       "rounded px-2.5 py-1 transition-colors",
                       filtro === v
