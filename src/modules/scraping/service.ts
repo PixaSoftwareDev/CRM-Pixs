@@ -99,9 +99,10 @@ export async function approveLead(leadId: string) {
       source: "scraping",
     })
     .returning({ id: contacts.id })
+  if (!contact) throw new Error("No se pudo crear el contacto")
 
   await db.insert(opportunities).values({
-    contactId: contact!.id,
+    contactId: contact.id,
     titulo: `Prospecto: ${lead.nombre}`,
     estado: "nuevo",
     scrapingCampaignId: lead.campaignId,
@@ -109,8 +110,8 @@ export async function approveLead(leadId: string) {
 
   await db
     .update(scrapingLeads)
-    .set({ estado: "aprobado", contactId: contact!.id })
+    .set({ estado: "aprobado", contactId: contact.id })
     .where(eq(scrapingLeads.id, leadId))
 
-  return { contactId: contact!.id }
+  return { contactId: contact.id }
 }

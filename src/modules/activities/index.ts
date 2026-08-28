@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { type ActivityEntity, type ActivityType, activities, users } from "@/db/schema"
 
@@ -14,7 +14,7 @@ export async function listActivities(entityType: ActivityEntity, entityId: strin
     })
     .from(activities)
     .leftJoin(users, eq(activities.autorId, users.id))
-    .where(eq(activities.entityId, entityId))
+    .where(and(eq(activities.entityType, entityType), eq(activities.entityId, entityId)))
     .orderBy(desc(activities.createdAt))
 }
 

@@ -36,11 +36,12 @@ export async function createOpportunity(
       moneda: parsed.data.moneda,
     })
     .returning({ id: opportunities.id })
+  if (!row) throw new Error("No se pudo crear la oportunidad")
 
   await addActivity({
     tipo: "nota",
     entityType: "opportunity",
-    entityId: row!.id,
+    entityId: row.id,
     contenido: "Oportunidad creada",
     autorId: user.id,
   })

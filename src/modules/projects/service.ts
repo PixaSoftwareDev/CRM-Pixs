@@ -26,14 +26,15 @@ export async function ensureProjectForOpportunity(opportunityId: string, autorId
     .insert(projects)
     .values({ opportunityId, nombre: opp.titulo })
     .returning({ id: projects.id })
+  if (!project) throw new Error("No se pudo crear el proyecto")
 
   await addActivity({
     tipo: "cambio_estado",
     entityType: "project",
-    entityId: project!.id,
+    entityId: project.id,
     contenido: "Proyecto creado desde oportunidad confirmada",
     autorId,
   })
 
-  return project!.id
+  return project.id
 }

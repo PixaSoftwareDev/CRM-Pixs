@@ -75,6 +75,7 @@ moneyRouter.post(
         descripcion: d.descripcion,
       })
       .returning({ id: budgets.id })
+    if (!budget) throw new Error("No se pudo crear el presupuesto")
 
     const base = Math.floor((d.montoTotal / d.cuotas) * 100) / 100
     const first = new Date(d.primerVencimiento)
@@ -83,7 +84,7 @@ moneyRouter.post(
       vence.setMonth(vence.getMonth() + i)
       const monto = i === d.cuotas - 1 ? d.montoTotal - base * (d.cuotas - 1) : base
       return {
-        budgetId: budget!.id,
+        budgetId: budget.id,
         monto: monto.toFixed(2),
         venceAt: vence.toISOString().slice(0, 10),
       }

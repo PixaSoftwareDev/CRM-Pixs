@@ -7,12 +7,14 @@ export async function GET() {
   const txs = await listTransactions()
 
   const header = ["fecha", "tipo", "monto", "moneda", "categoria", "autor", "descripcion"]
-  const escape = (v: unknown) => {
+  const csvCell = (v: unknown) => {
     const s = String(v ?? "")
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const rows = txs.map((t) =>
-    [t.fecha, t.tipo, t.monto, t.moneda, t.categoria, t.autor, t.descripcion].map(escape).join(","),
+    [t.fecha, t.tipo, t.monto, t.moneda, t.categoria, t.autor, t.descripcion]
+      .map(csvCell)
+      .join(","),
   )
   const csv = [header.join(","), ...rows].join("\n")
 

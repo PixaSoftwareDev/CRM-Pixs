@@ -75,6 +75,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
 }
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
+  // biome-ignore lint/a11y/noLabelWithoutControl: primitiva genérica, el control lo asocia quien la usa (htmlFor)
   return <label className={cn("text-sm font-medium", className)} {...props} />
 }
 
@@ -88,6 +89,7 @@ export function Field({
   className?: string
 }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: el control viene en children, envuelto por el label
     <label className={cn("block space-y-1.5", className)}>
       <span className="text-sm font-medium">{label}</span>
       {children}

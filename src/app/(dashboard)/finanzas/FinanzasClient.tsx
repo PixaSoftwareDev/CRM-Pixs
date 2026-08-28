@@ -32,6 +32,16 @@ function shortDate(fecha: string) {
   return d && m ? `${d}/${m}` : fecha
 }
 
+const MES_LABEL = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" })
+function labelMes(ym: string) {
+  const [y, m] = ym.split("-").map(Number)
+  const txt = MES_LABEL.format(new Date(y, m - 1, 1))
+  return txt.charAt(0).toUpperCase() + txt.slice(1)
+}
+function mesActual() {
+  return new Date().toISOString().slice(0, 7)
+}
+
 function isoDaysAgo(n: number) {
   const d = new Date()
   d.setDate(d.getDate() - n)
@@ -139,6 +149,8 @@ export function FinanzasClient({
   const [cuotas, setCuotas] = useState(cobrar)
   const [filtro, setFiltro] = useState<Filtro>("")
   const [persona, setPersona] = useState("")
+  // Período de la lista: "yyyy-mm" o "" = todo el historial. Por defecto, este mes.
+  const [mesLista, setMesLista] = useState(mesActual)
   const [limite, setLimite] = useState(PAGE)
   const [, start] = useTransition()
 
@@ -188,14 +200,28 @@ export function FinanzasClient({
     setPersona(v)
     setLimite(PAGE)
   }
+  function cambiarMes(v: string) {
+    setMesLista(v)
+    setLimite(PAGE)
+  }
+
+  // Meses con movimientos (más el actual), del más reciente al más viejo.
+  const meses = useMemo(() => {
+    const set = new Set<string>([mesActual()])
+    for (const t of items) set.add(t.fecha.slice(0, 7))
+    return [...set].sort().reverse()
+  }, [items])
 
   // Movimientos filtrados (todos) y agrupados por recencia (solo los visibles).
   const filtrados = useMemo(
     () =>
       items.filter(
-        (t) => (!filtro || t.tipo === filtro) && (!persona || t.realizadoPor === persona),
+        (t) =>
+          (!mesLista || t.fecha.startsWith(mesLista)) &&
+          (!filtro || t.tipo === filtro) &&
+          (!persona || t.realizadoPor === persona),
       ),
-    [items, filtro, persona],
+    [items, mesLista, filtro, persona],
   )
   const grupos = useMemo(() => {
     const hoy = isoDaysAgo(0)
@@ -354,7 +380,20 @@ export function FinanzasClient({
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Movimientos</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={mesLista}
+                onChange={(e) => cambiarMes(e.target.value)}
+                aria-label="Período"
+                className="h-7 w-auto text-xs"
+              >
+                {meses.map((m, i) => (
+                  <option key={m} value={m}>
+                    {i === 0 && m === mesActual() ? "Este mes" : labelMes(m)}
+                  </option>
+                ))}
+                <option value="">Todo el historial</option>
+              </Select>
               <Select
                 value={persona}
                 onChange={(e) => cambiarPersona(e.target.value)}
@@ -396,7 +435,11 @@ export function FinanzasClient({
 
           {grupos.length === 0 ? (
             <EmptyState>
-              {filtro || persona ? "Nada con ese filtro." : "Sin movimientos."}
+              {filtro || persona
+                ? "Nada con ese filtro."
+                : mesLista
+                  ? "Sin movimientos este período."
+                  : "Sin movimientos."}
             </EmptyState>
           ) : (
             <div>

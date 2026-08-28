@@ -43,6 +43,7 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
       descripcion: parsed.data.descripcion,
     })
     .returning({ id: budgets.id })
+  if (!budget) throw new Error("No se pudo crear el presupuesto")
 
   // Reparte en cuotas mensuales iguales (la última absorbe el redondeo).
   const base = Math.floor((montoTotal / cuotas) * 100) / 100
@@ -52,7 +53,7 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
     vence.setMonth(vence.getMonth() + i)
     const monto = i === cuotas - 1 ? montoTotal - base * (cuotas - 1) : base
     return {
-      budgetId: budget!.id,
+      budgetId: budget.id,
       monto: monto.toFixed(2),
       venceAt: vence.toISOString().slice(0, 10),
     }
