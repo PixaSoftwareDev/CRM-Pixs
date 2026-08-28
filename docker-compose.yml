@@ -1,0 +1,66 @@
+# /opt/crm-pixs/docker-compose.yml — CRM-Pixs dockerizado (migración 2026-08-20).
+# Antes corría con PM2 en /root/CRM-Pixs del VPS Dattaweb (pixs + pixs-api).
+# Next 16 fullstack: web (next start, :3020) + api (tsx server/index.ts, :3005),
+# datos en SQLite (data/pixs.sqlite, bind-mount del directorio del código).
+# Código copiado fiel con node_modules y .next (imagen node:22 trixie = glibc
+# compatible con los binarios nativos). Repo git: PixaSoftwareDev/CRM-Pixs.
+# ⚠️ Es el upstream del conector Pixs de Intellix: si cambia la URL pública,
+# actualizar la config del conector y los hosts aprobados del tenant.
+# cpuset 14-15: satélites enjauladas en 2 cores (plan de consolidación).
+
+name: crm-pixs
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  web:
+    image: node:22-trixie-slim
+    container_name: crm-pixs-web
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node_modules/.bin/next", "start"]
+    env_file: /opt/crm-pixs/.env
+    environment:
+      SQLITE_PATH: /app/data/pixs.sqlite
+    volumes:
+      - /opt/crm-pixs:/app
+    ports:
+      - "127.0.0.1:3020:3020"
+    networks:
+      - default
+      - edge
+    logging: *default-logging
+    cpuset: "14,15"
+    mem_limit: 512m
+    cpus: 1
+
+  api:
+    image: node:22-trixie-slim
+    container_name: crm-pixs-api
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node_modules/.bin/tsx", "--tsconfig", "server/tsconfig.json", "server/index.ts"]
+    env_file: /opt/crm-pixs/.env
+    environment:
+      SQLITE_PATH: /app/data/pixs.sqlite
+      API_CORS_ORIGIN: http://200.58.109.110,http://149.50.152.218
+    volumes:
+      - /opt/crm-pixs:/app
+    ports:
+      - "127.0.0.1:3005:3005"
+    networks:
+      - default
+      - edge
+    logging: *default-logging
+    cpuset: "14,15"
+    mem_limit: 512m
+    cpus: 1
+
+networks:
+  edge:
+    external: true

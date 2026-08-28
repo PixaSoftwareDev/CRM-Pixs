@@ -1,6 +1,6 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
@@ -198,6 +198,28 @@ export async function toggleReintegro(id: string, devuelto: boolean): Promise<Fo
     .set({ reintegrado: devuelto, reintegradoAt: devuelto ? new Date() : null })
     .where(eq(transactions.id, id))
   await audit({ userId: user.id, accion: "update", entityType: "transaction", entityId: id })
+  revalidatePath("/finanzas")
+  return { ok: true }
+}
+
+/**
+ * Devuelve de una vez todo lo que se le debe a una persona: marca reintegrados
+ * todos sus gastos pendientes. Es el botón "Pagado" de la columna "Falta pagar".
+ */
+export async function reintegrarTodo(userId: string): Promise<FormState> {
+  const user = await requireUser()
+  if (!z.string().uuid().safeParse(userId).success) return { error: "Usuario inválido" }
+  await db
+    .update(transactions)
+    .set({ reintegrado: true, reintegradoAt: new Date() })
+    .where(
+      and(
+        eq(transactions.tipo, "gasto"),
+        eq(transactions.realizadoPor, userId),
+        eq(transactions.reintegrado, false),
+      ),
+    )
+  await audit({ userId: user.id, accion: "update", entityType: "transaction", entityId: userId })
   revalidatePath("/finanzas")
   return { ok: true }
 }
