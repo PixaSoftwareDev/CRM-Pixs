@@ -16,7 +16,7 @@ export async function ensureProjectForOpportunity(opportunityId: string, autorId
   if (existing) return existing.id
 
   const [opp] = await db
-    .select({ titulo: opportunities.titulo })
+    .select({ titulo: opportunities.titulo, contactId: opportunities.contactId })
     .from(opportunities)
     .where(eq(opportunities.id, opportunityId))
     .limit(1)
@@ -24,7 +24,7 @@ export async function ensureProjectForOpportunity(opportunityId: string, autorId
 
   const [project] = await db
     .insert(projects)
-    .values({ opportunityId, nombre: opp.titulo })
+    .values({ opportunityId, contactId: opp.contactId, nombre: opp.titulo })
     .returning({ id: projects.id })
 
   await addActivity({

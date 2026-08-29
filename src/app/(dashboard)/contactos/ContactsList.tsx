@@ -1,119 +1,140 @@
-"use client"
-
 import Link from "next/link"
-import { useEffect, useState } from "react"
-import { GridIcon, ListIcon, UserIcon } from "@/components/icons"
+import { UserIcon } from "@/components/icons"
 import { Badge } from "@/components/ui"
-import { ViewToggle } from "@/components/ViewToggle"
 import type { Contact } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
+import type { ContactSort, SortDir } from "@/modules/contacts/queries"
 import { ContactActions } from "./ContactActions"
 import { Avatar } from "./contact-ui"
 
-type View = "card" | "list"
-const STORAGE_KEY = "contactos_view"
+// Clases compartidas de celda, para no repetirlas columna por columna.
+const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
+const TD = "px-4 py-2 align-middle"
 
-export function ContactsList({ contactos }: { contactos: Contact[] }) {
-  const [view, setView] = useState<View>("card")
+type Props = {
+  contactos: Contact[]
+  q?: string
+  sort: ContactSort
+  dir: SortDir
+}
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === "card" || saved === "list") setView(saved)
-  }, [])
+/** Columnas de la tabla. `oculta` las va escondiendo en pantallas chicas. */
+const COLUMNAS: { key: ContactSort; label: string; oculta?: string }[] = [
+  { key: "nombre", label: "Cliente" },
+  { key: "personaContacto", label: "Contacto", oculta: "hidden sm:table-cell" },
+  { key: "email", label: "Email", oculta: "hidden lg:table-cell" },
+  { key: "telefono", label: "Teléfono", oculta: "hidden xl:table-cell" },
+  { key: "source", label: "Origen", oculta: "hidden md:table-cell" },
+  { key: "createdAt", label: "Alta", oculta: "hidden sm:table-cell" },
+]
 
-  function change(v: View) {
-    setView(v)
-    localStorage.setItem(STORAGE_KEY, v)
+/**
+ * Listado de clientes en tabla: encabezado y columnas alineadas, para poder
+ * recorrer una columna con la vista en lugar de leer fila por fila. Tocando un
+ * encabezado se ordena por esa columna; el orden viaja en la URL.
+ */
+export function ContactsList({ contactos, q, sort, dir }: Props) {
+  /** Enlace del encabezado: misma columna alterna el sentido; otra, arranca ascendente. */
+  function hrefOrden(key: ContactSort) {
+    const params = new URLSearchParams()
+    if (q) params.set("q", q)
+    params.set("sort", key)
+    params.set("dir", sort === key && dir === "asc" ? "desc" : "asc")
+    return `/contactos?${params.toString()}`
   }
 
   return (
-    <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-zinc-500">
-          {contactos.length} {contactos.length === 1 ? "cliente" : "clientes"}
-        </span>
-        <ViewToggle
-          value={view}
-          onChange={change}
-          options={[
-            { value: "card", label: "Tarjetas", icon: <GridIcon /> },
-            { value: "list", label: "Lista", icon: <ListIcon /> },
-          ]}
-        />
-      </div>
-
-      {view === "card" ? (
-        <div className="grid animate-slide-up gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {contactos.map((c) => (
-            <div key={c.id} className="group relative">
-              <Link
-                href={`/contactos/${c.id}`}
-                className="block h-full rounded-xl border border-black/[.08] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-zinc-400 hover:shadow-md dark:border-white/[.12] dark:bg-zinc-900 dark:hover:border-zinc-500"
-              >
-                <div className="flex items-start gap-3 pr-8">
-                  <Avatar nombre={c.nombre} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold leading-tight">{c.nombre}</div>
-                    {c.personaContacto ? (
-                      <div className="mt-1 flex items-center gap-1 truncate text-xs text-zinc-500">
-                        <UserIcon size={13} className="shrink-0 opacity-70" />
-                        <span className="truncate">{c.personaContacto}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1 text-xs text-zinc-400">
-                  {c.email ? <div className="truncate">{c.email}</div> : null}
-                  {c.telefono ? <div className="truncate">{c.telefono}</div> : null}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  {c.source !== "manual" ? <Badge tone="violet">{c.source}</Badge> : <span />}
-                  <span className="text-xs text-zinc-400">Alta {formatDate(c.createdAt)}</span>
-                </div>
-              </Link>
-              <ContactActions contact={c} className="absolute right-3 top-3" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="animate-slide-up overflow-hidden rounded-xl border border-black/[.08] dark:border-white/[.12]">
+    <div className="animate-slide-up overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-black/[.08] bg-zinc-50 text-left dark:border-white/[.12] dark:bg-zinc-900">
+            {COLUMNAS.map((col) => {
+              const activa = sort === col.key
+              return (
+                <th
+                  key={col.key}
+                  scope="col"
+                  aria-sort={activa ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                  className={cn(TH, col.oculta, col.key === "nombre" && "w-[30%]")}
+                >
+                  <Link
+                    href={hrefOrden(col.key)}
+                    className={cn(
+                      "inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-zinc-900 dark:hover:text-zinc-100",
+                      activa && "text-zinc-900 dark:text-zinc-100",
+                    )}
+                  >
+                    {col.label}
+                    <span
+                      aria-hidden="true"
+                      className={cn("text-[0.6rem]", !activa && "opacity-0")}
+                    >
+                      {dir === "asc" ? "▲" : "▼"}
+                    </span>
+                  </Link>
+                </th>
+              )
+            })}
+            <th className={cn(TH, "w-10")}>
+              <span className="sr-only">Acciones</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
           {contactos.map((c, i) => (
-            <div
+            <tr
               key={c.id}
               className={cn(
-                "relative flex items-center gap-3 bg-white px-4 py-3 transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
+                "relative bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
                 i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
               )}
             >
-              <Link
-                href={`/contactos/${c.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0"
+              <td className={TD}>
+                {/* El seudoelemento cubre la fila entera: se puede hacer clic en
+                    cualquier parte, sin anidar enlaces dentro de la tabla. */}
+                <Link
+                  href={`/contactos/${c.id}`}
+                  className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0"
+                >
+                  <Avatar nombre={c.nombre} size="sm" />
+                  <span className="truncate font-medium">{c.nombre}</span>
+                </Link>
+              </td>
+              <td className={cn(TD, "hidden sm:table-cell")}>
+                {c.personaContacto ? (
+                  <span className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
+                    <UserIcon size={13} className="shrink-0 opacity-60" />
+                    <span className="truncate">{c.personaContacto}</span>
+                  </span>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
+              </td>
+              <td className={cn(TD, "hidden text-zinc-500 lg:table-cell")}>
+                <span className="truncate">{c.email || "—"}</span>
+              </td>
+              <td className={cn(TD, "hidden whitespace-nowrap text-zinc-500 xl:table-cell")}>
+                {c.telefono || "—"}
+              </td>
+              <td className={cn(TD, "hidden md:table-cell")}>
+                {c.source !== "manual" ? (
+                  <Badge tone="violet">{c.source}</Badge>
+                ) : (
+                  <span className="text-zinc-400">—</span>
+                )}
+              </td>
+              <td
+                className={cn(TD, "hidden whitespace-nowrap text-xs text-zinc-400 sm:table-cell")}
               >
-                <Avatar nombre={c.nombre} />
-                <div className="min-w-0">
-                  <div className="truncate font-semibold leading-tight">{c.nombre}</div>
-                  <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">
-                    {c.personaContacto ? (
-                      <>
-                        <UserIcon size={12} className="shrink-0 opacity-70" />
-                        <span className="truncate">{c.personaContacto}</span>
-                        {c.email ? <span className="text-zinc-400">· {c.email}</span> : null}
-                      </>
-                    ) : (
-                      <span className="truncate">{c.email || "—"}</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-              <div className="hidden shrink-0 text-xs text-zinc-400 sm:block">
-                Alta {formatDate(c.createdAt)}
-              </div>
-              {c.source !== "manual" ? <Badge tone="violet">{c.source}</Badge> : null}
-              <ContactActions contact={c} className="relative z-10 shrink-0" />
-            </div>
+                {formatDate(c.createdAt)}
+              </td>
+              <td className={cn(TD, "text-right")}>
+                <ContactActions contact={c} className="relative z-10" />
+              </td>
+            </tr>
           ))}
-        </div>
-      )}
-    </>
+        </tbody>
+      </table>
+    </div>
   )
 }

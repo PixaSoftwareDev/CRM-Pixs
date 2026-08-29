@@ -406,3 +406,12 @@ export function PaperclipIcon({ size = 14, className }: IconProps) {
     </svg>
   )
 }
+
+export function SearchIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...nav(size, className)} aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </svg>
+  )
+}

@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { contacts, opportunities } from "@/db/schema"
+import { contacts, opportunities, projects } from "@/db/schema"
 
 export type OpportunityWithContact = Awaited<ReturnType<typeof listOpportunities>>[number]
 
@@ -18,9 +18,14 @@ export async function listOpportunities() {
       contactId: opportunities.contactId,
       contactoNombre: contacts.nombre,
       personaContacto: contacts.personaContacto,
+      // El proyecto que nació de esta oportunidad, si ya se ganó. Sirve para
+      // no perder el hilo entre "lo que se vendió" y "lo que se está haciendo".
+      projectId: projects.id,
+      projectEstado: projects.estado,
     })
     .from(opportunities)
     .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
+    .leftJoin(projects, eq(projects.opportunityId, opportunities.id))
     .orderBy(desc(opportunities.createdAt))
 }
 

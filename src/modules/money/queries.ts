@@ -5,7 +5,6 @@ import {
   contacts,
   documents,
   installments,
-  opportunities,
   projects,
   transactions,
   users,
@@ -31,25 +30,28 @@ export async function getProjectBudget(projectId: string) {
 
 /** Cuentas por cobrar: cuotas no pagadas, con proyecto y empresa (cliente). */
 export async function receivables() {
-  return db
-    .select({
-      id: installments.id,
-      monto: installments.monto,
-      moneda: budgets.moneda,
-      venceAt: installments.venceAt,
-      estado: installments.estado,
-      proyecto: projects.nombre,
-      projectId: projects.id,
-      empresa: contacts.nombre,
-      contactId: contacts.id,
-    })
-    .from(installments)
-    .innerJoin(budgets, eq(installments.budgetId, budgets.id))
-    .innerJoin(projects, eq(budgets.projectId, projects.id))
-    .innerJoin(opportunities, eq(projects.opportunityId, opportunities.id))
-    .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
-    .where(not(eq(installments.estado, "pagada")))
-    .orderBy(installments.venceAt)
+  return (
+    db
+      .select({
+        id: installments.id,
+        monto: installments.monto,
+        moneda: budgets.moneda,
+        venceAt: installments.venceAt,
+        estado: installments.estado,
+        proyecto: projects.nombre,
+        projectId: projects.id,
+        empresa: contacts.nombre,
+        contactId: contacts.id,
+      })
+      .from(installments)
+      .innerJoin(budgets, eq(installments.budgetId, budgets.id))
+      .innerJoin(projects, eq(budgets.projectId, projects.id))
+      // El cliente sale del proyecto. Antes se llegaba a él por la oportunidad,
+      // y los proyectos creados sin oportunidad quedaban fuera del listado.
+      .innerJoin(contacts, eq(projects.contactId, contacts.id))
+      .where(not(eq(installments.estado, "pagada")))
+      .orderBy(installments.venceAt)
+  )
 }
 
 export type TransactionRow = Awaited<ReturnType<typeof listTransactions>>[number]

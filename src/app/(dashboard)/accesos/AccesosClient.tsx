@@ -3,22 +3,21 @@
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { useConfirm } from "@/components/ConfirmDialog"
-import {
-  CopyIcon,
-  ExternalLinkIcon,
-  EyeIcon,
-  EyeOffIcon,
-  GridIcon,
-  KeyIcon,
-  ListIcon,
-  UserIcon,
-} from "@/components/icons"
+import { CopyIcon, ExternalLinkIcon, EyeIcon, EyeOffIcon, UserIcon } from "@/components/icons"
 import { KebabMenu } from "@/components/KebabMenu"
 import { Modal } from "@/components/Modal"
-import { Badge, Button, EmptyState, Field, Input, Select, Textarea } from "@/components/ui"
-import { ViewToggle } from "@/components/ViewToggle"
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Textarea,
+} from "@/components/ui"
 import { CREDENTIAL_TYPES, type CredentialType } from "@/db/schema"
-import { cn, formatDate } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import {
   createCredential,
   deleteCredential,
@@ -61,18 +60,6 @@ export function AccesosClient({
   const [q, setQ] = useState("")
   const [projectFilter, setProjectFilter] = useState("")
   const [tipoFilter, setTipoFilter] = useState("")
-  const [view, setView] = useState<"card" | "list">("card")
-
-  useEffect(() => {
-    const saved = localStorage.getItem("accesos_view")
-    if (saved === "card" || saved === "list") setView(saved)
-  }, [])
-
-  function changeView(v: "card" | "list") {
-    setView(v)
-    localStorage.setItem("accesos_view", v)
-  }
-
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<Form>(EMPTY)
@@ -170,6 +157,16 @@ export function AccesosClient({
 
   return (
     <div>
+      {/* Misma cabecera que Clientes y Proyectos: título, bajada y la acción
+          principal arriba a la derecha. */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          title="Accesos"
+          subtitle="Usuarios, contraseñas y URLs de todo lo que tenemos. Los secretos se guardan cifrados."
+        />
+        <Button onClick={openNew}>+ Nuevo acceso</Button>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Input
           value={q}
@@ -203,22 +200,9 @@ export function AccesosClient({
             </option>
           ))}
         </Select>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-zinc-500">
-            {filtered.length} {filtered.length === 1 ? "acceso" : "accesos"}
-          </span>
-          <ViewToggle
-            value={view}
-            onChange={changeView}
-            options={[
-              { value: "card", label: "Tarjetas", icon: <GridIcon /> },
-              { value: "list", label: "Lista", icon: <ListIcon /> },
-            ]}
-          />
-          <Button size="sm" onClick={openNew}>
-            + Nuevo acceso
-          </Button>
-        </div>
+        <span className="ml-auto text-sm text-zinc-500">
+          {filtered.length} {filtered.length === 1 ? "acceso" : "accesos"}
+        </span>
       </div>
 
       {filtered.length === 0 ? (
@@ -227,29 +211,33 @@ export function AccesosClient({
             ? "Todavía no cargaste accesos. Sumá servidores, bases, paneles o servicios."
             : "Ningún acceso coincide con los filtros."}
         </EmptyState>
-      ) : view === "card" ? (
-        <div className="grid animate-slide-up gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c) => (
-            <CredentialCard
-              key={c.id}
-              cred={c}
-              view="card"
-              onEdit={() => openEdit(c)}
-              onDelete={() => remove(c)}
-            />
-          ))}
-        </div>
       ) : (
-        <div className="animate-slide-up overflow-hidden rounded-xl border border-black/[.08] dark:border-white/[.12]">
-          {filtered.map((c) => (
-            <CredentialCard
-              key={c.id}
-              cred={c}
-              view="list"
-              onEdit={() => openEdit(c)}
-              onDelete={() => remove(c)}
-            />
-          ))}
+        <div className="animate-slide-up overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/[.08] bg-zinc-50 text-left dark:border-white/[.12] dark:bg-zinc-900">
+                <th className={TH}>Tipo</th>
+                <th className={TH}>Acceso</th>
+                <th className={cn(TH, "hidden md:table-cell")}>Usuario</th>
+                <th className={cn(TH, "hidden xl:table-cell")}>Proyecto</th>
+                <th className={TH}>Contraseña</th>
+                <th className={cn(TH, "w-24 text-right")}>
+                  <span className="sr-only">Acciones</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c, i) => (
+                <CredentialRowItem
+                  key={c.id}
+                  cred={c}
+                  primera={i === 0}
+                  onEdit={() => openEdit(c)}
+                  onDelete={() => remove(c)}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -360,20 +348,29 @@ export function AccesosClient({
   )
 }
 
-function CredentialCard({
+// Clases compartidas de celda, para no repetirlas columna por columna.
+const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
+const TD = "px-4 py-2.5 align-middle"
+
+/**
+ * Una fila de la tabla de accesos. El secreto se pide al server solo cuando se
+ * lo muestra o copia, y queda cacheado en memoria mientras dure la vista.
+ */
+function CredentialRowItem({
   cred,
-  view,
+  primera,
   onEdit,
   onDelete,
 }: {
   cred: CredentialRow
-  view: "card" | "list"
+  primera: boolean
   onEdit: () => void
   onDelete: () => void
 }) {
   const [secret, setSecret] = useState<string | null>(null)
   const [loading, startReveal] = useTransition()
   const [copied, setCopied] = useState(false)
+  const [shown, setShown] = useState(false)
   const tieneSecreto = Boolean(cred.tieneSecreto)
 
   // Trae el secreto (descifrado en el server) una sola vez y lo cachea en memoria.
@@ -391,7 +388,6 @@ function CredentialCard({
     })
   }
 
-  const [shown, setShown] = useState(false)
   function toggle() {
     if (shown) {
       setShown(false)
@@ -413,54 +409,58 @@ function CredentialCard({
     })
   }
 
-  const secretControls = tieneSecreto ? (
-    <>
-      <IconBtn label={shown ? "Ocultar" : "Mostrar"} onClick={toggle} disabled={loading}>
-        {shown ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-      </IconBtn>
-      <IconBtn label={copied ? "Copiado" : "Copiar"} onClick={copy} disabled={loading}>
-        <CopyIcon size={16} className={cn(copied && "text-green-600 dark:text-green-400")} />
-      </IconBtn>
-    </>
-  ) : null
-
-  // Vista lista: fila compacta.
-  if (view === "list") {
-    return (
-      <div className="flex items-center gap-3 border-b border-black/[.06] bg-white px-4 py-3 transition-colors last:border-0 hover:bg-zinc-50 dark:border-white/[.08] dark:bg-zinc-900 dark:hover:bg-zinc-800/50">
+  return (
+    <tr
+      className={cn(
+        "bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
+        !primera && "border-t border-black/[.06] dark:border-white/[.08]",
+      )}
+    >
+      <td className={TD}>
         <Badge tone={CREDENTIAL_TYPE_TONE[cred.tipo]}>{CREDENTIAL_TYPE_LABELS[cred.tipo]}</Badge>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium leading-tight" title={cred.titulo}>
-            {cred.titulo}
-          </div>
-          <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">
-            {cred.usuario ? <span className="truncate">{cred.usuario}</span> : null}
-            {cred.usuario && cred.proyectoNombre ? <span className="text-zinc-300">·</span> : null}
-            {cred.proyectoNombre ? (
-              <span className="truncate text-zinc-400">{cred.proyectoNombre}</span>
-            ) : null}
-            {cred.notas ? (
-              <>
-                {cred.usuario || cred.proyectoNombre ? (
-                  <span className="text-zinc-300">·</span>
-                ) : null}
-                <span className="truncate text-zinc-400" title={cred.notas}>
-                  {cred.notas}
-                </span>
-              </>
-            ) : null}
-            {!cred.usuario && !cred.proyectoNombre && !cred.notas ? (
-              <span className="text-zinc-400">—</span>
-            ) : null}
-          </div>
+      </td>
+      <td className={TD}>
+        <div className="truncate font-medium" title={cred.titulo}>
+          {cred.titulo}
         </div>
-        {tieneSecreto && shown ? (
-          <code className="hidden max-w-[10rem] truncate rounded bg-black/[.04] px-2 py-1 text-xs sm:block dark:bg-white/[.08]">
-            {secret ?? "…"}
-          </code>
+        {cred.notas ? (
+          <div className="truncate text-xs text-zinc-400" title={cred.notas}>
+            {cred.notas}
+          </div>
         ) : null}
-        <div className="flex shrink-0 items-center gap-0.5">
-          {secretControls}
+      </td>
+      <td className={cn(TD, "hidden md:table-cell text-zinc-600 dark:text-zinc-300")}>
+        {cred.usuario ? (
+          <span className="flex items-center gap-1.5">
+            <UserIcon size={13} className="shrink-0 opacity-60" />
+            <span className="truncate">{cred.usuario}</span>
+          </span>
+        ) : (
+          <span className="text-zinc-400">—</span>
+        )}
+      </td>
+      <td className={cn(TD, "hidden xl:table-cell text-zinc-500")}>
+        {cred.proyectoNombre ?? <span className="text-zinc-400">—</span>}
+      </td>
+      <td className={TD}>
+        {tieneSecreto ? (
+          <div className="flex items-center gap-1">
+            <code className="max-w-[12rem] truncate rounded bg-black/[.04] px-2 py-1 text-xs dark:bg-white/[.08]">
+              {shown ? (secret ?? "…") : "••••••••••"}
+            </code>
+            <IconBtn label={shown ? "Ocultar" : "Mostrar"} onClick={toggle} disabled={loading}>
+              {shown ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+            </IconBtn>
+            <IconBtn label={copied ? "Copiado" : "Copiar"} onClick={copy} disabled={loading}>
+              <CopyIcon size={16} className={cn(copied && "text-green-600 dark:text-green-400")} />
+            </IconBtn>
+          </div>
+        ) : (
+          <span className="text-xs text-zinc-400">Sin contraseña</span>
+        )}
+      </td>
+      <td className={cn(TD, "text-right")}>
+        <div className="flex items-center justify-end gap-0.5">
           {cred.url ? (
             <a
               href={cred.url}
@@ -475,73 +475,8 @@ function CredentialCard({
           ) : null}
           <KebabMenu onEdit={onEdit} onDelete={onDelete} />
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="group relative flex flex-col rounded-xl border border-black/[.08] bg-white p-4 transition-colors hover:border-zinc-300 dark:border-white/[.12] dark:bg-zinc-900 dark:hover:border-zinc-600">
-      <div className="absolute right-2 top-2">
-        <KebabMenu onEdit={onEdit} onDelete={onDelete} />
-      </div>
-
-      <div className="flex items-start gap-2 pr-6">
-        <Badge tone={CREDENTIAL_TYPE_TONE[cred.tipo]}>{CREDENTIAL_TYPE_LABELS[cred.tipo]}</Badge>
-      </div>
-      <div className="mt-2 truncate font-semibold leading-tight" title={cred.titulo}>
-        {cred.titulo}
-      </div>
-
-      {cred.usuario ? (
-        <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-zinc-500">
-          <UserIcon size={13} className="shrink-0 opacity-70" />
-          <span className="truncate">{cred.usuario}</span>
-        </div>
-      ) : null}
-
-      {/* Secreto */}
-      <div className="mt-3 flex items-center gap-1.5">
-        <KeyIcon size={14} className="shrink-0 text-zinc-400" />
-        {tieneSecreto ? (
-          <>
-            <code className="min-w-0 flex-1 truncate rounded bg-black/[.04] px-2 py-1 text-xs dark:bg-white/[.08]">
-              {shown ? (secret ?? "…") : "••••••••••"}
-            </code>
-            <IconBtn label={shown ? "Ocultar" : "Mostrar"} onClick={toggle} disabled={loading}>
-              {shown ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-            </IconBtn>
-            <IconBtn label={copied ? "Copiado" : "Copiar"} onClick={copy} disabled={loading}>
-              <CopyIcon size={16} className={cn(copied && "text-green-600 dark:text-green-400")} />
-            </IconBtn>
-          </>
-        ) : (
-          <span className="text-xs text-zinc-400">Sin contraseña</span>
-        )}
-      </div>
-
-      {/* URL + proyecto */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[.06] pt-3 text-xs dark:border-white/[.08]">
-        {cred.url ? (
-          <a
-            href={cred.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400"
-          >
-            <ExternalLinkIcon size={13} />
-            Abrir
-          </a>
-        ) : null}
-        {cred.proyectoNombre ? <span className="text-zinc-400">{cred.proyectoNombre}</span> : null}
-        <span className="ml-auto text-zinc-400">{formatDate(cred.updatedAt)}</span>
-      </div>
-
-      {cred.notas ? (
-        <p className="mt-2 line-clamp-2 text-xs text-zinc-500" title={cred.notas}>
-          {cred.notas}
-        </p>
-      ) : null}
-    </div>
+      </td>
+    </tr>
   )
 }
 

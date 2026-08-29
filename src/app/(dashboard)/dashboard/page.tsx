@@ -205,7 +205,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-black/[.05] dark:bg-white/[.08]">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
+                      className="h-full rounded-full bg-gradient-to-r from-blue-700 to-sky-700"
                       style={{ width: `${(Number(s.cantidad) / maxPipeline) * 100}%` }}
                     />
                   </div>

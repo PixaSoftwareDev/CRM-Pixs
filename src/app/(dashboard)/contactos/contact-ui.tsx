@@ -8,12 +8,14 @@ export function contactInitials(nombre: string) {
 }
 
 /** Avatar circular con iniciales sobre un degradado. */
-export function Avatar({ nombre, size = "md" }: { nombre: string; size?: "md" | "lg" }) {
+export function Avatar({ nombre, size = "md" }: { nombre: string; size?: "sm" | "md" | "lg" }) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-600 font-semibold text-white shadow-sm",
-        size === "lg" ? "h-16 w-16 text-xl" : "h-10 w-10 text-sm",
+        "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-sky-700 font-semibold text-white shadow-sm",
+        size === "lg" && "h-16 w-16 text-xl",
+        size === "md" && "h-10 w-10 text-sm",
+        size === "sm" && "h-7 w-7 text-[0.6875rem]",
       )}
       aria-hidden="true"
     >

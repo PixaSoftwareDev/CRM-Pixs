@@ -1,4 +1,5 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { contacts } from "./contacts"
 import { projects } from "./projects"
 import { users } from "./users"
 
@@ -57,6 +58,10 @@ export const transactions = sqliteTable(
     categoria: text("categoria"),
     realizadoPor: text("realizado_por").references(() => users.id),
     projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    // Cliente al que corresponde el movimiento. Permite registrar un cobro
+    // directo desde la ficha del cliente, sin tener que abrir una oportunidad
+    // y un proyecto antes. Opcional: los gastos generales no tienen cliente.
+    contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
     // Si el ingreso proviene de marcar una cuota como pagada, queda vinculado a
     // ella: así al revertir el pago se borra el movimiento y la caja no duplica.
     installmentId: text("installment_id").references(() => installments.id, {

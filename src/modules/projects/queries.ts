@@ -12,14 +12,14 @@ export async function listProjects() {
       estado: projects.estado,
       fechaInicio: projects.fechaInicio,
       createdAt: projects.createdAt,
-      contactId: contacts.id,
+      contactId: projects.contactId,
       contactoNombre: contacts.nombre,
       valor: opportunities.valorEstimado,
       moneda: opportunities.moneda,
     })
     .from(projects)
-    .innerJoin(opportunities, eq(projects.opportunityId, opportunities.id))
-    .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
+    .leftJoin(contacts, eq(projects.contactId, contacts.id))
+    .leftJoin(opportunities, eq(projects.opportunityId, opportunities.id))
     .orderBy(desc(projects.createdAt))
 }
 
@@ -33,11 +33,11 @@ export async function getProject(id: string) {
       fechaFinEstimada: projects.fechaFinEstimada,
       opportunityId: projects.opportunityId,
       contactoNombre: contacts.nombre,
-      contactId: contacts.id,
+      contactId: projects.contactId,
     })
     .from(projects)
-    .innerJoin(opportunities, eq(projects.opportunityId, opportunities.id))
-    .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
+    .leftJoin(contacts, eq(projects.contactId, contacts.id))
+    .leftJoin(opportunities, eq(projects.opportunityId, opportunities.id))
     .where(eq(projects.id, id))
     .limit(1)
   return row ?? null

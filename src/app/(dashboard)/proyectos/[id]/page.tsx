@@ -4,14 +4,20 @@ import { DocumentsCard } from "@/components/documents/DocumentsCard"
 import { Timeline } from "@/components/Timeline"
 import { Badge, Card } from "@/components/ui"
 import { getProject, getTechInfo } from "@/modules/projects/queries"
+import { listTasks } from "@/modules/tasks/queries"
 import { ProjectPayments } from "./ProjectPayments"
+import { ProjectTasks } from "./ProjectTasks"
 import { TechInfoForm } from "./TechInfoForm"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProyectoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [project, tech] = await Promise.all([getProject(id), getTechInfo(id)])
+  const [project, tech, tareas] = await Promise.all([
+    getProject(id),
+    getTechInfo(id),
+    listTasks(id),
+  ])
   if (!project) notFound()
 
   return (
@@ -22,14 +28,33 @@ export default async function ProyectoPage({ params }: { params: Promise<{ id: s
       <div className="mt-2 mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{project.nombre}</h1>
-          <Link
-            href={`/contactos/${project.contactId}`}
-            className="text-sm text-zinc-500 hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
-          >
-            {project.contactoNombre}
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
+            <Link
+              href={`/contactos/${project.contactId}`}
+              className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
+            >
+              {project.contactoNombre}
+            </Link>
+            {/* Solo si nació de una oportunidad ganada: los proyectos creados
+                directo desde Proyectos no tienen origen que mostrar. */}
+            {project.opportunityId ? (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                <Link
+                  href={`/pipeline/${project.opportunityId}`}
+                  className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
+                >
+                  ver oportunidad de origen →
+                </Link>
+              </>
+            ) : null}
+          </div>
         </div>
         <Badge tone="green">{project.estado}</Badge>
+      </div>
+
+      <div className="mb-6">
+        <ProjectTasks tareas={tareas} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

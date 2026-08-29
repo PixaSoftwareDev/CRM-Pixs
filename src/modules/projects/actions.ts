@@ -50,3 +50,38 @@ export async function deleteTechInfo(id: string, projectId: string) {
   await db.delete(projectTechInfo).where(eq(projectTechInfo.id, id))
   revalidatePath(`/proyectos/${projectId}`)
 }
+
+/** Alta de proyecto directa, sin pasar por el embudo de ventas. */
+const newProjectSchema = z.object({
+  contactId: z.string().uuid(),
+  nombre: z.string().min(1).max(200),
+  estado: z.enum(PROJECT_STATES).default("activo"),
+  fechaInicio: z.string().optional(),
+})
+
+export async function createProject(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser()
+  const parsed = newProjectSchema.safeParse({
+    contactId: formData.get("contactId"),
+    nombre: formData.get("nombre"),
+    estado: formData.get("estado") || "activo",
+    fechaInicio: formData.get("fechaInicio") || undefined,
+  })
+  if (!parsed.success) return { error: "Datos inválidos" }
+
+  // Sin `opportunityId`: el proyecto nace del cliente, no de una oportunidad ganada.
+  const [project] = await db
+    .insert(projects)
+    .values({
+      contactId: parsed.data.contactId,
+      nombre: parsed.data.nombre,
+      estado: parsed.data.estado,
+      fechaInicio: parsed.data.fechaInicio,
+    })
+    .returning({ id: projects.id })
+
+  await audit({ userId: user.id, accion: "create", entityType: "project", entityId: project?.id })
+  revalidatePath("/proyectos")
+  revalidatePath(`/contactos/${parsed.data.contactId}`)
+  return { ok: true }
+}

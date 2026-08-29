@@ -24,8 +24,9 @@ export function Button({
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:opacity-60 disabled:pointer-events-none",
         size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 text-sm",
+        // Degradé azul → celeste, contenido: da color sin gritar.
         variant === "primary" &&
-          "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm shadow-blue-600/20 hover:from-blue-500 hover:to-violet-500",
+          "bg-gradient-to-r from-blue-700 to-sky-700 text-white shadow-sm shadow-blue-900/10 hover:from-blue-800 hover:to-sky-800",
         variant === "secondary" &&
           "border border-zinc-300 hover:bg-black/[.04] dark:border-zinc-700 dark:hover:bg-white/[.06]",
         variant === "ghost" && "hover:bg-black/[.04] dark:hover:bg-white/[.06]",

@@ -1,12 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
-import { GridIcon, ListIcon } from "@/components/icons"
+import { useMemo, useState } from "react"
 import { Badge, Input, Select } from "@/components/ui"
-import { ViewToggle } from "@/components/ViewToggle"
 import type { ProjectState } from "@/db/schema"
-import { cn, formatMoney } from "@/lib/utils"
+import { cn, formatDate, formatMoney } from "@/lib/utils"
 import type { ProjectListRow } from "@/modules/projects/queries"
 
 const ESTADO_TONE: Record<ProjectState, "green" | "amber" | "blue" | "red"> = {
@@ -16,29 +14,42 @@ const ESTADO_TONE: Record<ProjectState, "green" | "amber" | "blue" | "red"> = {
   cancelado: "red",
 }
 
-type View = "card" | "list"
-const STORAGE_KEY = "proyectos_view"
+// Clases compartidas de celda, para no repetirlas columna por columna.
+const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
+const TD = "px-4 py-2.5 align-middle"
+
+type SortKey = "contactoNombre" | "nombre" | "valor" | "estado" | "createdAt"
+type SortDir = "asc" | "desc"
+
+const COLUMNAS: { key: SortKey; label: string; oculta?: string }[] = [
+  { key: "contactoNombre", label: "Cliente" },
+  { key: "nombre", label: "Proyecto" },
+  { key: "valor", label: "Valor", oculta: "hidden sm:table-cell" },
+  { key: "estado", label: "Estado" },
+  { key: "createdAt", label: "Alta", oculta: "hidden lg:table-cell" },
+]
 
 export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
   const [cliente, setCliente] = useState<string>("")
   const [q, setQ] = useState<string>("")
-  const [view, setView] = useState<View>("card")
+  const [sort, setSort] = useState<SortKey>("createdAt")
+  const [dir, setDir] = useState<SortDir>("desc")
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === "card" || saved === "list") setView(saved)
-  }, [])
-
-  function changeView(v: View) {
-    setView(v)
-    localStorage.setItem(STORAGE_KEY, v)
+  /** Misma columna alterna el sentido; otra, arranca ascendente. */
+  function ordenarPor(key: SortKey) {
+    if (key === sort) {
+      setDir(dir === "asc" ? "desc" : "asc")
+    } else {
+      setSort(key)
+      setDir("asc")
+    }
   }
 
   // Clientes únicos (id + nombre) para el filtro.
   const clientes = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of proyectos) {
-      if (p.contactId) map.set(p.contactId, p.contactoNombre)
+      if (p.contactId && p.contactoNombre) map.set(p.contactId, p.contactoNombre)
     }
     return [...map]
       .map(([id, nombre]) => ({ id, nombre }))
@@ -47,12 +58,26 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
 
   const filtrados = useMemo(() => {
     const term = q.trim().toLowerCase()
-    return proyectos.filter((p) => {
+    const base = proyectos.filter((p) => {
       if (cliente && p.contactId !== cliente) return false
       if (!term) return true
-      return p.nombre.toLowerCase().includes(term) || p.contactoNombre.toLowerCase().includes(term)
+      return (
+        p.nombre.toLowerCase().includes(term) ||
+        (p.contactoNombre ?? "").toLowerCase().includes(term)
+      )
     })
-  }, [proyectos, cliente, q])
+
+    const signo = dir === "asc" ? 1 : -1
+    return [...base].sort((a, b) => {
+      if (sort === "valor") {
+        return (Number(a.valor ?? 0) - Number(b.valor ?? 0)) * signo
+      }
+      if (sort === "createdAt") {
+        return (a.createdAt.getTime() - b.createdAt.getTime()) * signo
+      }
+      return String(a[sort] ?? "").localeCompare(String(b[sort] ?? "")) * signo
+    })
+  }, [proyectos, cliente, q, sort, dir])
 
   return (
     <>
@@ -77,67 +102,90 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
             ))}
           </Select>
         ) : null}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-zinc-500">
-            {filtrados.length} {filtrados.length === 1 ? "proyecto" : "proyectos"}
-          </span>
-          <ViewToggle
-            value={view}
-            onChange={changeView}
-            options={[
-              { value: "card", label: "Tarjetas", icon: <GridIcon /> },
-              { value: "list", label: "Lista", icon: <ListIcon /> },
-            ]}
-          />
-        </div>
+        <span className="ml-auto text-sm text-zinc-500">
+          {filtrados.length} {filtrados.length === 1 ? "proyecto" : "proyectos"}
+        </span>
       </div>
 
       {filtrados.length === 0 ? (
         <div className="rounded-xl border border-dashed border-black/[.12] p-10 text-center text-sm text-zinc-500 dark:border-white/[.14]">
           No hay proyectos que coincidan con la búsqueda.
         </div>
-      ) : view === "card" ? (
-        <div className="grid animate-slide-up gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtrados.map((p) => (
-            <Link
-              key={p.id}
-              href={`/proyectos/${p.id}`}
-              className="block h-full rounded-xl border border-black/[.08] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-zinc-400 hover:shadow-md dark:border-white/[.12] dark:bg-zinc-900 dark:hover:border-zinc-500"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">{p.contactoNombre}</span>
-                <Badge tone={ESTADO_TONE[p.estado]}>{p.estado}</Badge>
-              </div>
-              <div className="truncate text-sm text-zinc-500">{p.nombre}</div>
-              {p.valor ? (
-                <div className="mt-2 text-xs text-zinc-400">{formatMoney(p.valor, p.moneda)}</div>
-              ) : null}
-            </Link>
-          ))}
-        </div>
       ) : (
-        <div className="animate-slide-up overflow-hidden rounded-xl border border-black/[.08] dark:border-white/[.12]">
-          {filtrados.map((p, i) => (
-            <Link
-              key={p.id}
-              href={`/proyectos/${p.id}`}
-              className={cn(
-                "flex items-center gap-3 bg-white px-4 py-3 transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
-                i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
-              )}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{p.contactoNombre}</div>
-                <div className="truncate text-xs text-zinc-500">{p.nombre}</div>
-              </div>
-              {p.valor ? (
-                <span className="hidden shrink-0 text-xs text-zinc-400 sm:block">
-                  {formatMoney(p.valor, p.moneda)}
-                </span>
-              ) : null}
-              <Badge tone={ESTADO_TONE[p.estado]}>{p.estado}</Badge>
-            </Link>
-          ))}
+        <div className="animate-slide-up overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/[.08] bg-zinc-50 text-left dark:border-white/[.12] dark:bg-zinc-900">
+                {COLUMNAS.map((col) => {
+                  const activa = sort === col.key
+                  return (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      aria-sort={activa ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                      className={cn(TH, col.oculta)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => ordenarPor(col.key)}
+                        className={cn(
+                          "inline-flex items-center gap-1 whitespace-nowrap uppercase transition-colors hover:text-zinc-900 dark:hover:text-zinc-100",
+                          activa && "text-zinc-900 dark:text-zinc-100",
+                        )}
+                      >
+                        {col.label}
+                        <span
+                          aria-hidden="true"
+                          className={cn("text-[0.6rem]", !activa && "opacity-0")}
+                        >
+                          {dir === "asc" ? "▲" : "▼"}
+                        </span>
+                      </button>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {filtrados.map((p, i) => (
+                <tr
+                  key={p.id}
+                  className={cn(
+                    "relative bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
+                    i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
+                  )}
+                >
+                  <td className={TD}>
+                    {/* El seudoelemento cubre la fila entera: se puede hacer clic
+                        en cualquier parte, sin anidar enlaces dentro de la tabla. */}
+                    <Link
+                      href={`/proyectos/${p.id}`}
+                      className="truncate font-medium after:absolute after:inset-0"
+                    >
+                      {p.contactoNombre ?? "—"}
+                    </Link>
+                  </td>
+                  <td className={cn(TD, "text-zinc-600 dark:text-zinc-300")}>
+                    <span className="truncate">{p.nombre}</span>
+                  </td>
+                  <td className={cn(TD, "hidden whitespace-nowrap text-zinc-500 sm:table-cell")}>
+                    {p.valor ? formatMoney(p.valor, p.moneda ?? "ARS") : "—"}
+                  </td>
+                  <td className={TD}>
+                    <Badge tone={ESTADO_TONE[p.estado]}>{p.estado}</Badge>
+                  </td>
+                  <td
+                    className={cn(
+                      TD,
+                      "hidden whitespace-nowrap text-xs text-zinc-400 lg:table-cell",
+                    )}
+                  >
+                    {formatDate(p.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </>

@@ -16,7 +16,16 @@ import { BoardIcon, ListIcon } from "@/components/icons"
 import { KebabMenu } from "@/components/KebabMenu"
 import { KANBAN_CARD, KanbanBoardShell, KanbanColumn } from "@/components/kanban"
 import { Modal } from "@/components/Modal"
-import { Badge, Button, EmptyState, Field, Input, Select, Textarea } from "@/components/ui"
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Textarea,
+} from "@/components/ui"
 import { ViewToggle } from "@/components/ViewToggle"
 import { TASK_COLORS, TASK_COLUMNS, type TaskColor, type TaskColumn } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
@@ -240,6 +249,22 @@ export function TareasClient({
 
   return (
     <div>
+      {/* Misma cabecera que Clientes y Proyectos: título, bajada y la acción
+          principal arriba a la derecha. */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          title="Tareas"
+          subtitle="Todas las tareas de todos los proyectos en un solo lugar"
+        />
+        <Button
+          onClick={openForm}
+          disabled={proyectos.length === 0}
+          title={proyectos.length === 0 ? "Primero creá un proyecto" : undefined}
+        >
+          + Nueva tarea
+        </Button>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <ViewToggle
           value={view}
@@ -276,20 +301,10 @@ export function TareasClient({
           ))}
         </Select>
 
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-zinc-500">
-            {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {hechas} hecha
-            {hechas === 1 ? "" : "s"}
-          </span>
-          <Button
-            size="sm"
-            onClick={openForm}
-            disabled={proyectos.length === 0}
-            title={proyectos.length === 0 ? "Primero creá un proyecto" : undefined}
-          >
-            + Nueva tarea
-          </Button>
-        </div>
+        <span className="ml-auto text-sm text-zinc-500">
+          {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {hechas} hecha
+          {hechas === 1 ? "" : "s"}
+        </span>
       </div>
 
       {showForm ? (

@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/ui"
 import { listDatabases, listServers } from "@/modules/infra/queries"
 import { InfraClient } from "./InfraClient"
 
@@ -9,10 +8,6 @@ export default async function InfraPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Infraestructura"
-        subtitle="Inventario compartido · filtrá por estado, entorno, proveedor o motor"
-      />
       <InfraClient servers={servers} databases={databases} />
     </div>
   )

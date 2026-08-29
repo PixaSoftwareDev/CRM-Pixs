@@ -11,14 +11,11 @@ import {
   HomeIcon,
   KeyIcon,
   LogoutIcon,
-  MegaphoneIcon,
   MenuIcon,
   ServerIcon,
-  TargetIcon,
   UsersIcon,
   WalletIcon,
 } from "@/components/icons"
-import { LogoMark, Wordmark } from "@/components/Logo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { cn } from "@/lib/utils"
 import { logout } from "@/modules/auth/actions"
@@ -26,13 +23,11 @@ import { logout } from "@/modules/auth/actions"
 const NAV = [
   { href: "/dashboard", label: "Inicio", Icon: HomeIcon },
   { href: "/contactos", label: "Clientes", Icon: UsersIcon },
-  { href: "/pipeline", label: "Oportunidades", Icon: TargetIcon },
   { href: "/proyectos", label: "Proyectos", Icon: FolderIcon },
   { href: "/tareas", label: "Tareas", Icon: CheckSquareIcon },
   { href: "/infra", label: "Infra", Icon: ServerIcon },
   { href: "/accesos", label: "Accesos", Icon: KeyIcon },
   { href: "/finanzas", label: "Finanzas", Icon: WalletIcon },
-  { href: "/captacion", label: "Captación", Icon: MegaphoneIcon },
 ]
 
 export function Sidebar({ email }: { email: string }) {
@@ -132,7 +127,6 @@ export function Sidebar({ email }: { email: string }) {
         >
           <MenuIcon />
         </button>
-        <Wordmark className="h-5" />
         <ThemeToggle className="ml-auto" />
       </header>
 
@@ -145,13 +139,10 @@ export function Sidebar({ email }: { email: string }) {
       >
         <div
           className={cn(
-            "flex border-b border-black/[.06] dark:border-white/[.08]",
-            collapsed
-              ? "flex-col items-center gap-3 pb-5"
-              : "items-center justify-between gap-2 px-1 pb-5",
+            "flex items-center pb-2",
+            collapsed ? "justify-center" : "justify-end px-1",
           )}
         >
-          {collapsed ? <LogoMark className="h-9 w-9" /> : <Wordmark className="h-5" />}
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -176,8 +167,7 @@ export function Sidebar({ email }: { email: string }) {
             className="absolute inset-0 animate-fade-in cursor-default bg-black/50 backdrop-blur-sm"
           />
           <aside className="absolute left-0 top-0 flex h-full w-64 animate-slide-up flex-col border-r border-black/[.08] bg-zinc-50 px-4 py-6 dark:border-white/[.12] dark:bg-zinc-950">
-            <div className="mb-6 flex items-center justify-between gap-2 border-b border-black/[.06] px-1 pb-5 dark:border-white/[.08]">
-              <Wordmark className="h-5" />
+            <div className="mb-3 flex items-center justify-end px-1 pb-2">
               <button
                 type="button"
                 aria-label="Cerrar menú"

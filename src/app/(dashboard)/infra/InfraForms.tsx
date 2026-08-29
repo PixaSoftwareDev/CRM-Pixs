@@ -21,9 +21,7 @@ export function NewServerForm() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        + Servidor
-      </Button>
+      <Button onClick={() => setOpen(true)}>+ Servidor</Button>
       {open ? (
         <Modal
           title="Nuevo servidor"
@@ -84,9 +82,7 @@ export function NewDatabaseForm({ servers }: { servers: { id: string; nombre: st
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        + Base de datos
-      </Button>
+      <Button onClick={() => setOpen(true)}>+ Base de datos</Button>
       {open ? (
         <Modal
           title="Nueva base de datos"

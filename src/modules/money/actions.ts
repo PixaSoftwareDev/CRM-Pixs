@@ -118,6 +118,7 @@ const txSchema = z.object({
   fecha: z.string().min(1),
   descripcion: z.string().max(500).optional(),
   projectId: z.string().uuid().optional().or(z.literal("")),
+  contactId: z.string().uuid().optional().or(z.literal("")),
   realizadoPor: z.string().uuid().optional().or(z.literal("")),
 })
 
@@ -131,6 +132,7 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
     fecha: formData.get("fecha"),
     descripcion: formData.get("descripcion") || undefined,
     projectId: formData.get("projectId") || "",
+    contactId: formData.get("contactId") || "",
     realizadoPor: formData.get("realizadoPor") || "",
   })
   if (!parsed.success) return { error: "Datos inválidos" }
@@ -155,6 +157,7 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
       fecha: parsed.data.fecha,
       descripcion: parsed.data.descripcion,
       projectId: parsed.data.projectId ? parsed.data.projectId : null,
+      contactId: parsed.data.contactId ? parsed.data.contactId : null,
       // Quién lo pagó: el elegido en el form, o el usuario actual por defecto.
       realizadoPor: parsed.data.realizadoPor ? parsed.data.realizadoPor : user.id,
     })
@@ -187,6 +190,7 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
 
   await audit({ userId: user.id, accion: "create", entityType: "transaction", entityId: tx?.id })
   revalidatePath("/finanzas")
+  if (parsed.data.contactId) revalidatePath(`/contactos/${parsed.data.contactId}`)
   return { ok: true }
 }
 

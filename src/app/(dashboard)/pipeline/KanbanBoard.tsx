@@ -47,6 +47,17 @@ function CardBody({ opp }: { opp: OpportunityWithContact }) {
           {formatMoney(opp.valorEstimado, opp.moneda)}
         </div>
       ) : null}
+      {/* Si la oportunidad ya se ganó, su proyecto es la continuación del mismo
+          trabajo: se enlaza acá para no tener que ir a buscarlo a otra pantalla. */}
+      {opp.projectId ? (
+        <Link
+          href={`/proyectos/${opp.projectId}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-200 hover:text-zinc-900 dark:bg-white/[.06] dark:text-zinc-300 dark:hover:bg-white/[.12] dark:hover:text-white"
+        >
+          Proyecto · {opp.projectEstado} →
+        </Link>
+      ) : null}
     </>
   )
 }

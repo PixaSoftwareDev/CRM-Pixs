@@ -5,12 +5,18 @@ import { GlobeIcon, MailIcon, PhoneIcon } from "@/components/icons"
 import { Timeline } from "@/components/Timeline"
 import { Badge, Card } from "@/components/ui"
 import type { ProjectState } from "@/db/schema"
-import { formatDate, formatMoney } from "@/lib/utils"
-import { getContact, listContactOpportunities, listContactPeople } from "@/modules/contacts/queries"
-import { STATE_LABELS, STATE_TONES } from "@/modules/opportunities/labels"
+import { formatDate } from "@/lib/utils"
+import {
+  getContact,
+  getContactPending,
+  listContactPayments,
+  listContactPeople,
+  listContactProjects,
+} from "@/modules/contacts/queries"
 import { ContactActions } from "../ContactActions"
 import { ContactPeople } from "../ContactPeople"
 import { Avatar } from "../contact-ui"
+import { ContactPayments } from "./ContactPayments"
 
 export const dynamic = "force-dynamic"
 
@@ -23,19 +29,19 @@ const PROJECT_TONE: Record<ProjectState, "green" | "amber" | "blue" | "red"> = {
 
 export default async function ContactoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [c, oportunidades, personas] = await Promise.all([
+  const [c, personas, pagos, pendiente, proyectos] = await Promise.all([
     getContact(id),
-    listContactOpportunities(id),
     listContactPeople(id),
+    listContactPayments(id),
+    getContactPending(id),
+    listContactProjects(id),
   ])
   if (!c) notFound()
 
   const tel = c.telefono?.replace(/[^\d+]/g, "")
 
   // Resumen de proyectos del cliente.
-  const conProyecto = oportunidades.filter((o) => o.projectId)
-  const activos = conProyecto.filter((o) => o.projectEstado === "activo")
-  const valorActivos = activos.reduce((s, o) => s + Number(o.valorEstimado ?? 0), 0)
+  const activos = proyectos.filter((p) => p.estado === "activo")
 
   return (
     <div className="animate-slide-up">
@@ -87,63 +93,42 @@ export default async function ContactoPage({ params }: { params: Promise<{ id: s
       {/* Contenido principal (izq) + datos del cliente (der, sticky) */}
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-6">
-          {/* Oportunidades y proyectos del contacto */}
+          {/* Proyectos del cliente: el trabajo que le hacés */}
           <Card>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Oportunidades y proyectos</h2>
+              <h2 className="text-sm font-semibold">Proyectos</h2>
               <span className="text-xs text-zinc-400">
-                {conProyecto.length} {conProyecto.length === 1 ? "proyecto" : "proyectos"}
+                {proyectos.length} {proyectos.length === 1 ? "proyecto" : "proyectos"}
                 {activos.length > 0
                   ? ` · ${activos.length} activo${activos.length === 1 ? "" : "s"}`
                   : ""}
-                {valorActivos > 0 ? ` · ${formatMoney(valorActivos)} en curso` : ""}
               </span>
             </div>
-            {oportunidades.length === 0 ? (
+            {proyectos.length === 0 ? (
               <p className="text-sm text-zinc-400">
-                Sin oportunidades todavía. Creá una en{" "}
-                <Link href="/pipeline" className="text-blue-600 hover:underline dark:text-blue-400">
-                  Oportunidades
+                Sin proyectos todavía. Creá uno en{" "}
+                <Link
+                  href="/proyectos"
+                  className="text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  Proyectos
                 </Link>
                 .
               </p>
             ) : (
               <ul className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-                {oportunidades.map((o) => (
+                {proyectos.map((p) => (
                   <li
-                    key={o.id}
+                    key={p.id}
                     className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 text-sm"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Link
-                        href={`/pipeline/${o.id}`}
-                        className="truncate font-medium hover:underline"
-                      >
-                        {o.titulo}
-                      </Link>
-                      <Badge tone={STATE_TONES[o.estado]}>{STATE_LABELS[o.estado]}</Badge>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {o.valorEstimado ? (
-                        <span className="text-xs text-zinc-500">
-                          {formatMoney(o.valorEstimado, o.moneda)}
-                        </span>
-                      ) : null}
-                      {o.projectId ? (
-                        <Link
-                          href={`/proyectos/${o.projectId}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          Ver proyecto
-                          {o.projectEstado ? (
-                            <Badge tone={PROJECT_TONE[o.projectEstado]}>{o.projectEstado}</Badge>
-                          ) : null}
-                          <span aria-hidden="true">→</span>
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-zinc-400">Sin proyecto</span>
-                      )}
-                    </div>
+                    <Link
+                      href={`/proyectos/${p.id}`}
+                      className="truncate font-medium hover:underline"
+                    >
+                      {p.nombre}
+                    </Link>
+                    <Badge tone={PROJECT_TONE[p.estado]}>{p.estado}</Badge>
                   </li>
                 ))}
               </ul>
@@ -152,6 +137,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ id: s
 
           {/* Personas de contacto (varias por empresa) */}
           <ContactPeople contactId={c.id} people={personas} />
+
+          {/* Cobros: se cargan acá mismo, sin pasar por oportunidad ni proyecto */}
+          <ContactPayments contactId={c.id} pagos={pagos} pendiente={pendiente} />
 
           {/* Documentos */}
           <DocumentsCard entityType="contact" entityId={c.id} />
