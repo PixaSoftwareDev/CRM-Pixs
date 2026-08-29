@@ -4,6 +4,7 @@ import { MulterError } from "multer"
 import { requireAuth } from "./lib/auth"
 import { config } from "./lib/config"
 import { HttpError } from "./lib/http"
+import { openapiSpec } from "./openapi"
 import { activitiesRouter } from "./routes/activities"
 import { authRouter } from "./routes/auth"
 import { contactsRouter } from "./routes/contacts"
@@ -30,6 +31,11 @@ app.use(express.json({ limit: "1mb" }))
 // Salud (sin auth) — para probes / nginx.
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "pixs-api" })
+})
+
+// Spec OpenAPI (sin auth) — para conectores/herramientas que descubren la API.
+app.get(["/api/openapi.json", "/api/swagger.json", "/api/api-docs"], (_req, res) => {
+  res.json(openapiSpec)
 })
 
 // Login (sin auth).

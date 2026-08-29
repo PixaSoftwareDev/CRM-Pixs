@@ -47,3 +47,6 @@ demo.sqlite-*
 
 # Documentos subidos (binarios en filesystem)
 storage/
+
+# Backups de la base de producción bajados del VPS (datos reales, no van al repo)
+vps-backups/

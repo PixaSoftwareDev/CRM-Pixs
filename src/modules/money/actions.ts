@@ -1,6 +1,6 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
@@ -43,6 +43,7 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
       descripcion: parsed.data.descripcion,
     })
     .returning({ id: budgets.id })
+  if (!budget) throw new Error("No se pudo crear el presupuesto")
 
   // Reparte en cuotas mensuales iguales (la última absorbe el redondeo).
   const base = Math.floor((montoTotal / cuotas) * 100) / 100
@@ -52,7 +53,7 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
     vence.setMonth(vence.getMonth() + i)
     const monto = i === cuotas - 1 ? montoTotal - base * (cuotas - 1) : base
     return {
-      budgetId: budget!.id,
+      budgetId: budget.id,
       monto: monto.toFixed(2),
       venceAt: vence.toISOString().slice(0, 10),
     }
@@ -202,6 +203,28 @@ export async function toggleReintegro(id: string, devuelto: boolean): Promise<Fo
     .set({ reintegrado: devuelto, reintegradoAt: devuelto ? new Date() : null })
     .where(eq(transactions.id, id))
   await audit({ userId: user.id, accion: "update", entityType: "transaction", entityId: id })
+  revalidatePath("/finanzas")
+  return { ok: true }
+}
+
+/**
+ * Devuelve de una vez todo lo que se le debe a una persona: marca reintegrados
+ * todos sus gastos pendientes. Es el botón "Pagado" de la columna "Falta pagar".
+ */
+export async function reintegrarTodo(userId: string): Promise<FormState> {
+  const user = await requireUser()
+  if (!z.string().uuid().safeParse(userId).success) return { error: "Usuario inválido" }
+  await db
+    .update(transactions)
+    .set({ reintegrado: true, reintegradoAt: new Date() })
+    .where(
+      and(
+        eq(transactions.tipo, "gasto"),
+        eq(transactions.realizadoPor, userId),
+        eq(transactions.reintegrado, false),
+      ),
+    )
+  await audit({ userId: user.id, accion: "update", entityType: "transaction", entityId: userId })
   revalidatePath("/finanzas")
   return { ok: true }
 }
