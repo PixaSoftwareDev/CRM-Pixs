@@ -13,10 +13,12 @@ import {
   Field,
   Input,
   PageHeader,
+  SearchInput,
   Select,
   Textarea,
 } from "@/components/ui"
-import { CREDENTIAL_TYPES, type CredentialType } from "@/db/schema"
+import { ColorSelect } from "@/components/ui/ColorSelect"
+
 import { cn } from "@/lib/utils"
 import {
   createCredential,
@@ -25,11 +27,11 @@ import {
   updateCredential,
 } from "@/modules/credentials/actions"
 import type { CredentialRow, ProjectOption } from "@/modules/credentials/queries"
-import { CREDENTIAL_TYPE_LABELS, CREDENTIAL_TYPE_TONE } from "@/modules/credentials/shared"
+import { etiquetaDeTipo, TIPOS_SUGERIDOS, tonoDeTipo } from "@/modules/credentials/shared"
 
 type Form = {
   titulo: string
-  tipo: CredentialType
+  tipo: string
   usuario: string
   secreto: string
   url: string
@@ -69,6 +71,16 @@ export function AccesosClient({
   const [, startDelete] = useTransition()
 
   useEffect(() => setItems(initial), [initial])
+
+  // Tipos realmente cargados: alimentan el filtro y las sugerencias.
+  const tiposUsados = useMemo(
+    () => [...new Set(items.map((c) => c.tipo).filter(Boolean))].sort(),
+    [items],
+  )
+  const sugerencias = useMemo(
+    () => [...new Set([...tiposUsados, ...TIPOS_SUGERIDOS])],
+    [tiposUsados],
+  )
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
@@ -168,38 +180,29 @@ export function AccesosClient({
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por título, usuario, URL…"
-          className="h-9 max-w-xs flex-1"
-        />
+        <SearchInput value={q} onChange={setQ} />
         {proyectos.length > 0 ? (
-          <Select
-            className="w-auto min-w-44"
+          <ColorSelect
+            className="w-52"
             value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-          >
-            <option value="">Todos los proyectos</option>
-            {proyectos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </Select>
+            onChange={setProjectFilter}
+            ariaLabel="Proyecto"
+            options={[
+              { value: "", label: "Todos los proyectos" },
+              ...proyectos.map((p) => ({ value: p.id, label: p.nombre })),
+            ]}
+          />
         ) : null}
-        <Select
-          className="w-auto min-w-36"
+        <ColorSelect
+          className="w-44"
           value={tipoFilter}
-          onChange={(e) => setTipoFilter(e.target.value)}
-        >
-          <option value="">Todos los tipos</option>
-          {CREDENTIAL_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {CREDENTIAL_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </Select>
+          onChange={setTipoFilter}
+          ariaLabel="Tipo"
+          options={[
+            { value: "", label: "Todos los tipos" },
+            ...tiposUsados.map((t) => ({ value: t, label: etiquetaDeTipo(t) })),
+          ]}
+        />
         <span className="ml-auto text-sm text-zinc-500">
           {filtered.length} {filtered.length === 1 ? "acceso" : "accesos"}
         </span>
@@ -255,20 +258,24 @@ export function AccesosClient({
                   autoFocus
                   value={form.titulo}
                   onChange={(e) => setField("titulo", e.target.value)}
-                  placeholder="VPS Hetzner, Panel de Vercel…"
+                  placeholder="Nombre"
                 />
               </Field>
               <Field label="Tipo">
-                <Select
+                {/* Texto libre con sugerencias de lo ya usado: evita que el
+                    mismo tipo termine escrito de cinco formas distintas. */}
+                <Input
+                  list="tipos-de-acceso"
                   value={form.tipo}
-                  onChange={(e) => setField("tipo", e.target.value as CredentialType)}
-                >
-                  {CREDENTIAL_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {CREDENTIAL_TYPE_LABELS[t]}
-                    </option>
+                  onChange={(e) => setField("tipo", e.target.value)}
+                  placeholder="Tipo"
+                  maxLength={60}
+                />
+                <datalist id="tipos-de-acceso">
+                  {sugerencias.map((t) => (
+                    <option key={t} value={t} />
                   ))}
-                </Select>
+                </datalist>
               </Field>
               <Field label="Usuario / email">
                 <Input
@@ -306,7 +313,7 @@ export function AccesosClient({
                 <Input
                   value={form.url}
                   onChange={(e) => setField("url", e.target.value)}
-                  placeholder="https://…"
+                  placeholder="https://"
                   autoComplete="off"
                 />
               </Field>
@@ -329,7 +336,7 @@ export function AccesosClient({
                 rows={2}
                 value={form.notas}
                 onChange={(e) => setField("notas", e.target.value)}
-                placeholder="Detalles, 2FA, contacto de soporte…"
+                placeholder="Notas"
               />
             </Field>
             {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
@@ -417,7 +424,7 @@ function CredentialRowItem({
       )}
     >
       <td className={TD}>
-        <Badge tone={CREDENTIAL_TYPE_TONE[cred.tipo]}>{CREDENTIAL_TYPE_LABELS[cred.tipo]}</Badge>
+        <Badge tone={tonoDeTipo(cred.tipo)}>{etiquetaDeTipo(cred.tipo)}</Badge>
       </td>
       <td className={TD}>
         <div className="truncate font-medium" title={cred.titulo}>

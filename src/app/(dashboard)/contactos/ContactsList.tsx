@@ -5,7 +5,6 @@ import type { Contact } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
 import type { ContactSort, SortDir } from "@/modules/contacts/queries"
 import { ContactActions } from "./ContactActions"
-import { Avatar } from "./contact-ui"
 
 // Clases compartidas de celda, para no repetirlas columna por columna.
 const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
@@ -94,10 +93,9 @@ export function ContactsList({ contactos, q, sort, dir }: Props) {
                     cualquier parte, sin anidar enlaces dentro de la tabla. */}
                 <Link
                   href={`/contactos/${c.id}`}
-                  className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0"
+                  className="block truncate font-medium after:absolute after:inset-0"
                 >
-                  <Avatar nombre={c.nombre} size="sm" />
-                  <span className="truncate font-medium">{c.nombre}</span>
+                  {c.nombre}
                 </Link>
               </td>
               <td className={cn(TD, "hidden sm:table-cell")}>

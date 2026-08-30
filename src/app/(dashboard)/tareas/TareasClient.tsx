@@ -24,9 +24,11 @@ import {
   Input,
   PageHeader,
   Select,
+  Tab,
+  Tabs,
   Textarea,
 } from "@/components/ui"
-import { ViewToggle } from "@/components/ViewToggle"
+import { ColorSelect } from "@/components/ui/ColorSelect"
 import { TASK_COLORS, TASK_COLUMNS, type TaskColor, type TaskColumn } from "@/db/schema"
 import { cn, formatDate } from "@/lib/utils"
 import { createTaskFromBoard, deleteTask, setTaskStatus, updateTask } from "@/modules/tasks/actions"
@@ -40,6 +42,10 @@ const STATUS_LABELS: Record<TaskColumn, string> = {
   revision: "Revisión",
   hecho: "Hecho",
 }
+
+// Clases compartidas de celda, para no repetirlas columna por columna.
+const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
+const TD = "px-4 py-2.5 align-middle"
 
 type View = "tablero" | "lista"
 
@@ -90,6 +96,7 @@ export function TareasClient({
   const [view, setView] = useState<View>("tablero")
   const [projectFilter, setProjectFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
+  const [responsableFilter, setResponsableFilter] = useState<string>("")
   const [, startTransition] = useTransition()
 
   // Alta / edición de tarea desde esta pestaña.
@@ -108,13 +115,15 @@ export function TareasClient({
       items.filter(
         (t) =>
           (!projectFilter || t.projectId === projectFilter) &&
-          (!statusFilter || t.estado === statusFilter),
+          (!statusFilter || t.estado === statusFilter) &&
+          // "sin" = tareas que no tiene nadie asignado.
+          (!responsableFilter ||
+            (responsableFilter === "sin"
+              ? parseAsignados(t.asignados).length === 0
+              : parseAsignados(t.asignados).includes(responsableFilter))),
       ),
-    [items, projectFilter, statusFilter],
+    [items, projectFilter, statusFilter, responsableFilter],
   )
-
-  const pendientes = filtered.filter((t) => t.estado !== "hecho").length
-  const hechas = filtered.length - pendientes
 
   // Cambia el estado con actualización optimista; revierte si el server falla.
   function changeStatus(id: string, estado: TaskColumn) {
@@ -265,47 +274,58 @@ export function TareasClient({
         </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <ViewToggle
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "tablero", label: "Tablero", icon: <BoardIcon /> },
-            { value: "lista", label: "Lista", icon: <ListIcon /> },
-          ]}
-        />
+      {/* Vista y filtros en la misma línea: las pestañas a la izquierda, los
+          controles a la derecha. */}
+      <Tabs
+        className="mb-4"
+        acciones={
+          <>
+            <ColorSelect
+              className="w-60"
+              value={projectFilter}
+              onChange={setProjectFilter}
+              ariaLabel="Proyecto"
+              options={[
+                { value: "", label: "Todos los proyectos" },
+                ...proyectos.map((p) => ({ value: p.id, label: p.nombre })),
+              ]}
+            />
 
-        <Select
-          className="w-auto min-w-44"
-          value={projectFilter}
-          onChange={(e) => setProjectFilter(e.target.value)}
-        >
-          <option value="">Todos los proyectos</option>
-          {proyectos.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </Select>
+            <ColorSelect
+              className="w-44"
+              value={responsableFilter}
+              onChange={setResponsableFilter}
+              ariaLabel="Responsable"
+              options={[
+                { value: "", label: "Responsable" },
+                { value: "sin", label: "Sin asignar" },
+                ...usuarios.map((u) => ({ value: u.id, label: u.nombre })),
+              ]}
+            />
 
-        <Select
-          className="w-auto min-w-40"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Todos los estados</option>
-          {TASK_COLUMNS.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </Select>
-
-        <span className="ml-auto text-sm text-zinc-500">
-          {pendientes} pendiente{pendientes === 1 ? "" : "s"} · {hechas} hecha
-          {hechas === 1 ? "" : "s"}
-        </span>
-      </div>
+            {/* El estado solo se filtra en Lista: en el tablero las columnas ya son los estados. */}
+            {view === "lista" ? (
+              <ColorSelect
+                className="w-40"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                ariaLabel="Estado"
+                options={[
+                  { value: "", label: "Todos los estados" },
+                  ...TASK_COLUMNS.map((e) => ({ value: e as string, label: STATUS_LABELS[e] })),
+                ]}
+              />
+            ) : null}
+          </>
+        }
+      >
+        <Tab activa={view === "tablero"} onClick={() => setView("tablero")}>
+          <BoardIcon /> Tablero
+        </Tab>
+        <Tab activa={view === "lista"} onClick={() => setView("lista")}>
+          <ListIcon /> Lista
+        </Tab>
+      </Tabs>
 
       {showForm ? (
         <Modal
@@ -318,7 +338,7 @@ export function TareasClient({
             <Field label="Título">
               <Input
                 autoFocus
-                placeholder="¿Qué hay que hacer?"
+                placeholder="Título"
                 value={form.titulo}
                 onChange={(e) => setField("titulo", e.target.value)}
               />
@@ -338,36 +358,23 @@ export function TareasClient({
                 </Select>
               </Field>
 
-              <div className="space-y-1.5">
-                <span className="text-sm font-medium">Responsables</span>
-                <div className="flex flex-wrap gap-2 pt-0.5">
-                  {usuarios.map((u) => {
-                    const on = form.asignados.includes(u.id)
-                    return (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() =>
-                          setField(
-                            "asignados",
-                            on
-                              ? form.asignados.filter((x) => x !== u.id)
-                              : [...form.asignados, u.id],
-                          )
-                        }
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-sm transition-colors",
-                          on
-                            ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900"
-                            : "border-black/[.12] text-zinc-600 hover:border-zinc-400 dark:border-white/[.18] dark:text-zinc-300",
-                        )}
-                      >
-                        {u.nombre}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              <Field label="Responsable">
+                {/* Un solo responsable por tarea. El campo guarda una lista
+                    (por si algún día hacen falta varios), pero acá se elige uno. */}
+                <Select
+                  value={form.asignados[0] ?? ""}
+                  onChange={(e) =>
+                    setField("asignados", e.target.value === "" ? [] : [e.target.value])
+                  }
+                >
+                  <option value="">Sin asignar</option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
               <Field label="Estado">
                 <Select
@@ -394,7 +401,7 @@ export function TareasClient({
             <Field label="Descripción">
               <Textarea
                 rows={2}
-                placeholder="Detalles, contexto, links…"
+                placeholder="Notas"
                 value={form.descripcion}
                 onChange={(e) => setField("descripcion", e.target.value)}
               />
@@ -409,41 +416,23 @@ export function TareasClient({
                 />
               </Field>
 
-              <div className="space-y-1.5">
-                <span className="text-sm font-medium">Color</span>
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setField("color", null)}
-                    aria-label="Sin color"
-                    title="Sin color"
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-full border text-zinc-400 transition-transform hover:scale-110",
-                      form.color === null
-                        ? "border-zinc-900 ring-2 ring-zinc-900/20 dark:border-white dark:ring-white/20"
-                        : "border-black/[.12] dark:border-white/[.18]",
-                    )}
-                  >
-                    <span className="h-3.5 w-px rotate-45 bg-current" />
-                  </button>
-                  {TASK_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setField("color", c)}
-                      aria-label={TASK_COLOR_STYLES[c].label}
-                      title={TASK_COLOR_STYLES[c].label}
-                      className={cn(
-                        "h-7 w-7 rounded-full transition-transform hover:scale-110",
-                        TASK_COLOR_STYLES[c].swatch,
-                        form.color === c
-                          ? "ring-2 ring-offset-2 ring-zinc-900 ring-offset-white dark:ring-white dark:ring-offset-zinc-950"
-                          : "",
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
+              <Field label="Prioridad">
+                {/* Desplegable en vez de botones: entra en una línea y queda a
+                    la par del campo de fecha. */}
+                <ColorSelect
+                  value={form.color ?? ""}
+                  onChange={(v) => setField("color", v === "" ? null : (v as TaskColor))}
+                  ariaLabel="Prioridad"
+                  options={[
+                    { value: "", label: "Sin prioridad", dot: "bg-zinc-300 dark:bg-zinc-600" },
+                    ...TASK_COLORS.map((c) => ({
+                      value: c as string,
+                      label: TASK_COLOR_STYLES[c].label,
+                      dot: TASK_COLOR_STYLES[c].swatch,
+                    })),
+                  ]}
+                />
+              </Field>
             </div>
 
             {newError ? <p className="text-sm text-red-600">{newError}</p> : null}
@@ -616,9 +605,6 @@ function BoardColumn({
 function BoardCardBody({ task, nombres }: { task: GlobalTaskRow; nombres: Map<string, string> }) {
   return (
     <>
-      {task.color ? (
-        <div className={cn("mb-2 h-1.5 w-10 rounded-full", TASK_COLOR_STYLES[task.color].bar)} />
-      ) : null}
       <div className="pr-6 font-medium leading-snug">{task.titulo}</div>
       {task.descripcion ? (
         <div className="mt-1 line-clamp-2 text-xs text-zinc-500">{task.descripcion}</div>
@@ -660,6 +646,8 @@ function BoardCard({
       className={cn(
         "group relative cursor-grab hover:shadow-md",
         KANBAN_CARD,
+        // Tinte suave según la prioridad: se lee de un vistazo sin gritar.
+        task.color && TASK_COLOR_STYLES[task.color].card,
         isDragging && "opacity-40",
       )}
       {...listeners}
@@ -680,6 +668,18 @@ function isOverdue(task: GlobalTaskRow) {
 
 // ---------- Lista (tabla) ----------
 
+type TaskSort = "titulo" | "proyectoNombre" | "estado" | "responsable" | "createdAt" | "venceAt"
+
+const COLUMNAS: { key: TaskSort; label: string; oculta?: string }[] = [
+  { key: "titulo", label: "Tarea" },
+  { key: "proyectoNombre", label: "Proyecto", oculta: "hidden md:table-cell" },
+  { key: "estado", label: "Estado" },
+  { key: "responsable", label: "Responsable", oculta: "hidden lg:table-cell" },
+  { key: "createdAt", label: "Apertura", oculta: "hidden xl:table-cell" },
+  { key: "venceAt", label: "Vence", oculta: "hidden sm:table-cell" },
+]
+
+/** Misma tabla que el resto de la app: encabezados que ordenan al tocarlos. */
 function List({
   items,
   usuarios,
@@ -692,28 +692,81 @@ function List({
   onChange: (id: string, estado: TaskColumn) => void
 } & RowActions) {
   const nombres = useMemo(() => usuariosMap(usuarios), [usuarios])
+  const [sort, setSort] = useState<TaskSort>("createdAt")
+  const [dir, setDir] = useState<"asc" | "desc">("desc")
+
+  function ordenarPor(key: TaskSort) {
+    if (key === sort) {
+      setDir(dir === "asc" ? "desc" : "asc")
+    } else {
+      setSort(key)
+      setDir("asc")
+    }
+  }
+
+  const ordenados = useMemo(() => {
+    const signo = dir === "asc" ? 1 : -1
+    const fecha = (d: Date | string | null | undefined) => (d ? new Date(d).getTime() : 0)
+    return [...items].sort((a, b) => {
+      if (sort === "createdAt") return (fecha(a.createdAt) - fecha(b.createdAt)) * signo
+      if (sort === "venceAt") return (fecha(a.venceAt) - fecha(b.venceAt)) * signo
+      if (sort === "responsable") {
+        const na = asignadoNombres(a.asignados, nombres).join(", ")
+        const nb = asignadoNombres(b.asignados, nombres).join(", ")
+        return na.localeCompare(nb) * signo
+      }
+      return String(a[sort] ?? "").localeCompare(String(b[sort] ?? "")) * signo
+    })
+  }, [items, sort, dir, nombres])
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
-      <table className="w-full min-w-[720px] text-sm">
+    <div className="rounded-xl border border-black/[.08] dark:border-white/[.12]">
+      <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-black/[.08] text-left text-xs text-zinc-500 dark:border-white/[.12]">
-            <th className="px-4 py-2 font-medium">Tarea</th>
-            <th className="px-4 py-2 font-medium">Proyecto</th>
-            <th className="px-4 py-2 font-medium">Estado</th>
-            <th className="px-4 py-2 font-medium">Responsable</th>
-            <th className="px-4 py-2 font-medium">Apertura</th>
-            <th className="px-4 py-2 font-medium">Vence</th>
-            <th className="px-4 py-2 font-medium">Cierre</th>
-            <th className="w-10 px-2 py-2" />
+          <tr className="border-b border-black/[.08] bg-zinc-50 text-left dark:border-white/[.12] dark:bg-zinc-900">
+            {COLUMNAS.map((col) => {
+              const activa = sort === col.key
+              return (
+                <th
+                  key={col.key}
+                  scope="col"
+                  aria-sort={activa ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                  className={cn(TH, col.oculta)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => ordenarPor(col.key)}
+                    className={cn(
+                      "inline-flex items-center gap-1 whitespace-nowrap uppercase transition-colors hover:text-zinc-900 dark:hover:text-zinc-100",
+                      activa && "text-zinc-900 dark:text-zinc-100",
+                    )}
+                  >
+                    {col.label}
+                    <span
+                      aria-hidden="true"
+                      className={cn("text-[0.6rem]", !activa && "opacity-0")}
+                    >
+                      {dir === "asc" ? "▲" : "▼"}
+                    </span>
+                  </button>
+                </th>
+              )
+            })}
+            <th className={cn(TH, "w-10")}>
+              <span className="sr-only">Acciones</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {items.map((t) => (
+          {ordenados.map((t, i) => (
             <tr
               key={t.id}
-              className="border-b border-black/[.05] last:border-0 dark:border-white/[.08]"
+              className={cn(
+                "bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
+                i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
+              )}
             >
-              <td className="px-4 py-2 font-medium">
+              <td className={TD}>
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
@@ -721,36 +774,35 @@ function List({
                       t.color ? TASK_COLOR_STYLES[t.color].bar : "bg-transparent",
                     )}
                   />
-                  {t.titulo}
+                  <span className="truncate font-medium">{t.titulo}</span>
                 </div>
               </td>
-              <td className="px-4 py-2 text-zinc-500">{t.proyectoNombre}</td>
-              <td className="px-4 py-2">
-                <Select
-                  className="h-8 w-auto min-w-32 text-xs"
+              <td className={cn(TD, "hidden text-zinc-500 md:table-cell")}>{t.proyectoNombre}</td>
+              <td className={TD}>
+                <ColorSelect
+                  className="w-32"
                   value={t.estado}
-                  onChange={(e) => onChange(t.id, e.target.value as TaskColumn)}
-                >
-                  {TASK_COLUMNS.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(v) => onChange(t.id, v as TaskColumn)}
+                  ariaLabel="Estado"
+                  options={TASK_COLUMNS.map((e) => ({ value: e, label: STATUS_LABELS[e] }))}
+                />
               </td>
-              <td className="px-4 py-2 text-zinc-500">
+              <td className={cn(TD, "hidden text-zinc-500 lg:table-cell")}>
                 {asignadoNombres(t.asignados, nombres).join(", ") || "—"}
               </td>
-              <td className="px-4 py-2 text-zinc-400">{formatDate(t.createdAt)}</td>
-              <td className="px-4 py-2 text-zinc-400">{formatDate(t.venceAt)}</td>
-              <td className="px-4 py-2">
+              <td
+                className={cn(TD, "hidden whitespace-nowrap text-xs text-zinc-400 xl:table-cell")}
+              >
+                {formatDate(t.createdAt)}
+              </td>
+              <td className={cn(TD, "hidden whitespace-nowrap text-xs sm:table-cell")}>
                 {t.cerradoAt ? (
-                  <Badge tone="green">{formatDate(t.cerradoAt)}</Badge>
+                  <Badge tone="green">hecha</Badge>
                 ) : (
-                  <span className="text-zinc-400">—</span>
+                  <span className="text-zinc-400">{formatDate(t.venceAt) || "—"}</span>
                 )}
               </td>
-              <td className="px-2 py-2 text-right">
+              <td className={cn(TD, "text-right")}>
                 <KebabMenu onEdit={() => onEdit(t)} onDelete={() => onDelete(t)} />
               </td>
             </tr>

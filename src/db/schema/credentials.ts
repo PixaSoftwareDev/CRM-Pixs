@@ -6,8 +6,11 @@ import { projects } from "./projects"
  * levantado. El secreto se guarda CIFRADO (libsodium, src/lib/crypto.ts), nunca
  * en texto plano, y nunca viaja al cliente salvo en un "mostrar" puntual (§4.1).
  */
-export const CREDENTIAL_TYPES = ["servidor", "base", "servicio", "web", "email", "otro"] as const
-export type CredentialType = (typeof CREDENTIAL_TYPES)[number]
+/**
+ * El tipo es texto libre (se guarda normalizado en minúsculas). Antes era una
+ * lista cerrada que no cubría los casos reales.
+ */
+export type CredentialType = string
 
 export const credentials = sqliteTable(
   "credentials",

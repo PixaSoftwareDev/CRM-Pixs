@@ -67,3 +67,11 @@ body {
     animation: none;
   }
 }
+
+/* Los campos con sugerencias (datalist) muestran una flecha del navegador que
+   los hace parecer un desplegable. Acá se escribe libremente y las sugerencias
+   aparecen solas, así que la flecha confunde más de lo que ayuda.
+   Va acotado a `input[list]` para no tocar los selectores de fecha. */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}

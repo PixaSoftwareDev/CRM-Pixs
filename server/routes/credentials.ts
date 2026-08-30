@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm"
 import { Router } from "express"
 import { z } from "zod"
 import { db } from "@/db"
-import { CREDENTIAL_TYPES, type CredentialType, credentials } from "@/db/schema"
+import { type CredentialType, credentials } from "@/db/schema"
 import { listCredentials } from "@/modules/credentials/queries"
 import { audit } from "../lib/audit"
 import { decryptSecret, encryptSecret } from "../lib/crypto"
@@ -23,7 +23,12 @@ credentialsRouter.get(
 
 const baseSchema = z.object({
   titulo: z.string().min(1, "El título es obligatorio").max(200),
-  tipo: z.enum(CREDENTIAL_TYPES),
+  // Texto libre, normalizado (ver src/modules/credentials/shared.ts).
+  tipo: z
+    .string()
+    .min(1)
+    .max(60)
+    .transform((v) => v.trim().toLowerCase()),
   usuario: z.string().max(200).optional(),
   secreto: z.string().max(2000).optional(),
   url: z.string().max(500).optional(),

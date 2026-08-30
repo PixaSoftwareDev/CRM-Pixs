@@ -33,7 +33,7 @@ export default async function ContactosPage({
           <input
             name="q"
             defaultValue={q}
-            placeholder="Buscar por nombre, contacto o email…"
+            placeholder="Buscar…"
             className="h-9 w-full max-w-sm min-w-[16rem] rounded-md border border-zinc-300 bg-transparent px-3 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
           />
         </form>

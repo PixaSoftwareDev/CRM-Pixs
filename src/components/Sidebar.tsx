@@ -12,6 +12,7 @@ import {
   KeyIcon,
   LogoutIcon,
   MenuIcon,
+  PulseIcon,
   ServerIcon,
   UsersIcon,
   WalletIcon,
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/proyectos", label: "Proyectos", Icon: FolderIcon },
   { href: "/tareas", label: "Tareas", Icon: CheckSquareIcon },
   { href: "/infra", label: "Infra", Icon: ServerIcon },
+  { href: "/monitoreo", label: "Monitoreo", Icon: PulseIcon },
   { href: "/accesos", label: "Accesos", Icon: KeyIcon },
   { href: "/finanzas", label: "Finanzas", Icon: WalletIcon },
 ]

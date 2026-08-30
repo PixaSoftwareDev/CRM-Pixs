@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Pixs CRM",
-  description: "CRM interno de Pixs",
+  title: "CRM",
+  description: "CRM interno",
 }
 
 // Setea la clase .dark antes del primer paint para evitar el flash (FOUC).

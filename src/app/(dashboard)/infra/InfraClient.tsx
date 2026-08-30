@@ -1,171 +1,141 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Badge, EmptyState, Input, PageHeader } from "@/components/ui"
+import { Badge, EmptyState, PageHeader, SearchInput } from "@/components/ui"
 import { cn } from "@/lib/utils"
-import type { DatabaseRow, ServerRow } from "@/modules/infra/queries"
-import { NewDatabaseForm, NewServerForm } from "./InfraForms"
+import type { ServerRow } from "@/modules/infra/queries"
+import { NewServerForm } from "./InfraForms"
 
 // Clases compartidas de celda, para no repetirlas columna por columna.
 const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
 const TD = "px-4 py-2.5 align-middle"
 
 const ESTADO_TONE = { activo: "green", baja: "neutral", caido: "red" } as const
-const ENTORNO_LABEL: Record<string, string> = { prod: "Producción", staging: "Staging", dev: "Dev" }
 
-type Filtro = "todo" | "servidor" | "base"
+type Sort = "nombre" | "proveedor" | "ipHostname" | "estado"
 
-/**
- * Una sola fila, sea servidor o base: el inventario se lee de corrido y el tipo
- * es una columna más. Antes eran dos listas separadas, y en la práctica todo
- * vive en el mismo lugar.
- */
-type Item = {
-  id: string
-  tipo: "servidor" | "base"
-  nombre: string
-  /** Dónde se conecta: IP del servidor o host:puerto de la base. */
-  donde: string
-  /** Proveedor y sistema, o motor y entorno. */
-  detalle: string
-  estado: string
-  tone: "green" | "neutral" | "red" | "blue"
-}
+const COLUMNAS: { key: Sort; label: string; oculta?: string }[] = [
+  { key: "nombre", label: "Servidor" },
+  { key: "proveedor", label: "Proveedor", oculta: "hidden sm:table-cell" },
+  { key: "ipHostname", label: "IP / Host", oculta: "hidden lg:table-cell" },
+  { key: "estado", label: "Estado" },
+]
 
-export function InfraClient({
-  servers,
-  databases,
-}: {
-  servers: ServerRow[]
-  databases: DatabaseRow[]
-}) {
+/** Inventario de servidores, con la misma tabla y controles que el resto de la app. */
+export function InfraClient({ servers }: { servers: ServerRow[] }) {
   const [q, setQ] = useState("")
-  const [filtro, setFiltro] = useState<Filtro>("todo")
+  const [sort, setSort] = useState<Sort>("nombre")
+  const [dir, setDir] = useState<"asc" | "desc">("asc")
 
-  const items = useMemo<Item[]>(() => {
-    const deServidores: Item[] = servers.map((s) => ({
-      id: s.id,
-      tipo: "servidor",
-      nombre: s.nombre,
-      donde: s.ipHostname ?? "—",
-      detalle: [s.proveedor, s.os].filter(Boolean).join(" · ") || "—",
-      estado: s.estado,
-      tone: ESTADO_TONE[s.estado as keyof typeof ESTADO_TONE] ?? "neutral",
-    }))
-
-    const deBases: Item[] = databases.map((d) => ({
-      id: d.id,
-      tipo: "base",
-      nombre: d.nombre,
-      donde: [d.host, d.puerto].filter(Boolean).join(":") || "—",
-      detalle: [d.motor, ENTORNO_LABEL[d.entorno] ?? d.entorno].filter(Boolean).join(" · "),
-      estado: d.motor,
-      tone: "blue",
-    }))
-
-    return [...deServidores, ...deBases]
-  }, [servers, databases])
+  function ordenarPor(key: Sort) {
+    if (key === sort) {
+      setDir(dir === "asc" ? "desc" : "asc")
+    } else {
+      setSort(key)
+      setDir("asc")
+    }
+  }
 
   const filtrados = useMemo(() => {
     const term = q.trim().toLowerCase()
-    return items.filter((i) => {
-      if (filtro !== "todo" && i.tipo !== filtro) return false
+    const base = servers.filter((s) => {
       if (!term) return true
-      return `${i.nombre} ${i.donde} ${i.detalle}`.toLowerCase().includes(term)
+      return [s.nombre, s.proveedor, s.ipHostname, s.os, s.descripcion]
+        .filter(Boolean)
+        .some((f) => f?.toLowerCase().includes(term))
     })
-  }, [items, filtro, q])
-
-  const cuenta = (t: Filtro) =>
-    t === "todo" ? items.length : items.filter((i) => i.tipo === t).length
+    const signo = dir === "asc" ? 1 : -1
+    return [...base].sort(
+      (a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? "")) * signo,
+    )
+  }, [servers, q, sort, dir])
 
   return (
     <div>
-      {/* Misma cabecera que Clientes y Proyectos: título, bajada y las acciones
-          principales arriba a la derecha. */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <PageHeader
-          title="Infraestructura"
-          subtitle="Dónde vive todo: los servidores y las bases de datos que corren en ellos"
-        />
-        <div className="flex items-center gap-2">
-          <NewServerForm />
-          <NewDatabaseForm servers={servers.map((s) => ({ id: s.id, nombre: s.nombre }))} />
-        </div>
+        <PageHeader title="Infraestructura" subtitle="Los servidores donde corre todo" />
+        <NewServerForm />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {/* Filtro por tipo: todo / servidores / bases */}
-        <div className="inline-flex rounded-lg border border-black/[.08] p-0.5 dark:border-white/[.12]">
-          {(
-            [
-              ["todo", "Todo"],
-              ["servidor", "Servidores"],
-              ["base", "Bases"],
-            ] as const
-          ).map(([valor, label]) => (
-            <button
-              key={valor}
-              type="button"
-              onClick={() => setFiltro(valor)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                filtro === valor
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                  : "text-zinc-600 hover:bg-black/[.04] dark:text-zinc-300 dark:hover:bg-white/[.06]",
-              )}
-            >
-              {label} <span className="opacity-60">{cuenta(valor)}</span>
-            </button>
-          ))}
-        </div>
-
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre, host o proveedor…"
-          className="h-9 max-w-xs flex-1"
-        />
+        <SearchInput value={q} onChange={setQ} />
+        <span className="ml-auto text-sm text-zinc-500">
+          {filtrados.length} {filtrados.length === 1 ? "servidor" : "servidores"}
+        </span>
       </div>
 
       {filtrados.length === 0 ? (
         <EmptyState>
-          {items.length === 0
-            ? "Todavía no cargaste nada. Sumá tu primer servidor."
-            : "Nada coincide con la búsqueda."}
+          {servers.length === 0
+            ? "Todavía no cargaste servidores. Sumá el primero."
+            : "Ningún servidor coincide con la búsqueda."}
         </EmptyState>
       ) : (
         <div className="animate-slide-up overflow-x-auto rounded-xl border border-black/[.08] dark:border-white/[.12]">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-black/[.08] bg-zinc-50 text-left dark:border-white/[.12] dark:bg-zinc-900">
-                <th className={TH}>Nombre</th>
-                <th className={TH}>Tipo</th>
-                <th className={cn(TH, "hidden lg:table-cell")}>Dirección</th>
-                <th className={cn(TH, "hidden sm:table-cell")}>Detalle</th>
-                <th className={TH}>Estado</th>
+                {COLUMNAS.map((col) => {
+                  const activa = sort === col.key
+                  return (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      aria-sort={activa ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                      className={cn(TH, col.oculta)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => ordenarPor(col.key)}
+                        className={cn(
+                          "inline-flex items-center gap-1 whitespace-nowrap uppercase transition-colors hover:text-zinc-900 dark:hover:text-zinc-100",
+                          activa && "text-zinc-900 dark:text-zinc-100",
+                        )}
+                      >
+                        {col.label}
+                        <span
+                          aria-hidden="true"
+                          className={cn("text-[0.6rem]", !activa && "opacity-0")}
+                        >
+                          {dir === "asc" ? "▲" : "▼"}
+                        </span>
+                      </button>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
-              {filtrados.map((i, idx) => (
+              {filtrados.map((s, i) => (
                 <tr
-                  key={`${i.tipo}-${i.id}`}
+                  key={s.id}
                   className={cn(
-                    "bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
-                    idx > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
+                    "relative bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800/50",
+                    i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
                   )}
                 >
-                  <td className={cn(TD, "font-medium")}>{i.nombre}</td>
                   <td className={TD}>
-                    <Badge tone={i.tipo === "servidor" ? "neutral" : "violet"}>
-                      {i.tipo === "servidor" ? "Servidor" : "Base"}
-                    </Badge>
+                    {/* El seudoelemento cubre la fila entera: se puede hacer clic
+                        en cualquier parte para ver el detalle. */}
+                    <Link
+                      href={`/infra/${s.id}`}
+                      className="block truncate font-medium after:absolute after:inset-0"
+                    >
+                      {s.nombre}
+                    </Link>
+                    {s.os ? <div className="truncate text-xs text-zinc-400">{s.os}</div> : null}
+                  </td>
+                  <td className={cn(TD, "hidden text-zinc-500 sm:table-cell")}>
+                    {s.proveedor || "—"}
                   </td>
                   <td className={cn(TD, "hidden font-mono text-xs text-zinc-500 lg:table-cell")}>
-                    {i.donde}
+                    {s.ipHostname || "—"}
                   </td>
-                  <td className={cn(TD, "hidden text-zinc-500 sm:table-cell")}>{i.detalle}</td>
                   <td className={TD}>
-                    <Badge tone={i.tone}>{i.estado}</Badge>
+                    <Badge tone={ESTADO_TONE[s.estado as keyof typeof ESTADO_TONE] ?? "neutral"}>
+                      {s.estado}
+                    </Badge>
                   </td>
                 </tr>
               ))}

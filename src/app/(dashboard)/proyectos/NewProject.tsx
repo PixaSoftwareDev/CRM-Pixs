@@ -47,7 +47,7 @@ export function NewProject({ contactos }: { contactos: Contacto[] }) {
             </Field>
 
             <Field label="Nombre del proyecto">
-              <Input name="nombre" required maxLength={200} placeholder="Ej: Sitio web" />
+              <Input name="nombre" required maxLength={200} placeholder="Nombre" />
             </Field>
 
             <div className="grid gap-4 sm:grid-cols-2">

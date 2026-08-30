@@ -126,13 +126,13 @@ export function ContactPeople({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nombre">
-              <Input name="nombre" autoFocus placeholder="Juan Pérez" autoComplete="off" />
+              <Input name="nombre" autoFocus placeholder="Nombre" autoComplete="off" />
             </Field>
             <Field label="Puesto">
-              <Input name="puesto" placeholder="Encargado de pagos" autoComplete="off" />
+              <Input name="puesto" placeholder="Rol" autoComplete="off" />
             </Field>
             <Field label="Correo">
-              <Input name="email" type="email" placeholder="juan@empresa.com" autoComplete="off" />
+              <Input name="email" type="email" placeholder="Email" autoComplete="off" />
             </Field>
             <Field label="Teléfono">
               <Input name="telefono" placeholder="+54 11 …" autoComplete="off" />

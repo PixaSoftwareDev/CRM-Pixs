@@ -5,8 +5,12 @@ import { projects } from "./projects"
 export const TASK_COLUMNS = ["backlog", "en_curso", "revision", "hecho"] as const
 export type TaskColumn = (typeof TASK_COLUMNS)[number]
 
-/** Colores opcionales de etiqueta de una tarea (estilo Trello). */
-export const TASK_COLORS = ["red", "amber", "green", "blue", "violet", "pink"] as const
+/**
+ * Prioridad de una tarea, en código de semáforo. Antes eran seis colores
+ * decorativos sin significado; ahora el color dice cuánto corre.
+ * La columna sigue llamándose `color` por compatibilidad con lo ya cargado.
+ */
+export const TASK_COLORS = ["green", "amber", "red"] as const
 export type TaskColor = (typeof TASK_COLORS)[number]
 
 export const tasks = sqliteTable(

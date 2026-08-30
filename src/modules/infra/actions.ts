@@ -1,9 +1,11 @@
 "use server"
 
+import { eq } from "drizzle-orm"
+
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
-import { databases, servers } from "@/db/schema"
+import { APP_ENVIRONMENTS, databases, monitoredApps, SERVER_STATES, servers } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import type { FormState } from "@/lib/forms"
 
@@ -35,7 +37,14 @@ export async function createServer(_prev: FormState, formData: FormData): Promis
   })
   if (!parsed.success) return { error: "El nombre es obligatorio" }
 
+  // Estado y renovación viven en la base desde siempre; hasta ahora el
+  // formulario no los exponía y quedaban vacíos.
+  const estado = String(formData.get("estado") || "activo")
+  const renovacion = String(formData.get("renovacionAt") || "")
+
   await db.insert(servers).values({
+    estado: SERVER_STATES.includes(estado as (typeof SERVER_STATES)[number]) ? estado : "activo",
+    renovacionAt: renovacion ? new Date(renovacion) : null,
     nombre: parsed.data.nombre,
     proveedor: nil(formData.get("proveedor")),
     ipHostname: nil(formData.get("ipHostname")),
@@ -87,5 +96,39 @@ export async function createDatabase(_prev: FormState, formData: FormData): Prom
   })
   await audit({ userId: user.id, accion: "create", entityType: "database" })
   revalidatePath("/infra")
+  return { ok: true }
+}
+
+/** Alta de una aplicación para el listado de Monitoreo. */
+const appSchema = z.object({
+  nombre: z.string().min(1).max(120),
+  url: z.string().url(),
+  entorno: z.enum(APP_ENVIRONMENTS).default("produccion"),
+})
+
+export async function createApp(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser()
+  const parsed = appSchema.safeParse({
+    nombre: formData.get("nombre"),
+    url: formData.get("url"),
+    entorno: formData.get("entorno") || "produccion",
+  })
+  if (!parsed.success) return { error: "Revisá el nombre y la dirección (tiene que ser una URL)" }
+
+  const [app] = await db
+    .insert(monitoredApps)
+    .values(parsed.data)
+    .returning({ id: monitoredApps.id })
+
+  await audit({ userId: user.id, accion: "create", entityType: "server", entityId: app?.id })
+  revalidatePath("/monitoreo")
+  return { ok: true }
+}
+
+export async function deleteApp(id: string): Promise<FormState> {
+  const user = await requireUser()
+  await db.delete(monitoredApps).where(eq(monitoredApps.id, id))
+  await audit({ userId: user.id, accion: "delete", entityType: "server", entityId: id })
+  revalidatePath("/monitoreo")
   return { ok: true }
 }

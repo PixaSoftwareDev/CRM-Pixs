@@ -27,12 +27,7 @@ export function OpportunityFields({
         </Select>
       </Field>
       <Field label="Título">
-        <Input
-          name="titulo"
-          required
-          placeholder="Ej: Rediseño de sitio web"
-          defaultValue={defaults?.titulo}
-        />
+        <Input name="titulo" required placeholder="Título" defaultValue={defaults?.titulo} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Valor estimado">

@@ -34,19 +34,29 @@ export function NewServerForm() {
                 <Input name="nombre" required />
               </Field>
               <Field label="Proveedor">
-                <Input name="proveedor" placeholder="Hetzner, AWS…" />
+                <Input name="proveedor" placeholder="Proveedor" />
               </Field>
               <Field label="IP / Hostname">
                 <Input name="ipHostname" />
               </Field>
               <Field label="OS">
-                <Input name="os" placeholder="Ubuntu 24.04" />
+                <Input name="os" placeholder="Sistema" />
               </Field>
               <Field label="Specs">
-                <Input name="specs" placeholder="4 vCPU / 8GB" />
+                <Input name="specs" placeholder="Recursos" />
               </Field>
               <Field label="Costo mensual">
                 <Input name="costoMensual" type="number" step="0.01" min="0" />
+              </Field>
+              <Field label="Estado">
+                <Select name="estado" defaultValue="activo">
+                  <option value="activo">activo</option>
+                  <option value="baja">baja</option>
+                  <option value="caido">caído</option>
+                </Select>
+              </Field>
+              <Field label="Renueva">
+                <Input name="renovacionAt" type="date" />
               </Field>
             </div>
             <Field label="Descripción">
@@ -127,7 +137,7 @@ export function NewDatabaseForm({ servers }: { servers: { id: string; nombre: st
               </Field>
             </div>
             <Field label="Referencia de credencial (Bitwarden/1Password) — NO el secreto">
-              <Input name="credencialRef" placeholder="bitwarden://item/xxxx" />
+              <Input name="credencialRef" placeholder="Referencia" />
             </Field>
             <Field label="Descripción">
               <Textarea name="descripcion" rows={2} />

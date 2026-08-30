@@ -21,14 +21,14 @@ export function ContactFields({ defaults }: { defaults?: Defaults }) {
             name="nombre"
             required
             autoFocus
-            placeholder="Ej: Panadería La Espiga"
+            placeholder="Nombre"
             defaultValue={defaults?.nombre ?? ""}
           />
         </Field>
         <Field label="Persona de contacto">
           <Input
             name="personaContacto"
-            placeholder="Ej: Laura – dueña"
+            placeholder="Nombre y rol"
             defaultValue={defaults?.personaContacto ?? ""}
           />
         </Field>
@@ -45,12 +45,7 @@ export function ContactFields({ defaults }: { defaults?: Defaults }) {
         <Input name="sitioWeb" placeholder="https://" defaultValue={defaults?.sitioWeb ?? ""} />
       </Field>
       <Field label="Notas">
-        <Textarea
-          name="notas"
-          rows={3}
-          placeholder="Contexto, cómo llegó, etc."
-          defaultValue={defaults?.notas ?? ""}
-        />
+        <Textarea name="notas" rows={3} placeholder="Notas" defaultValue={defaults?.notas ?? ""} />
       </Field>
     </>
   )

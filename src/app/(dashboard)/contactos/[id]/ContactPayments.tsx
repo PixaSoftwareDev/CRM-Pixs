@@ -144,7 +144,7 @@ export function ContactPayments({
             </Field>
 
             <Field label="Concepto">
-              <Input name="descripcion" placeholder="Ej: Factura 0001-00000123" maxLength={500} />
+              <Input name="descripcion" placeholder="Concepto" maxLength={500} />
             </Field>
 
             <Field label="Factura (opcional)">

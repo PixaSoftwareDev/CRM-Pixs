@@ -4,14 +4,19 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { db } from "@/db"
-import { CREDENTIAL_TYPES, credentials } from "@/db/schema"
+import { credentials } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
 import type { FormState } from "@/lib/forms"
 
 const baseSchema = z.object({
   titulo: z.string().min(1, "El título es obligatorio").max(200),
-  tipo: z.enum(CREDENTIAL_TYPES),
+  // Texto libre, normalizado: "VPS" y "vps" tienen que ser el mismo tipo.
+  tipo: z
+    .string()
+    .min(1)
+    .max(60)
+    .transform((v) => v.trim().toLowerCase().replace(/\s+/g, " ")),
   usuario: z.string().max(200).optional(),
   secreto: z.string().max(2000).optional(),
   url: z.string().max(500).optional(),

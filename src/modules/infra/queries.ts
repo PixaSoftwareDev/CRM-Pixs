@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm"
+import { asc, desc, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { databases, servers } from "@/db/schema"
+import { databases, monitoredApps, servers } from "@/db/schema"
 
 export type ServerRow = typeof servers.$inferSelect
 export type DatabaseRow = typeof databases.$inferSelect
@@ -21,4 +21,11 @@ export async function listDatabases() {
 export async function getServer(id: string) {
   const [row] = await db.select().from(servers).where(eq(servers.id, id)).limit(1)
   return row ?? null
+}
+
+export type MonitoredAppRow = Awaited<ReturnType<typeof listApps>>[number]
+
+/** Aplicaciones publicadas, para el listado de Monitoreo. */
+export async function listApps() {
+  return db.select().from(monitoredApps).orderBy(asc(monitoredApps.nombre))
 }

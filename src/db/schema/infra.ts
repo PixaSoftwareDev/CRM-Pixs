@@ -88,3 +88,25 @@ export const projectTechInfo = sqliteTable(
 export type Server = typeof servers.$inferSelect
 export type Database = typeof databases.$inferSelect
 export type ProjectTechInfo = typeof projectTechInfo.$inferSelect
+
+/**
+ * Aplicaciones que corren en la infraestructura, con su URL pública. Se listan
+ * en Monitoreo para entrar rápido a cada una. Antes estaban escritas a mano en
+ * el componente; ahora se cargan desde la app.
+ */
+export const APP_ENVIRONMENTS = ["produccion", "desarrollo", "staging"] as const
+
+export const monitoredApps = sqliteTable("monitored_apps", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  nombre: text("nombre").notNull(),
+  url: text("url").notNull(),
+  entorno: text("entorno").notNull().default("produccion"),
+  serverId: text("server_id").references(() => servers.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+export type MonitoredApp = typeof monitoredApps.$inferSelect

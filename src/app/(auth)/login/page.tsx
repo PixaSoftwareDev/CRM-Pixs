@@ -51,7 +51,7 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               required
-              className="w-full rounded-lg border border-zinc-300 bg-white/60 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-white/[.03] dark:focus:border-blue-400"
+              className="w-full rounded-lg border border-zinc-300 bg-white/60 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-white/[.03] dark:focus:border-blue-500"
             />
           </label>
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
-              className="w-full rounded-lg border border-zinc-300 bg-white/60 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-white/[.03] dark:focus:border-blue-400"
+              className="w-full rounded-lg border border-zinc-300 bg-white/60 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-white/[.03] dark:focus:border-blue-500"
             />
           </label>
 

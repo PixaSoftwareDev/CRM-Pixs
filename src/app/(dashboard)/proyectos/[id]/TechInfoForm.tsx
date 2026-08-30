@@ -24,7 +24,7 @@ export function TechInfoForm({ projectId }: { projectId: string }) {
         <option value="link">Link</option>
       </Select>
       <Input name="label" placeholder="Etiqueta" className="w-40" required />
-      <Input name="valor" placeholder="URL o valor" className="w-56" required />
+      <Input name="valor" placeholder="Valor" className="w-56" required />
       <Button type="submit" size="sm" disabled={pending}>
         Agregar
       </Button>

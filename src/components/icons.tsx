@@ -415,3 +415,11 @@ export function SearchIcon({ size = 16, className }: IconProps) {
     </svg>
   )
 }
+
+export function PulseIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...nav(size, className)} aria-hidden="true">
+      <path d="M3 12h4l3-8 4 16 3-8h4" />
+    </svg>
+  )
+}

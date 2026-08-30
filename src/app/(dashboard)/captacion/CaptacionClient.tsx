@@ -39,14 +39,14 @@ export function NewCampaign() {
         >
           <form action={action} className="space-y-4">
             <Field label="Nombre">
-              <Input name="nombre" required placeholder="Estudios contables CABA" />
+              <Input name="nombre" required placeholder="Búsqueda" />
             </Field>
             <Field label="Qué buscar (query)">
-              <Input name="query" required placeholder="estudio contable" />
+              <Input name="query" required placeholder="Rubro" />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Ubicación">
-                <Input name="ubicacion" placeholder="Buenos Aires" />
+                <Input name="ubicacion" placeholder="Ciudad" />
               </Field>
               <Field label="Cantidad (máx 20)">
                 <Input name="cantidad" type="number" min="1" max="20" defaultValue="20" />

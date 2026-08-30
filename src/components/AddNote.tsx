@@ -26,7 +26,7 @@ export function AddNote({
       <input type="hidden" name="entityType" value={entityType} />
       <input type="hidden" name="entityId" value={entityId} />
       <input type="hidden" name="revalidate" value={revalidate} />
-      <Textarea name="contenido" rows={2} placeholder="Agregar una nota…" required />
+      <Textarea name="contenido" rows={2} placeholder="Nota" required />
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       <Button type="submit" size="sm" disabled={pending}>
         {pending ? "Guardando…" : "Agregar nota"}

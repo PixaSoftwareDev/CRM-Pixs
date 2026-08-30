@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Badge, Input, Select } from "@/components/ui"
+import { Badge, SearchInput } from "@/components/ui"
+import { ColorSelect } from "@/components/ui/ColorSelect"
 import type { ProjectState } from "@/db/schema"
 import { cn, formatDate, formatMoney } from "@/lib/utils"
 import type { ProjectListRow } from "@/modules/projects/queries"
@@ -82,25 +83,18 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por proyecto o cliente…"
-          className="h-9 max-w-xs flex-1"
-        />
+        <SearchInput value={q} onChange={setQ} />
         {clientes.length > 1 ? (
-          <Select
-            className="w-auto min-w-48"
+          <ColorSelect
+            className="w-56"
             value={cliente}
-            onChange={(e) => setCliente(e.target.value)}
-          >
-            <option value="">Todos los clientes</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+            onChange={setCliente}
+            ariaLabel="Cliente"
+            options={[
+              { value: "", label: "Todos los clientes" },
+              ...clientes.map((c) => ({ value: c.id, label: c.nombre })),
+            ]}
+          />
         ) : null}
         <span className="ml-auto text-sm text-zinc-500">
           {filtrados.length} {filtrados.length === 1 ? "proyecto" : "proyectos"}
