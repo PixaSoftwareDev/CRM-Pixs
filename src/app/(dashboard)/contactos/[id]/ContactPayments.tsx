@@ -5,13 +5,13 @@ import { useActionState, useState } from "react"
 import { Modal } from "@/components/Modal"
 import { Badge, Button, Card, Field, Input, Select } from "@/components/ui"
 import { asset } from "@/lib/basePath"
-import { formatMoney } from "@/lib/utils"
+import { formatMoney, todayISO } from "@/lib/utils"
 import type { ContactPayment } from "@/modules/contacts/queries"
 import { createTransaction } from "@/modules/money/actions"
 
 /** Fecha de hoy en yyyy-mm-dd, para el valor por defecto del formulario. */
 function hoy() {
-  return new Date().toISOString().slice(0, 10)
+  return todayISO()
 }
 
 /**

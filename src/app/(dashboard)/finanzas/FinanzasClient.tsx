@@ -6,7 +6,7 @@ import { PaperclipIcon } from "@/components/icons"
 import { Badge, Card, Tab, Tabs } from "@/components/ui"
 import { ColorSelect } from "@/components/ui/ColorSelect"
 import { asset } from "@/lib/basePath"
-import { cn, daysUntil, formatMoney } from "@/lib/utils"
+import { cn, daysUntil, formatMoney, todayISO } from "@/lib/utils"
 import { reintegrarTodo, toggleInstallment, toggleReintegro } from "@/modules/money/actions"
 import type { TransactionRow } from "@/modules/money/queries"
 import type { UserOption } from "@/modules/users/queries"
@@ -45,7 +45,7 @@ function labelMes(ym: string) {
   return txt.charAt(0).toUpperCase() + txt.slice(1)
 }
 function mesActual() {
-  return new Date().toISOString().slice(0, 7)
+  return todayISO().slice(0, 7)
 }
 
 /**

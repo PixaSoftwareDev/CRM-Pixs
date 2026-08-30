@@ -8,6 +8,7 @@ import { budgets, documents, installments, transactions } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import type { FormState } from "@/lib/forms"
 import { saveDocumentFile } from "@/lib/storage"
+import { todayISO } from "@/lib/utils"
 import { ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_SIZE } from "@/modules/documents/shared"
 
 /** Crea el presupuesto de un proyecto con N cuotas iguales. */
@@ -46,16 +47,16 @@ export async function createBudget(_prev: FormState, formData: FormData): Promis
   if (!budget) throw new Error("No se pudo crear el presupuesto")
 
   // Reparte en cuotas mensuales iguales (la última absorbe el redondeo).
+  // Todo en fecha local: mezclar new Date(utc) con setMonth corría los vencimientos un día.
   const base = Math.floor((montoTotal / cuotas) * 100) / 100
-  const first = new Date(primerVencimiento)
+  const [anio, mes, dia] = primerVencimiento.split("-").map(Number)
   const rows = Array.from({ length: cuotas }, (_, i) => {
-    const vence = new Date(first)
-    vence.setMonth(vence.getMonth() + i)
+    const vence = new Date(anio, mes - 1 + i, dia)
     const monto = i === cuotas - 1 ? montoTotal - base * (cuotas - 1) : base
     return {
       budgetId: budget.id,
       monto: monto.toFixed(2),
-      venceAt: vence.toISOString().slice(0, 10),
+      venceAt: `${vence.getFullYear()}-${String(vence.getMonth() + 1).padStart(2, "0")}-${String(vence.getDate()).padStart(2, "0")}`,
     }
   })
   await db.insert(installments).values(rows)
@@ -98,7 +99,7 @@ export async function toggleInstallment(id: string, projectId: string, pagar: bo
         categoria: "Cobro de proyecto",
         projectId,
         installmentId: id,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: todayISO(),
         realizadoPor: user.id,
         descripcion: "Cobro de cuota",
       })

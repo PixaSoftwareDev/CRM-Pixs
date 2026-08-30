@@ -6,13 +6,13 @@ import { PaperclipIcon } from "@/components/icons"
 import { Modal } from "@/components/Modal"
 import { Button, Field, Input, Select } from "@/components/ui"
 import type { FormState } from "@/lib/forms"
-import { cn } from "@/lib/utils"
+import { cn, todayISO } from "@/lib/utils"
 import { ALLOWED_DOCUMENT_TYPES } from "@/modules/documents/shared"
 import { createTransaction } from "@/modules/money/actions"
 import type { UserOption } from "@/modules/users/queries"
 
 function hoy() {
-  return new Date().toISOString().slice(0, 10)
+  return todayISO()
 }
 
 /**
