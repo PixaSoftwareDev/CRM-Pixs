@@ -14,14 +14,11 @@ export default async function ProyectosPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <PageHeader title="Proyectos" subtitle="El trabajo que hacés para cada cliente" />
-        {opciones.length > 0 ? <NewProject contactos={opciones} /> : null}
+        {/* Siempre visible: un proyecto puede nacer sin cliente asignado. */}
+        <NewProject contactos={opciones} />
       </div>
 
-      {contactos.length === 0 ? (
-        <EmptyState>
-          Primero creá un cliente en <strong>Clientes</strong> para poder abrir proyectos.
-        </EmptyState>
-      ) : proyectos.length === 0 ? (
+      {proyectos.length === 0 ? (
         <EmptyState>Todavía no hay proyectos. Creá el primero.</EmptyState>
       ) : (
         <ProjectsList proyectos={proyectos} />

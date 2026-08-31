@@ -34,10 +34,8 @@ export function NewProject({ contactos }: { contactos: Contacto[] }) {
         >
           <form action={action} className="space-y-4">
             <Field label="Cliente">
-              <Select name="contactId" required defaultValue="">
-                <option value="" disabled>
-                  Elegí un cliente…
-                </option>
+              <Select name="contactId" defaultValue="">
+                <option value="">Sin asignar</option>
                 {contactos.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre}

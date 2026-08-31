@@ -51,9 +51,9 @@ export async function deleteTechInfo(id: string, projectId: string) {
   revalidatePath(`/proyectos/${projectId}`)
 }
 
-/** Alta de proyecto directa, sin pasar por el embudo de ventas. */
+/** Alta de proyecto directa, sin pasar por el embudo de ventas. El cliente es opcional. */
 const newProjectSchema = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.string().uuid().optional().or(z.literal("")),
   nombre: z.string().min(1).max(200),
   estado: z.enum(PROJECT_STATES).default("activo"),
   fechaInicio: z.string().optional(),
@@ -62,7 +62,7 @@ const newProjectSchema = z.object({
 export async function createProject(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser()
   const parsed = newProjectSchema.safeParse({
-    contactId: formData.get("contactId"),
+    contactId: formData.get("contactId") || "",
     nombre: formData.get("nombre"),
     estado: formData.get("estado") || "activo",
     fechaInicio: formData.get("fechaInicio") || undefined,
@@ -73,7 +73,7 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
   const [project] = await db
     .insert(projects)
     .values({
-      contactId: parsed.data.contactId,
+      contactId: parsed.data.contactId ? parsed.data.contactId : null,
       nombre: parsed.data.nombre,
       estado: parsed.data.estado,
       fechaInicio: parsed.data.fechaInicio,
@@ -82,6 +82,6 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
 
   await audit({ userId: user.id, accion: "create", entityType: "project", entityId: project?.id })
   revalidatePath("/proyectos")
-  revalidatePath(`/contactos/${parsed.data.contactId}`)
+  if (parsed.data.contactId) revalidatePath(`/contactos/${parsed.data.contactId}`)
   return { ok: true }
 }

@@ -48,7 +48,8 @@ export async function receivables() {
       .innerJoin(projects, eq(budgets.projectId, projects.id))
       // El cliente sale del proyecto. Antes se llegaba a él por la oportunidad,
       // y los proyectos creados sin oportunidad quedaban fuera del listado.
-      .innerJoin(contacts, eq(projects.contactId, contacts.id))
+      // leftJoin: los proyectos sin cliente asignado también cobran.
+      .leftJoin(contacts, eq(projects.contactId, contacts.id))
       .where(not(eq(installments.estado, "pagada")))
       .orderBy(installments.venceAt)
   )

@@ -26,8 +26,9 @@ type Receivable = {
   venceAt: string
   proyecto: string
   projectId: string
-  empresa: string
-  contactId: string
+  // Nulos cuando el proyecto no tiene cliente asignado.
+  empresa: string | null
+  contactId: string | null
 }
 
 type Pestana = "movimientos" | "cobrar" | "devolver"
@@ -375,9 +376,13 @@ export function FinanzasClient({
               return (
                 <tr key={c.id} className={fila(i)}>
                   <td className={cn(TD, "font-medium")}>
-                    <Link href={`/contactos/${c.contactId}`} className="hover:underline">
-                      {c.empresa}
-                    </Link>
+                    {c.contactId ? (
+                      <Link href={`/contactos/${c.contactId}`} className="hover:underline">
+                        {c.empresa}
+                      </Link>
+                    ) : (
+                      <span className="text-zinc-500">Sin cliente</span>
+                    )}
                   </td>
                   <td className={cn(TD, "hidden text-zinc-500 sm:table-cell")}>
                     <Link href={`/proyectos/${c.projectId}`} className="hover:underline">

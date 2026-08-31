@@ -29,12 +29,16 @@ export default async function ProyectoPage({ params }: { params: Promise<{ id: s
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{project.nombre}</h1>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
-            <Link
-              href={`/contactos/${project.contactId}`}
-              className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
-            >
-              {project.contactoNombre}
-            </Link>
+            {project.contactId ? (
+              <Link
+                href={`/contactos/${project.contactId}`}
+                className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
+              >
+                {project.contactoNombre}
+              </Link>
+            ) : (
+              <span>Sin cliente asignado</span>
+            )}
             {/* Solo si nació de una oportunidad ganada: los proyectos creados
                 directo desde Proyectos no tienen origen que mostrar. */}
             {project.opportunityId ? (
