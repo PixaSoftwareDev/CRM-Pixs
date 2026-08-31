@@ -7,7 +7,7 @@ import { db } from "@/db"
 import { budgets, documents, installments, transactions } from "@/db/schema"
 import { audit, requireUser } from "@/lib/auth"
 import type { FormState } from "@/lib/forms"
-import { saveDocumentFile } from "@/lib/storage"
+import { deleteDocumentFile, saveDocumentFile } from "@/lib/storage"
 import { todayISO } from "@/lib/utils"
 import { ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_SIZE } from "@/modules/documents/shared"
 
@@ -193,6 +193,92 @@ export async function createTransaction(_prev: FormState, formData: FormData): P
   await audit({ userId: user.id, accion: "create", entityType: "transaction", entityId: tx?.id })
   revalidatePath("/finanzas")
   if (parsed.data.contactId) revalidatePath(`/contactos/${parsed.data.contactId}`)
+  return { ok: true }
+}
+
+/** Edita un movimiento existente. No toca el comprobante ni el vínculo con cuotas. */
+export async function updateTransaction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser()
+  const parsed = txSchema.extend({ id: z.string().uuid() }).safeParse({
+    id: formData.get("id"),
+    tipo: formData.get("tipo"),
+    monto: formData.get("monto"),
+    moneda: formData.get("moneda") || "ARS",
+    categoria: formData.get("categoria") || undefined,
+    fecha: formData.get("fecha"),
+    descripcion: formData.get("descripcion") || undefined,
+    projectId: formData.get("projectId") || "",
+    contactId: "",
+    realizadoPor: formData.get("realizadoPor") || "",
+  })
+  if (!parsed.success) return { error: "Datos inválidos" }
+
+  await db
+    .update(transactions)
+    .set({
+      tipo: parsed.data.tipo,
+      monto: parsed.data.monto.toString(),
+      moneda: parsed.data.moneda,
+      categoria: parsed.data.categoria ?? null,
+      fecha: parsed.data.fecha,
+      descripcion: parsed.data.descripcion ?? null,
+      projectId: parsed.data.projectId ? parsed.data.projectId : null,
+      // Solo se pisa si el form lo mandó (en ingresos el campo no existe).
+      ...(parsed.data.realizadoPor ? { realizadoPor: parsed.data.realizadoPor } : {}),
+    })
+    .where(eq(transactions.id, parsed.data.id))
+
+  await audit({
+    userId: user.id,
+    accion: "update",
+    entityType: "transaction",
+    entityId: parsed.data.id,
+  })
+  revalidatePath("/finanzas")
+  return { ok: true }
+}
+
+/**
+ * Borra un movimiento. Si era el cobro de una cuota, la cuota vuelve a
+ * "pendiente" (reaparece en Por cobrar); si tenía comprobante, se borra el
+ * documento y su archivo.
+ */
+export async function deleteTransaction(id: string): Promise<FormState> {
+  const user = await requireUser()
+  if (!z.string().uuid().safeParse(id).success) return { error: "Movimiento inválido" }
+
+  const [tx] = await db
+    .select({
+      installmentId: transactions.installmentId,
+      comprobanteUrl: transactions.comprobanteUrl,
+    })
+    .from(transactions)
+    .where(eq(transactions.id, id))
+    .limit(1)
+  if (!tx) return { error: "El movimiento no existe" }
+
+  if (tx.installmentId) {
+    await db
+      .update(installments)
+      .set({ estado: "pendiente", pagadaAt: null })
+      .where(eq(installments.id, tx.installmentId))
+  }
+
+  if (tx.comprobanteUrl) {
+    const [doc] = await db
+      .select({ id: documents.id, storedName: documents.storedName })
+      .from(documents)
+      .where(eq(documents.id, tx.comprobanteUrl))
+      .limit(1)
+    if (doc) {
+      await deleteDocumentFile(doc.storedName)
+      await db.delete(documents).where(eq(documents.id, doc.id))
+    }
+  }
+
+  await db.delete(transactions).where(eq(transactions.id, id))
+  await audit({ userId: user.id, accion: "delete", entityType: "transaction", entityId: id })
+  revalidatePath("/finanzas")
   return { ok: true }
 }
 

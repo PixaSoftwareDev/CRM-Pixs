@@ -2,14 +2,22 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { useConfirm } from "@/components/ConfirmDialog"
 import { PaperclipIcon } from "@/components/icons"
+import { KebabMenu } from "@/components/KebabMenu"
 import { Badge, Card, Tab, Tabs } from "@/components/ui"
 import { ColorSelect } from "@/components/ui/ColorSelect"
 import { asset } from "@/lib/basePath"
 import { cn, daysUntil, formatMoney, todayISO } from "@/lib/utils"
-import { reintegrarTodo, toggleInstallment, toggleReintegro } from "@/modules/money/actions"
+import {
+  deleteTransaction,
+  reintegrarTodo,
+  toggleInstallment,
+  toggleReintegro,
+} from "@/modules/money/actions"
 import type { TransactionRow } from "@/modules/money/queries"
 import type { UserOption } from "@/modules/users/queries"
+import { EditMovimiento } from "./EditMovimiento"
 
 type Receivable = {
   id: string
@@ -56,14 +64,18 @@ function mesActual() {
 export function FinanzasClient({
   initial,
   usuarios,
+  proyectos,
   cobrar,
 }: {
   initial: TransactionRow[]
   usuarios: UserOption[]
+  proyectos: { id: string; nombre: string }[]
   cobrar: Receivable[]
 }) {
+  const confirm = useConfirm()
   const [items, setItems] = useState(initial)
   const [cuotas, setCuotas] = useState(cobrar)
+  const [editar, setEditar] = useState<TransactionRow | null>(null)
   const [pestana, setPestana] = useState<Pestana>("movimientos")
   const [filtro, setFiltro] = useState<Filtro>("")
   const [persona, setPersona] = useState("")
@@ -144,6 +156,25 @@ export function FinanzasClient({
     setItems((cur) => cur.map((x) => (x.id === t.id ? { ...x, reintegrado: false } : x)))
     start(async () => {
       const res = await toggleReintegro(t.id, false)
+      if (res.error) setItems(prev)
+    })
+  }
+
+  /** Borra un movimiento (con confirmación); si era cobro de cuota, la cuota vuelve a Por cobrar. */
+  async function borrar(t: TransactionRow) {
+    const ok = await confirm({
+      title: "Eliminar movimiento",
+      message: `Se borra "${t.descripcion || t.categoria || t.tipo}" de ${formatMoney(t.monto, t.moneda)}. ${
+        t.comprobanteId ? "El comprobante adjunto también se elimina. " : ""
+      }Esto no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      danger: true,
+    })
+    if (!ok) return
+    const prev = items
+    setItems((cur) => cur.filter((x) => x.id !== t.id))
+    start(async () => {
+      const res = await deleteTransaction(t.id)
       if (res.error) setItems(prev)
     })
   }
@@ -263,7 +294,7 @@ export function FinanzasClient({
           <Vacio>Sin movimientos en este período.</Vacio>
         ) : (
           <>
-            <Tabla cabeceras={["Fecha", "Concepto", "Quién", "Monto"]}>
+            <Tabla cabeceras={["Fecha", "Concepto", "Quién", "Monto", ""]}>
               {visibles.map((t, i) => (
                 <tr key={t.id} className={fila(i)}>
                   <td className={cn(TD, "whitespace-nowrap text-xs text-zinc-500")}>
@@ -310,6 +341,9 @@ export function FinanzasClient({
                       {t.tipo === "ingreso" ? "+" : "−"}
                       {formatMoney(t.monto, t.moneda)}
                     </span>
+                  </td>
+                  <td className={cn(TD, "w-8 pl-0 pr-2 text-right")}>
+                    <KebabMenu onEdit={() => setEditar(t)} onDelete={() => borrar(t)} />
                   </td>
                 </tr>
               ))}
@@ -397,6 +431,15 @@ export function FinanzasClient({
           </Tabla>
         )
       ) : null}
+
+      {editar ? (
+        <EditMovimiento
+          tx={editar}
+          usuarios={usuarios}
+          proyectos={proyectos}
+          onClose={() => setEditar(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -429,8 +472,9 @@ function Tabla({
                 scope="col"
                 className={cn(
                   TH,
-                  i === 1 && "hidden sm:table-cell",
-                  i === 2 && cabeceras.length === 4 && "hidden md:table-cell",
+                  // Cada th se oculta igual que las celdas de su columna.
+                  (c === "Proyecto" || c === "Conceptos") && "hidden sm:table-cell",
+                  c === "Quién" && "hidden md:table-cell",
                   i === cabeceras.length - 1 && "text-right",
                 )}
               >

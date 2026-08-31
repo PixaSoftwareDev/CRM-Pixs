@@ -37,7 +37,12 @@ export default async function FinanzasPage() {
         </div>
       </div>
 
-      <FinanzasClient initial={txs} usuarios={usuarios} cobrar={cobrar} />
+      <FinanzasClient
+        initial={txs}
+        usuarios={usuarios}
+        proyectos={proyectos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+        cobrar={cobrar}
+      />
     </div>
   )
 }
