@@ -35,8 +35,10 @@ export default async function CaptacionPage() {
         />
       </div>
 
+      {/* min-w-0 en las secciones: son grid items y sin esto no pueden achicarse
+          por debajo de las líneas `truncate` de los leads (desbordan en móvil). */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <section>
+        <section className="min-w-0">
           <h2 className="mb-3 text-sm font-semibold">Campañas</h2>
           {campaigns.length === 0 ? (
             <EmptyState>Sin campañas. Creá la primera para recolectar leads.</EmptyState>
@@ -61,7 +63,7 @@ export default async function CaptacionPage() {
           )}
         </section>
 
-        <section>
+        <section className="min-w-0">
           <h2 className="mb-3 text-sm font-semibold">Bandeja de leads ({bandeja.length})</h2>
           <Card>
             {bandeja.length === 0 ? (

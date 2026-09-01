@@ -12,7 +12,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-full flex-1 flex-col md:flex-row">
       <Sidebar email={user.email} />
-      <main className="flex-1 animate-fade-in p-4 md:p-8">
+      {/* min-w-0: sin esto, contenido ancho (kanban, tablas) estira la página
+          entera en vez de scrollear dentro de su propio overflow-x-auto. */}
+      <main className="min-w-0 flex-1 animate-fade-in p-4 md:p-8">
         <ConfirmProvider>{children}</ConfirmProvider>
       </main>
     </div>
