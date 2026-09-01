@@ -47,14 +47,16 @@ export function QuickAdd({
       className="rounded-xl border border-black/[.08] bg-white p-3 dark:border-white/[.12] dark:bg-zinc-950"
     >
       <input type="hidden" name="tipo" value={tipo} />
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Móvil: grilla de 2 columnas (los `order-*` arman las filas).
+          Desde md: una sola línea con flex, como siempre. */}
+      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
         {/* Gasto / Ingreso */}
-        <div className="flex rounded-md bg-black/[.05] p-[3px] dark:bg-white/[.06]">
+        <div className="order-1 col-span-2 flex rounded-md bg-black/[.05] p-[3px] md:order-none md:col-span-1 dark:bg-white/[.06]">
           <button
             type="button"
             onClick={() => setTipo("gasto")}
             className={cn(
-              "h-[30px] rounded px-3.5 text-[13px] font-medium transition-colors",
+              "h-[30px] flex-1 rounded px-3.5 text-[13px] font-medium transition-colors md:flex-none",
               esGasto
                 ? "bg-red-600 text-white"
                 : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
@@ -66,7 +68,7 @@ export function QuickAdd({
             type="button"
             onClick={() => setTipo("ingreso")}
             className={cn(
-              "h-[30px] rounded px-3.5 text-[13px] font-medium transition-colors",
+              "h-[30px] flex-1 rounded px-3.5 text-[13px] font-medium transition-colors md:flex-none",
               !esGasto
                 ? "bg-green-600 text-white"
                 : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
@@ -84,7 +86,7 @@ export function QuickAdd({
           required
           placeholder="$ monto"
           aria-label="Monto"
-          className="w-28"
+          className="order-2 md:order-none md:w-28"
         />
         <Input
           name="descripcion"
@@ -95,7 +97,7 @@ export function QuickAdd({
               : "¿De qué? (ej. cuota, anticipo)"
           }
           aria-label="Concepto"
-          className="min-w-36 flex-1"
+          className="order-4 col-span-2 md:order-none md:col-span-1 md:min-w-36 md:flex-1"
         />
         {/* Quién puso la plata: solo en gastos, es lo que define el reintegro. */}
         {esGasto ? (
@@ -103,7 +105,7 @@ export function QuickAdd({
             name="realizadoPor"
             defaultValue={defaultPagadoPor ?? ""}
             aria-label="Quién lo pagó"
-            className="w-32"
+            className="order-5 md:order-none md:w-32"
           >
             {usuarios.map((u) => (
               <option key={u.id} value={u.id}>
@@ -112,7 +114,12 @@ export function QuickAdd({
             ))}
           </Select>
         ) : null}
-        <Select name="projectId" defaultValue="" aria-label="Proyecto (opcional)" className="w-36">
+        <Select
+          name="projectId"
+          defaultValue=""
+          aria-label="Proyecto (opcional)"
+          className={cn("order-6 md:order-none md:w-36", !esGasto && "col-span-2 md:col-span-1")}
+        >
           <option value="">Sin proyecto</option>
           {proyectos.map((p) => (
             <option key={p.id} value={p.id}>
@@ -126,7 +133,7 @@ export function QuickAdd({
           required
           defaultValue={todayISO()}
           aria-label="Fecha"
-          className="w-32"
+          className="order-3 md:order-none md:w-32"
         />
 
         {/* Comprobante opcional */}
@@ -138,24 +145,28 @@ export function QuickAdd({
           className="hidden"
           onChange={(e) => setComprobante(e.target.files?.[0]?.name ?? null)}
         />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          title={comprobante ?? "Adjuntar comprobante"}
-          aria-label="Adjuntar comprobante"
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors",
-            comprobante
-              ? "border-blue-500 text-blue-600 dark:text-blue-400"
-              : "border-zinc-300 text-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:hover:text-zinc-200",
-          )}
-        >
-          <PaperclipIcon size={16} />
-        </button>
+        {/* En móvil, clip + Agregar comparten la última fila; en md el div
+            desaparece (contents) y quedan sueltos en la línea. */}
+        <div className="order-7 col-span-2 flex items-center gap-2 md:contents">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            title={comprobante ?? "Adjuntar comprobante"}
+            aria-label="Adjuntar comprobante"
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors",
+              comprobante
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-zinc-300 text-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:hover:text-zinc-200",
+            )}
+          >
+            <PaperclipIcon size={16} />
+          </button>
 
-        <Button type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Agregar"}
-        </Button>
+          <Button type="submit" disabled={pending} className="flex-1 md:flex-none">
+            {pending ? "Guardando…" : "Agregar"}
+          </Button>
+        </div>
       </div>
       {state.error ? <p className="mt-2 text-xs text-red-600">{state.error}</p> : null}
       {comprobante ? (
