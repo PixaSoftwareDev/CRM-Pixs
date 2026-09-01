@@ -85,3 +85,49 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
   if (parsed.data.contactId) revalidatePath(`/contactos/${parsed.data.contactId}`)
   return { ok: true }
 }
+
+/** Edita los datos base de un proyecto: cliente, nombre, estado y fecha de inicio. */
+export async function updateProject(
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireUser()
+  if (!z.string().uuid().safeParse(id).success) return { error: "Proyecto inválido" }
+  const parsed = newProjectSchema.safeParse({
+    contactId: formData.get("contactId") || "",
+    nombre: formData.get("nombre"),
+    estado: formData.get("estado") || "activo",
+    fechaInicio: formData.get("fechaInicio") || undefined,
+  })
+  if (!parsed.success) return { error: "Datos inválidos" }
+
+  await db
+    .update(projects)
+    .set({
+      contactId: parsed.data.contactId ? parsed.data.contactId : null,
+      nombre: parsed.data.nombre,
+      estado: parsed.data.estado,
+      fechaInicio: parsed.data.fechaInicio ?? null,
+    })
+    .where(eq(projects.id, id))
+
+  await audit({ userId: user.id, accion: "update", entityType: "project", entityId: id })
+  revalidatePath("/proyectos")
+  revalidatePath(`/proyectos/${id}`)
+  return { ok: true }
+}
+
+/**
+ * Borra un proyecto. Las FKs hacen el resto: tareas, presupuestos y cuotas
+ * caen en cascada; movimientos y accesos quedan sin proyecto (set null).
+ */
+export async function deleteProject(id: string): Promise<FormState> {
+  const user = await requireUser()
+  if (!z.string().uuid().safeParse(id).success) return { error: "Proyecto inválido" }
+  await db.delete(projects).where(eq(projects.id, id))
+  await audit({ userId: user.id, accion: "delete", entityType: "project", entityId: id })
+  revalidatePath("/proyectos")
+  revalidatePath("/finanzas")
+  return { ok: true }
+}

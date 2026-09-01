@@ -7,6 +7,7 @@ import { ColorSelect } from "@/components/ui/ColorSelect"
 import type { ProjectState } from "@/db/schema"
 import { cn, formatDate, formatMoney } from "@/lib/utils"
 import type { ProjectListRow } from "@/modules/projects/queries"
+import { ProjectActions } from "./ProjectActions"
 
 const ESTADO_TONE: Record<ProjectState, "green" | "amber" | "blue" | "red"> = {
   activo: "green",
@@ -30,7 +31,13 @@ const COLUMNAS: { key: SortKey; label: string; oculta?: string }[] = [
   { key: "createdAt", label: "Alta", oculta: "hidden lg:table-cell" },
 ]
 
-export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
+export function ProjectsList({
+  proyectos,
+  contactos,
+}: {
+  proyectos: ProjectListRow[]
+  contactos: { id: string; nombre: string }[]
+}) {
   const [cliente, setCliente] = useState<string>("")
   const [q, setQ] = useState<string>("")
   const [sort, setSort] = useState<SortKey>("createdAt")
@@ -138,6 +145,9 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
                     </th>
                   )
                 })}
+                <th scope="col" className={TH}>
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -175,6 +185,10 @@ export function ProjectsList({ proyectos }: { proyectos: ProjectListRow[] }) {
                     )}
                   >
                     {formatDate(p.createdAt)}
+                  </td>
+                  <td className={cn(TD, "w-8 pl-0 pr-2 text-right")}>
+                    {/* z-10: por encima del seudoelemento que hace clicable la fila. */}
+                    <ProjectActions project={p} contactos={contactos} className="relative z-10" />
                   </td>
                 </tr>
               ))}

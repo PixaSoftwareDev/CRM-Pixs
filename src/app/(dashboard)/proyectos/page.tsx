@@ -21,7 +21,7 @@ export default async function ProyectosPage() {
       {proyectos.length === 0 ? (
         <EmptyState>Todavía no hay proyectos. Creá el primero.</EmptyState>
       ) : (
-        <ProjectsList proyectos={proyectos} />
+        <ProjectsList proyectos={proyectos} contactos={opciones} />
       )}
     </div>
   )
