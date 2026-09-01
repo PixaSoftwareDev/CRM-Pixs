@@ -98,7 +98,7 @@ export function EditMovimiento({
             name="descripcion"
             required
             defaultValue={tx.descripcion ?? ""}
-            placeholder={esGasto ? "En qué se gastó" : "De qué es el ingreso"}
+            placeholder={esGasto ? "Ej: hosting" : "Ej: cuota"}
           />
         </Field>
 

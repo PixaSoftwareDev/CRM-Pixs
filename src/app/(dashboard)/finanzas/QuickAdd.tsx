@@ -120,7 +120,7 @@ export function QuickAdd({
               <Input
                 name="descripcion"
                 required
-                placeholder={esGasto ? "En qué se gastó" : "De qué es el ingreso"}
+                placeholder={esGasto ? "Ej: hosting" : "Ej: cuota"}
               />
             </Field>
 

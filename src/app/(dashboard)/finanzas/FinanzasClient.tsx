@@ -80,8 +80,8 @@ export function FinanzasClient({
   const [pestana, setPestana] = useState<Pestana>("movimientos")
   const [filtro, setFiltro] = useState<Filtro>("")
   const [persona, setPersona] = useState("")
-  // Período: "yyyy-mm", o "" para todo el historial. Por defecto, este mes.
-  const [mesLista, setMesLista] = useState(mesActual)
+  // Período: "yyyy-mm", o "" para todo el historial (el default).
+  const [mesLista, setMesLista] = useState("")
   const [limite, setLimite] = useState(PAGE)
   const [, start] = useTransition()
 
@@ -194,33 +194,20 @@ export function FinanzasClient({
     <div className="space-y-5">
       {/* Un solo número protagonista: el saldo del período. */}
       <Card className="p-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-sm text-zinc-500">
-              Saldo · {mesLista ? labelMes(mesLista) : "todo el historial"}
-            </div>
-            <div
-              className={cn(
-                "mt-1 text-4xl font-semibold tracking-tight",
-                totales.neto >= 0
-                  ? "text-zinc-900 dark:text-white"
-                  : "text-red-600 dark:text-red-400",
-              )}
-            >
-              {formatMoney(totales.neto)}
-            </div>
+        <div>
+          <div className="text-sm text-zinc-500">
+            Saldo · {mesLista ? labelMes(mesLista) : "todo el historial"}
           </div>
-
-          <ColorSelect
-            className="w-44"
-            value={mesLista}
-            onChange={setMesLista}
-            ariaLabel="Período"
-            options={[
-              ...meses.map((m) => ({ value: m, label: labelMes(m) })),
-              { value: "", label: "Todo el historial" },
-            ]}
-          />
+          <div
+            className={cn(
+              "mt-1 text-4xl font-semibold tracking-tight",
+              totales.neto >= 0
+                ? "text-zinc-900 dark:text-white"
+                : "text-red-600 dark:text-red-400",
+            )}
+          >
+            {formatMoney(totales.neto)}
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
@@ -234,6 +221,19 @@ export function FinanzasClient({
         acciones={
           pestana === "movimientos" ? (
             <>
+              <ColorSelect
+                className="w-44"
+                value={mesLista}
+                onChange={(v) => {
+                  setMesLista(v)
+                  setLimite(PAGE)
+                }}
+                ariaLabel="Período"
+                options={[
+                  { value: "", label: "Todo el historial" },
+                  ...meses.map((m) => ({ value: m, label: labelMes(m) })),
+                ]}
+              />
               <ColorSelect
                 className="w-36"
                 value={filtro}
