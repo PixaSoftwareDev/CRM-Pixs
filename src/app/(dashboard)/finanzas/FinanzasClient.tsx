@@ -38,8 +38,9 @@ type Filtro = "" | "gasto" | "ingreso"
 const PAGE = 15
 
 // Clases compartidas de celda, para no repetirlas columna por columna.
-const TH = "px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500"
-const TD = "px-4 py-3 align-middle"
+// px-2 en móvil: con px-4 las tablas no entran en 320px y aparecería scroll interno.
+const TH = "px-2 py-2.5 text-xs font-medium uppercase tracking-wide text-zinc-500 sm:px-4"
+const TD = "px-2 py-3 align-middle sm:px-4"
 
 /** dd/mm sin año: compacto para la columna de fecha. */
 function shortDate(fecha: string) {
@@ -200,7 +201,8 @@ export function FinanzasClient({
           </div>
           <div
             className={cn(
-              "mt-1 text-4xl font-semibold tracking-tight",
+              // 3xl en móvil: un saldo millonario a 4xl no entra en 320px.
+              "mt-1 text-3xl font-semibold tracking-tight sm:text-4xl",
               totales.neto >= 0
                 ? "text-zinc-900 dark:text-white"
                 : "text-red-600 dark:text-red-400",
@@ -301,7 +303,9 @@ export function FinanzasClient({
                   <td className={cn(TD, "whitespace-nowrap text-xs text-zinc-500")}>
                     {shortDate(t.fecha)}
                   </td>
-                  <td className={TD}>
+                  {/* w-full + max-w-0: la columna toma el espacio libre y el truncate
+                      funciona; sin esto un concepto largo fuerza scroll en la tabla. */}
+                  <td className={cn(TD, "w-full max-w-0")}>
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">
                         {t.descripcion || t.categoria || t.tipo}
@@ -383,13 +387,19 @@ export function FinanzasClient({
                     ) : (
                       <span className="text-zinc-500">Sin cliente</span>
                     )}
+                    {/* En móvil la columna Vence se oculta y el badge baja acá. */}
+                    <div className="mt-1 sm:hidden">
+                      <Badge tone={vencida ? "red" : dias <= 7 ? "amber" : "neutral"}>
+                        {vencida ? `vencida ${Math.abs(dias)}d` : `en ${dias}d`}
+                      </Badge>
+                    </div>
                   </td>
                   <td className={cn(TD, "hidden text-zinc-500 sm:table-cell")}>
                     <Link href={`/proyectos/${c.projectId}`} className="hover:underline">
                       {c.proyecto}
                     </Link>
                   </td>
-                  <td className={cn(TD, "whitespace-nowrap")}>
+                  <td className={cn(TD, "hidden whitespace-nowrap sm:table-cell")}>
                     <Badge tone={vencida ? "red" : dias <= 7 ? "amber" : "neutral"}>
                       {vencida ? `vencida ${Math.abs(dias)}d` : `en ${dias}d`}
                     </Badge>
@@ -478,8 +488,12 @@ function Tabla({
                 className={cn(
                   TH,
                   // Cada th se oculta igual que las celdas de su columna.
-                  (c === "Proyecto" || c === "Conceptos") && "hidden sm:table-cell",
+                  (c === "Proyecto" || c === "Conceptos" || c === "Vence") &&
+                    "hidden sm:table-cell",
                   c === "Quién" && "hidden md:table-cell",
+                  // Concepto es la columna elástica: toma el espacio libre y su
+                  // encabezado puede comprimirse (igual que sus celdas).
+                  c === "Concepto" && "w-full max-w-0 truncate",
                   i === cabeceras.length - 1 && "text-right",
                 )}
               >
@@ -498,25 +512,30 @@ function Tabla({
 function Pie({ label, valor }: { label: string; valor: number }) {
   return (
     <tr className="border-t border-black/[.08] bg-zinc-50 dark:border-white/[.12] dark:bg-white/[.03]">
-      <td className={cn(TD, "text-sm text-zinc-500")} colSpan={2}>
-        {label}
-      </td>
-      <td className={cn(TD, "whitespace-nowrap text-right font-semibold")} colSpan={2}>
+      <td className={cn(TD, "text-sm text-zinc-500")}>{label}</td>
+      {/* colSpan 99 = "el resto de las columnas": el navegador lo recorta a las
+          reales, así el pie no inventa columnas cuando algunas están ocultas. */}
+      <td className={cn(TD, "whitespace-nowrap text-right font-semibold")} colSpan={99}>
         {formatMoney(valor)}
       </td>
     </tr>
   )
 }
 
-/** Botón de resolver, en la última columna. */
+/** Botón de resolver, en la última columna. En móvil queda solo el ✓ (compacto). */
 function Accion({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className="whitespace-nowrap rounded-md border border-black/[.12] px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:border-green-500/50 hover:bg-green-500/10 hover:text-green-700 dark:border-white/[.18] dark:text-zinc-300 dark:hover:text-green-400"
     >
-      {label}
+      <span aria-hidden className="sm:hidden">
+        ✓
+      </span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   )
 }

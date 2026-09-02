@@ -5,7 +5,7 @@ import { listTransactions, receivables } from "@/modules/money/queries"
 import { listProjects } from "@/modules/projects/queries"
 import { listUsers } from "@/modules/users/queries"
 import { FinanzasClient } from "./FinanzasClient"
-import { QuickAdd } from "./QuickAdd"
+import { QuickAdd, QuickAddMovil } from "./QuickAdd"
 
 export const dynamic = "force-dynamic"
 
@@ -29,12 +29,21 @@ export default async function FinanzasPage() {
           >
             Exportar
           </a>
-          <QuickAdd
+          {/* En móvil el alta va acá, junto a Exportar; en desktop es la barra de abajo. */}
+          <QuickAddMovil
             usuarios={usuarios}
             proyectos={proyectos.map((p) => ({ id: p.id, nombre: p.nombre }))}
             defaultPagadoPor={user.id}
           />
         </div>
+      </div>
+
+      <div className="mb-6 hidden md:block">
+        <QuickAdd
+          usuarios={usuarios}
+          proyectos={proyectos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+          defaultPagadoPor={user.id}
+        />
       </div>
 
       <FinanzasClient

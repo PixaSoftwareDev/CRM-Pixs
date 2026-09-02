@@ -176,13 +176,19 @@ export function Tabs({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 border-b border-black/[.08] dark:border-white/[.12]",
+        // flex-wrap: si las acciones no entran al lado de las pestañas
+        // (pantallas angostas), bajan de línea en vez de desbordar la página.
+        "flex flex-wrap items-center justify-between gap-x-4 border-b border-black/[.08] dark:border-white/[.12]",
         className,
       )}
     >
-      <nav className="flex shrink-0 gap-6">{children}</nav>
+      {/* Sin scroll interno: si las pestañas no entran (pantallas muy angostas),
+          bajan de línea; cada una mantiene su texto entero en una línea. */}
+      <nav className="flex max-w-full flex-wrap gap-x-4 sm:shrink-0 sm:gap-x-6">{children}</nav>
       {acciones ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 py-1.5">{acciones}</div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 py-1.5">
+          {acciones}
+        </div>
       ) : null}
     </div>
   )
@@ -207,7 +213,7 @@ export function Tab({
       onClick={onClick}
       aria-current={activa ? "page" : undefined}
       className={cn(
-        "-mb-px flex items-center gap-2 border-b-2 py-3 text-sm font-medium transition-colors",
+        "-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors",
         activa
           ? "border-blue-600 text-zinc-900 dark:border-blue-400 dark:text-white"
           : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white",

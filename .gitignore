@@ -50,3 +50,5 @@ storage/
 
 # Backups de la base de producción bajados del VPS (datos reales, no van al repo)
 vps-backups/
+*.sqlite.bak*
+demo.sqlite.bak*

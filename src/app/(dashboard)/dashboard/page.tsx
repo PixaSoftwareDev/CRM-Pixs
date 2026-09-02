@@ -60,9 +60,11 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {/* min-w-0 en los items del grid: sin esto las líneas `truncate` de las
+          listas fijan el ancho mínimo y la página desborda en pantallas chicas. */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Lo que hay que hacer, primero: ocupa dos tercios */}
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Tareas por vencer</h2>
             <Link
@@ -107,7 +109,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Plata que falta entrar o devolver */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Próximos cobros</h2>
