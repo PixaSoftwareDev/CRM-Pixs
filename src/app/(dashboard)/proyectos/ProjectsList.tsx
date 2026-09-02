@@ -24,8 +24,9 @@ type SortKey = "contactoNombre" | "nombre" | "valor" | "estado" | "createdAt"
 type SortDir = "asc" | "desc"
 
 const COLUMNAS: { key: SortKey; label: string; oculta?: string }[] = [
-  { key: "contactoNombre", label: "Cliente" },
+  // Proyecto primero: en móvil es la única columna de texto (el cliente va de subtítulo).
   { key: "nombre", label: "Proyecto" },
+  { key: "contactoNombre", label: "Cliente", oculta: "hidden sm:table-cell" },
   { key: "valor", label: "Valor", oculta: "hidden sm:table-cell" },
   { key: "estado", label: "Estado" },
   { key: "createdAt", label: "Alta", oculta: "hidden lg:table-cell" },
@@ -159,18 +160,24 @@ export function ProjectsList({
                     i > 0 && "border-t border-black/[.06] dark:border-white/[.08]",
                   )}
                 >
-                  <td className={TD}>
+                  {/* w-full + max-w-0: la celda toma el espacio sobrante y trunca
+                      en vez de estirar la tabla más allá de la pantalla. */}
+                  <td className={cn(TD, "w-full max-w-0")}>
                     {/* El seudoelemento cubre la fila entera: se puede hacer clic
                         en cualquier parte, sin anidar enlaces dentro de la tabla. */}
                     <Link
                       href={`/proyectos/${p.id}`}
-                      className="truncate font-medium after:absolute after:inset-0"
+                      className="block truncate font-medium after:absolute after:inset-0"
                     >
-                      {p.contactoNombre ?? "—"}
+                      {p.nombre}
                     </Link>
+                    {/* En móvil el cliente va acá abajo; en pantallas grandes tiene su columna. */}
+                    <div className="truncate text-xs text-zinc-500 sm:hidden">
+                      {p.contactoNombre ?? "—"}
+                    </div>
                   </td>
-                  <td className={cn(TD, "text-zinc-600 dark:text-zinc-300")}>
-                    <span className="truncate">{p.nombre}</span>
+                  <td className={cn(TD, "hidden text-zinc-600 sm:table-cell dark:text-zinc-300")}>
+                    <span className="truncate">{p.contactoNombre ?? "—"}</span>
                   </td>
                   <td className={cn(TD, "hidden whitespace-nowrap text-zinc-500 sm:table-cell")}>
                     {p.valor ? formatMoney(p.valor, p.moneda ?? "ARS") : "—"}
