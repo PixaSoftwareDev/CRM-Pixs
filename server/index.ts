@@ -13,9 +13,7 @@ import { dashboardRouter } from "./routes/dashboard"
 import { documentsRouter } from "./routes/documents"
 import { infraRouter } from "./routes/infra"
 import { moneyRouter } from "./routes/money"
-import { opportunitiesRouter } from "./routes/opportunities"
 import { projectsRouter } from "./routes/projects"
-import { scrapingRouter } from "./routes/scraping"
 import { tasksRouter } from "./routes/tasks"
 import { usersRouter } from "./routes/users"
 
@@ -43,14 +41,12 @@ app.use("/api/auth", authRouter)
 
 // Todo lo demás requiere JWT.
 app.use("/api/contacts", requireAuth, contactsRouter)
-app.use("/api/opportunities", requireAuth, opportunitiesRouter)
 app.use("/api/projects", requireAuth, projectsRouter)
 app.use("/api/tasks", requireAuth, tasksRouter)
 app.use("/api/money", requireAuth, moneyRouter)
 app.use("/api/documents", requireAuth, documentsRouter)
 app.use("/api/credentials", requireAuth, credentialsRouter)
 app.use("/api/infra", requireAuth, infraRouter)
-app.use("/api/scraping", requireAuth, scrapingRouter)
 app.use("/api/activities", requireAuth, activitiesRouter)
 app.use("/api/dashboard", requireAuth, dashboardRouter)
 app.use("/api/users", requireAuth, usersRouter)

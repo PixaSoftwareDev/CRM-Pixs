@@ -39,19 +39,6 @@ export default async function ProyectoPage({ params }: { params: Promise<{ id: s
             ) : (
               <span>Sin cliente asignado</span>
             )}
-            {/* Solo si nació de una oportunidad ganada: los proyectos creados
-                directo desde Proyectos no tienen origen que mostrar. */}
-            {project.opportunityId ? (
-              <>
-                <span className="text-zinc-300 dark:text-zinc-600">·</span>
-                <Link
-                  href={`/pipeline/${project.opportunityId}`}
-                  className="hover:text-zinc-800 hover:underline dark:hover:text-zinc-200"
-                >
-                  ver oportunidad de origen →
-                </Link>
-              </>
-            ) : null}
           </div>
         </div>
         <Badge tone="green">{project.estado}</Badge>

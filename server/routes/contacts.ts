@@ -3,12 +3,7 @@ import { Router } from "express"
 import { z } from "zod"
 import { db } from "@/db"
 import { contactPeople, contacts } from "@/db/schema"
-import {
-  getContact,
-  listContactOpportunities,
-  listContactPeople,
-  listContacts,
-} from "@/modules/contacts/queries"
+import { getContact, listContactPeople, listContacts } from "@/modules/contacts/queries"
 import { cleanContact, contactSchema } from "@/modules/contacts/schemas"
 import { audit } from "../lib/audit"
 import { asyncHandler, HttpError, parse } from "../lib/http"
@@ -31,14 +26,6 @@ contactsRouter.get(
     const c = await getContact(req.params.id)
     if (!c) throw new HttpError(404, "Cliente no encontrado")
     res.json(c)
-  }),
-)
-
-// GET /api/contacts/:id/opportunities
-contactsRouter.get(
-  "/:id/opportunities",
-  asyncHandler(async (req, res) => {
-    res.json(await listContactOpportunities(req.params.id))
   }),
 )
 

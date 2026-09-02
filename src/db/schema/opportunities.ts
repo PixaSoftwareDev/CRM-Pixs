@@ -1,3 +1,6 @@
+// ⚠️ TABLA LEGADA — la funcionalidad se dio de baja (2026-09) pero la tabla se
+// conserva en el schema para que `db:push` NO la borre: en producción hay datos.
+// No construir features nuevas sobre esto.
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import { contacts } from "./contacts"
 

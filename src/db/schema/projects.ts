@@ -17,6 +17,7 @@ export const projects = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     // Opcional: un proyecto puede crearse directo desde Proyectos, sin pasar por
     // el embudo de ventas. Si nació de una oportunidad ganada, queda el vínculo.
+    // Legado: las oportunidades se dieron de baja; la columna queda por los datos viejos.
     opportunityId: text("opportunity_id").references(() => opportunities.id, {
       onDelete: "cascade",
     }),

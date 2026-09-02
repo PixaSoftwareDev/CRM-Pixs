@@ -1,14 +1,6 @@
 import { and, asc, desc, eq, like, ne, or, sql } from "drizzle-orm"
 import { db } from "@/db"
-import {
-  budgets,
-  contactPeople,
-  contacts,
-  installments,
-  opportunities,
-  projects,
-  transactions,
-} from "@/db/schema"
+import { budgets, contactPeople, contacts, installments, projects, transactions } from "@/db/schema"
 
 export type ContactPersonRow = Awaited<ReturnType<typeof listContactPeople>>[number]
 
@@ -64,31 +56,6 @@ export async function listContacts(
 export async function getContact(id: string) {
   const [row] = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1)
   return row ?? null
-}
-
-export type ContactOpportunity = Awaited<ReturnType<typeof listContactOpportunities>>[number]
-
-/**
- * Oportunidades del contacto con su proyecto asociado (si la oportunidad se
- * ganó). Un contacto puede tener varias: así se ven todos sus negocios y
- * proyectos desde su ficha.
- */
-export async function listContactOpportunities(contactId: string) {
-  return db
-    .select({
-      id: opportunities.id,
-      titulo: opportunities.titulo,
-      estado: opportunities.estado,
-      valorEstimado: opportunities.valorEstimado,
-      moneda: opportunities.moneda,
-      projectId: projects.id,
-      projectNombre: projects.nombre,
-      projectEstado: projects.estado,
-    })
-    .from(opportunities)
-    .leftJoin(projects, eq(projects.opportunityId, opportunities.id))
-    .where(eq(opportunities.contactId, contactId))
-    .orderBy(desc(opportunities.createdAt))
 }
 
 export type ContactPayment = Awaited<ReturnType<typeof listContactPayments>>[number]

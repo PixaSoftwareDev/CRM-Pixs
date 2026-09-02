@@ -71,14 +71,12 @@ export const openapiSpec = {
   tags: [
     { name: "auth" },
     { name: "contacts", description: "Contactos / clientes" },
-    { name: "opportunities", description: "Oportunidades (pipeline)" },
     { name: "projects" },
     { name: "tasks" },
     { name: "money", description: "Presupuestos, cuotas y transacciones" },
     { name: "documents" },
     { name: "credentials", description: "Accesos / credenciales" },
     { name: "infra", description: "Servidores y bases de datos" },
-    { name: "scraping", description: "Captación de leads" },
     { name: "activities", description: "Timeline / notas" },
     { name: "dashboard" },
     { name: "users" },
@@ -137,9 +135,6 @@ export const openapiSpec = {
       }),
       delete: op("contacts", "Elimina un contacto", { parameters: [idParam()] }),
     },
-    "/contacts/{id}/opportunities": {
-      get: op("contacts", "Oportunidades del contacto", { parameters: [idParam()] }),
-    },
     "/contacts/{id}/people": {
       get: op("contacts", "Personas de contacto", { parameters: [idParam()] }),
       post: op("contacts", "Agrega una persona de contacto", {
@@ -150,27 +145,6 @@ export const openapiSpec = {
     "/contacts/people/{personId}": {
       delete: op("contacts", "Elimina una persona de contacto", {
         parameters: [idParam("personId", "Id de la persona")],
-      }),
-    },
-
-    "/opportunities": {
-      get: op("opportunities", "Lista oportunidades"),
-      post: op("opportunities", "Crea una oportunidad", {
-        requestBody: jsonBody("opportunitySchema (Zod)"),
-      }),
-    },
-    "/opportunities/{id}": {
-      get: op("opportunities", "Detalle de una oportunidad", { parameters: [idParam()] }),
-      patch: op("opportunities", "Actualiza una oportunidad", {
-        parameters: [idParam()],
-        requestBody: jsonBody("opportunitySchema (Zod)"),
-      }),
-      delete: op("opportunities", "Elimina una oportunidad", { parameters: [idParam()] }),
-    },
-    "/opportunities/{id}/move": {
-      post: op("opportunities", "Mueve la oportunidad de etapa (kanban)", {
-        parameters: [idParam()],
-        requestBody: jsonBody("{ etapa, posicion? }"),
       }),
     },
 
@@ -322,36 +296,6 @@ export const openapiSpec = {
       post: op("infra", "Crea una base de datos", {
         requestBody: jsonBody("databaseSchema (Zod)"),
       }),
-    },
-
-    "/scraping/campaigns": {
-      get: op("scraping", "Lista campañas de captación"),
-      post: op("scraping", "Crea una campaña", { requestBody: jsonBody("campaignSchema (Zod)") }),
-    },
-    "/scraping/campaigns/{id}/run": {
-      post: op("scraping", "Ejecuta la campaña (Google Places → leads)", {
-        parameters: [idParam("id", "Id de la campaña")],
-      }),
-    },
-    "/scraping/leads": {
-      get: op("scraping", "Lista leads", {
-        parameters: [queryParam("campaignId", "Filtrar por campaña")],
-      }),
-    },
-    "/scraping/leads/stats": {
-      get: op("scraping", "Estadísticas de leads"),
-    },
-    "/scraping/leads/{id}/approve": {
-      post: op("scraping", "Aprueba el lead (pasa al pipeline)", { parameters: [idParam()] }),
-    },
-    "/scraping/leads/{id}/discard": {
-      post: op("scraping", "Descarta el lead", { parameters: [idParam()] }),
-    },
-    "/scraping/leads/{id}/enrich": {
-      post: op("scraping", "Enriquece el lead con Claude", { parameters: [idParam()] }),
-    },
-    "/scraping/leads/{id}": {
-      delete: op("scraping", "Elimina el lead", { parameters: [idParam()] }),
     },
 
     "/activities": {
