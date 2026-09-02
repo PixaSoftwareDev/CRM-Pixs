@@ -90,11 +90,7 @@ export function QuickAdd({ usuarios, proyectos, defaultPagadoPor }: QuickAddProp
         <Input
           name="descripcion"
           required
-          placeholder={
-            esGasto
-              ? "¿Qué fue? (ej. hosting, dominio, suscripción)"
-              : "¿De qué? (ej. cuota, anticipo)"
-          }
+          placeholder={esGasto ? "Ej: hosting" : "Ej: cuota"}
           aria-label="Concepto"
           className="min-w-36 flex-1"
         />
