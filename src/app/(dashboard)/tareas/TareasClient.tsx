@@ -110,20 +110,28 @@ export function TareasClient({
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  const filtered = useMemo(
-    () =>
-      items.filter(
-        (t) =>
-          (!projectFilter || t.projectId === projectFilter) &&
-          (!statusFilter || t.estado === statusFilter) &&
-          // "sin" = tareas que no tiene nadie asignado.
-          (!responsableFilter ||
-            (responsableFilter === "sin"
-              ? parseAsignados(t.asignados).length === 0
-              : parseAsignados(t.asignados).includes(responsableFilter))),
-      ),
-    [items, projectFilter, statusFilter, responsableFilter],
-  )
+  // Las hechas se archivan solas: pasados 14 días de cerradas salen del
+  // tablero para que la columna no crezca infinita. Filtrando por estado
+  // "Hecho" se ven todas, viejas incluidas.
+  const DIAS_ARCHIVO = 14
+  const filtered = useMemo(() => {
+    const corte = Date.now() - DIAS_ARCHIVO * 24 * 60 * 60 * 1000
+    return items.filter((t) => {
+      if (t.estado === "hecho" && statusFilter !== "hecho") {
+        const cierre = t.cerradoAt ?? t.createdAt
+        if (cierre && new Date(cierre).getTime() < corte) return false
+      }
+      return (
+        (!projectFilter || t.projectId === projectFilter) &&
+        (!statusFilter || t.estado === statusFilter) &&
+        // "sin" = tareas que no tiene nadie asignado.
+        (!responsableFilter ||
+          (responsableFilter === "sin"
+            ? parseAsignados(t.asignados).length === 0
+            : parseAsignados(t.asignados).includes(responsableFilter)))
+      )
+    })
+  }, [items, projectFilter, statusFilter, responsableFilter])
 
   // Cambia el estado con actualización optimista; revierte si el server falla.
   function changeStatus(id: string, estado: TaskColumn) {
