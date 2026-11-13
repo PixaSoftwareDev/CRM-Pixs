@@ -29,7 +29,7 @@ export const auth = betterAuth({
     },
   },
   session: {
-    // "Recordarme" en el login: 30 días; sin tildarlo, la cookie muere al cerrar el navegador.
+    // La sesión se recuerda 30 días en el navegador donde se inició.
     expiresIn: 30 * DAY,
     updateAge: DAY,
     // Evita ir a la base en cada request: la sesión se valida desde una cookie firmada por 5 min.
