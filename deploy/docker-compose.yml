@@ -40,7 +40,13 @@ services:
         aliases: [crm-pixs-api]
 
   web:
-    build: { context: .., target: web }
+    build:
+      context: ..
+      target: web
+      # Botón "Acceso de prueba": se activa con DEMO_LOGIN_* en .env (ver .env.example).
+      args:
+        VITE_DEMO_LOGIN_EMAIL: ${DEMO_LOGIN_EMAIL:-}
+        VITE_DEMO_LOGIN_PASSWORD: ${DEMO_LOGIN_PASSWORD:-}
     image: crm-web
     container_name: crm-web
     restart: unless-stopped

@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { signIn } from "./api";
-import { devCredentials } from "./dev-credentials";
+import { quickAccess } from "./dev-credentials";
 import { type LoginInput, loginSchema } from "./login-schema";
 
 const inputClass =
@@ -27,9 +27,9 @@ export function LoginPage() {
   });
 
   const fillDevCredentials = () => {
-    if (!devCredentials) return;
-    setValue("email", devCredentials.email, { shouldValidate: true });
-    setValue("password", devCredentials.password, { shouldValidate: true });
+    if (!quickAccess) return;
+    setValue("email", quickAccess.credentials.email, { shouldValidate: true });
+    setValue("password", quickAccess.credentials.password, { shouldValidate: true });
   };
 
   return (
@@ -101,17 +101,17 @@ export function LoginPage() {
             {isSubmitting ? "Entrando…" : "Entrar"}
           </button>
 
-          {devCredentials && (
+          {quickAccess && (
             <div className="flex flex-col gap-1.5 border-t border-dashed border-line pt-4">
               <button
                 type="button"
                 onClick={fillDevCredentials}
                 className="h-10 rounded-[10px] border border-line bg-white text-sm font-medium transition hover:bg-slate-50"
               >
-                Acceso rápido (desarrollo)
+                {quickAccess.label}
               </button>
               <p className="text-center text-xs text-muted">
-                Completa el usuario de prueba. No aparece en producción.
+                {quickAccess.hint}
               </p>
             </div>
           )}

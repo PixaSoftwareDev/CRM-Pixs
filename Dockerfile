@@ -19,7 +19,12 @@ COPY packages packages
 COPY apps/web apps/web
 # La ruta pública la fija el nginx compartido del VPS (repo de Mutualyf), no este repo.
 ARG BASE_PATH=/crmpixs/
-RUN BASE_PATH=$BASE_PATH pnpm --filter @crm/web exec vite build
+# Botón "Acceso de prueba" del login (opcional). Si se pasan, quedan en el código
+# publicado: solo para probar sin datos reales.
+ARG VITE_DEMO_LOGIN_EMAIL=
+ARG VITE_DEMO_LOGIN_PASSWORD=
+RUN BASE_PATH=$BASE_PATH VITE_DEMO_LOGIN_EMAIL=$VITE_DEMO_LOGIN_EMAIL VITE_DEMO_LOGIN_PASSWORD=$VITE_DEMO_LOGIN_PASSWORD \
+    pnpm --filter @crm/web exec vite build
 
 # ─── API ───
 FROM base AS api-deps
