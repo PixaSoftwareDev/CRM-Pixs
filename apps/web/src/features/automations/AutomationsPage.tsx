@@ -70,7 +70,7 @@ export function AutomationsPage() {
             alguien avise a mano.
           </p>
           {waiting.map((r) => (
-            <RuleCard key={r.id} rule={r} busy={false} onToggle={() => {}} onRun={() => {}} />
+            <RuleCard key={r.id} rule={r} busy={false} />
           ))}
         </section>
       )}
@@ -79,7 +79,18 @@ export function AutomationsPage() {
   );
 }
 
-function RuleCard({ rule: r, busy, onToggle, onRun }: { rule: AutomationRuleDto; busy: boolean; onToggle: () => void; onRun: () => void }) {
+/** Las reglas que esperan una conexión se muestran sin acciones (no hay nada que activar todavía). */
+function RuleCard({
+  rule: r,
+  busy,
+  onToggle,
+  onRun,
+}: {
+  rule: AutomationRuleDto;
+  busy: boolean;
+  onToggle?: () => void;
+  onRun?: () => void;
+}) {
   const on = r.enabled || r.builtIn;
   const stats = !r.available
     ? `Necesita: ${r.requires}`
@@ -109,7 +120,7 @@ function RuleCard({ rule: r, busy, onToggle, onRun }: { rule: AutomationRuleDto;
         <p className={cn("text-xs", r.available ? "text-muted" : "font-semibold text-amber-800")}>{stats}</p>
         {r.lastError && r.enabled && <p className="text-xs text-red-700">Último error: {r.lastError}</p>}
       </div>
-      {r.runnable && r.available && (
+      {onRun && r.runnable && r.available && (
         <Button size="sm" variant="secondary" onClick={onRun} disabled={busy}>
           <Play size={13} aria-hidden /> Ejecutar ahora
         </Button>
@@ -119,7 +130,8 @@ function RuleCard({ rule: r, busy, onToggle, onRun }: { rule: AutomationRuleDto;
         role="switch"
         aria-checked={on}
         aria-label={`${on ? "Pausar" : "Activar"}: ${r.name}`}
-        disabled={!r.available || r.builtIn || busy}
+        title={!r.available ? `Para activarla: ${r.requires}` : r.builtIn ? "Es parte de «Venta ganada»: no se pausa" : undefined}
+        disabled={!onToggle || !r.available || r.builtIn || busy}
         onClick={onToggle}
         className={cn(
           "relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed",
