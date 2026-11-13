@@ -36,3 +36,37 @@ body {
     display: none;
   }
 }
+
+/*
+ * Cursor de mano en todo lo que se puede clickear (Tailwind v4 lo dejó en
+ * "default" para los botones). Lo deshabilitado muestra que no se puede usar.
+ */
+@layer base {
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="switch"],
+  a[href],
+  select,
+  summary,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="color"],
+  input[type="file"],
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    cursor: pointer;
+  }
+
+  /* Abre el calendario o el reloj del navegador. */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled="true"],
+  label:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+}

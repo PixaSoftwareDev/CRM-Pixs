@@ -15,14 +15,14 @@ function fromEnv(): { credentials: Credentials; label: string; hint: string } | 
     return {
       credentials: { email: env.VITE_DEV_LOGIN_EMAIL, password: env.VITE_DEV_LOGIN_PASSWORD },
       label: "Acceso rápido (desarrollo)",
-      hint: "Completa el usuario de prueba. No aparece en producción.",
+      hint: "Entra con el usuario de prueba. No aparece en producción.",
     };
   }
   if (env.VITE_DEMO_LOGIN_EMAIL && env.VITE_DEMO_LOGIN_PASSWORD) {
     return {
       credentials: { email: env.VITE_DEMO_LOGIN_EMAIL, password: env.VITE_DEMO_LOGIN_PASSWORD },
       label: "Acceso de prueba",
-      hint: "Completa el usuario de prueba. Solo para probar: se quita antes de cargar datos reales.",
+      hint: "Entra con el usuario de prueba. Solo para probar: se quita antes de cargar datos reales.",
     };
   }
   return null;

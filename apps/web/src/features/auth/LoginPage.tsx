@@ -26,10 +26,12 @@ export function LoginPage() {
     }
   });
 
-  const fillDevCredentials = () => {
+  /** Acceso rápido: completa el usuario de prueba y entra con un solo clic. */
+  const quickLogin = () => {
     if (!quickAccess) return;
     setValue("email", quickAccess.credentials.email, { shouldValidate: true });
     setValue("password", quickAccess.credentials.password, { shouldValidate: true });
+    void onSubmit();
   };
 
   return (
@@ -88,6 +90,7 @@ export function LoginPage() {
             </p>
           )}
 
+          {/* Envía el formulario (onSubmit): así también entra con Enter. */}
           <button
             type="submit"
             disabled={isSubmitting}
@@ -100,8 +103,9 @@ export function LoginPage() {
             <div className="flex flex-col gap-1.5 border-t border-dashed border-line pt-4">
               <button
                 type="button"
-                onClick={fillDevCredentials}
-                className="h-10 rounded-[10px] border border-line bg-white text-sm font-medium transition hover:bg-slate-50"
+                onClick={quickLogin}
+                disabled={isSubmitting}
+                className="h-10 rounded-[10px] border border-line bg-white text-sm font-medium transition hover:bg-slate-50 disabled:opacity-60"
               >
                 {quickAccess.label}
               </button>
