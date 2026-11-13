@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, Link, lazyRouteComponent } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   CLIENT_PRIORITIES,
@@ -30,7 +30,20 @@ const page = {
   MyDayPage: lazyRouteComponent(() => import("./features/tasks/MyDayPage"), "MyDayPage"),
 };
 
-const rootRoute = createRootRoute({ component: AppLayout });
+/** Cualquier dirección que no existe dentro de la app (link viejo, error de tipeo). */
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+      <h1 className="text-xl font-bold">Esta página no existe</h1>
+      <p className="text-sm text-muted">Puede ser un link viejo o mal copiado.</p>
+      <Link to="/" className="rounded-[10px] bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">
+        Ir a Mi día
+      </Link>
+    </div>
+  );
+}
+
+const rootRoute = createRootRoute({ component: AppLayout, notFoundComponent: NotFound });
 
 /** Filtros del listado en la URL: se comparten por link y sobreviven a recargar. */
 const clientsSearch = z.object({
