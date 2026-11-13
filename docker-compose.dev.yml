@@ -1,0 +1,18 @@
+# Postgres SOLO para desarrollo local. Producción usa su propio compose en el VPS.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pixs
+      POSTGRES_PASSWORD: pixs_dev
+      POSTGRES_DB: crm_pixs
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixs -d crm_pixs"]
+      interval: 2s
+      retries: 30
+volumes:
+  pgdata:

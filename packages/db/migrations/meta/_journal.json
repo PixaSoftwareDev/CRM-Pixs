@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794591562273,
+      "tag": "0000_extensiones",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794591562843,
+      "tag": "0001_schema_inicial",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794603009044,
+      "tag": "0002_estado_esperando",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794605124584,
+      "tag": "0003_etapas_y_fases",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794607238098,
+      "tag": "0004_devengamiento_abonos",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794608430922,
+      "tag": "0005_accesos_y_automatizaciones",
+      "breakpoints": true
+    }
+  ]
+}

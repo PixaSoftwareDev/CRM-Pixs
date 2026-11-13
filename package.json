@@ -1,0 +1,21 @@
+{
+  "name": "crm-pixs",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @pixs/api --filter @pixs/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:generate": "pnpm --filter @pixs/db generate",
+    "db:migrate": "pnpm --filter @pixs/db migrate",
+    "db:seed": "pnpm --filter @pixs/db seed",
+    "db:studio": "pnpm --filter @pixs/db studio",
+    "user:dev": "pnpm --filter @pixs/api user:dev",
+    "seed:demo": "pnpm --filter @pixs/api seed:demo",
+    "test": "pnpm -r --if-present test"
+  }
+}
