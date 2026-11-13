@@ -1,5 +1,6 @@
-# Producción en el VPS (/opt/crm). Los nombres y puertos coinciden con lo
-# que ya espera ia_nginx: /crm → crm-web:3020, /crm/api → crm-api:3005.
+# Producción en el VPS (/opt/crm). El nginx compartido (ia_nginx, configurado en
+# el repo de Mutualyf) publica /crmpixs → crm-pixs-web:3020 y /crmpixs/api →
+# crm-pixs-api:3005: por eso los contenedores llevan esos alias en la red edge.
 name: crm
 
 services:
@@ -33,7 +34,10 @@ services:
       DATABASE_URL: postgres://crm:${POSTGRES_PASSWORD}@crm-db:5432/crm
     depends_on:
       db: { condition: service_healthy }
-    networks: [internal, edge]
+    networks:
+      internal: {}
+      edge:
+        aliases: [crm-pixs-api]
 
   web:
     build: { context: .., target: web }
@@ -41,7 +45,9 @@ services:
     container_name: crm-web
     restart: unless-stopped
     depends_on: [api]
-    networks: [edge]
+    networks:
+      edge:
+        aliases: [crm-pixs-web]
 
 volumes:
   pgdata:

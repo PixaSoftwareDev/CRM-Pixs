@@ -1,6 +1,6 @@
 # Imagen del CRM: un solo Dockerfile con dos destinos (api y web).
 #   docker build --target api .   → Node 22 corriendo la API (TypeScript vía tsx)
-#   docker build --target web .   → nginx sirviendo el front compilado bajo /crm
+#   docker build --target web .   → nginx sirviendo el front compilado bajo /crmpixs
 FROM node:22-alpine AS base
 RUN corepack enable
 WORKDIR /repo
@@ -17,7 +17,8 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS web-build
 COPY packages packages
 COPY apps/web apps/web
-ARG BASE_PATH=/crm/
+# La ruta pública la fija el nginx compartido del VPS (repo de Mutualyf), no este repo.
+ARG BASE_PATH=/crmpixs/
 RUN BASE_PATH=$BASE_PATH pnpm --filter @crm/web exec vite build
 
 # ─── API ───
@@ -45,5 +46,5 @@ CMD ["sh", "-c", "node --import tsx src/scripts/migrate.ts && exec node --import
 # ─── Web ───
 FROM nginx:1.27-alpine AS web
 COPY deploy/nginx-web.conf /etc/nginx/conf.d/default.conf
-COPY --from=web-build /repo/apps/web/dist /usr/share/nginx/html/crm
+COPY --from=web-build /repo/apps/web/dist /usr/share/nginx/html/crmpixs
 EXPOSE 3020

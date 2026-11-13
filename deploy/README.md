@@ -5,10 +5,12 @@ nginx de borde (`ia_nginx`, compartido con otros proyectos) ya publica:
 
 | URL pública | Contenedor |
 |---|---|
-| `/crm/api/*` (reescrito a `/api/*`) | `crm-api:3005` |
-| `/crm/*` | `crm-web:3020` |
+| `/crmpixs/api/*` (reescrito a `/api/*`) | `crm-api:3005` (alias `crm-pixs-api`) |
+| `/crmpixs/*` | `crm-web:3020` (alias `crm-pixs-web`) |
 
-Por eso los nombres y puertos de `docker-compose.yml` no se cambian.
+Esa configuración vive en el repo de Mutualyf (`nginx/nginx.prod.conf`): por eso
+la URL pública es `/crmpixs` y los contenedores llevan esos alias. No cambiar
+puertos ni alias sin cambiar también ese nginx.
 
 ## Primera vez
 
