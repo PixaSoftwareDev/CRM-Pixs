@@ -15,7 +15,7 @@ export function LoginPage() {
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { rememberMe: true } });
 
   const onSubmit = handleSubmit(async (data) => {
     setServerError(null);
@@ -80,6 +80,11 @@ export function LoginPage() {
             {errors.password && (
               <span className="text-xs text-red-600">{errors.password.message}</span>
             )}
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="size-4 accent-brand" {...register("rememberMe")} />
+            Recordarme en este equipo (30 días)
           </label>
 
           {serverError && (

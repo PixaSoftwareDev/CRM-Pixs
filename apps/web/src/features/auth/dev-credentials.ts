@@ -5,7 +5,7 @@ import type { LoginInput } from "./login-schema";
  * `import.meta.env.DEV` es `false` literal en el build de producción, así que Vite
  * elimina esta rama y los valores nunca llegan al bundle publicado.
  */
-export const devCredentials: LoginInput | null =
+export const devCredentials: Pick<LoginInput, "email" | "password"> | null =
   import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN_EMAIL && import.meta.env.VITE_DEV_LOGIN_PASSWORD
     ? {
         email: import.meta.env.VITE_DEV_LOGIN_EMAIL,
