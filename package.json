@@ -16,6 +16,7 @@
     "db:studio": "pnpm --filter @crm/db studio",
     "user:dev": "pnpm --filter @crm/api user:dev",
     "seed:demo": "pnpm --filter @crm/api seed:demo",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "test:e2e": "node tests/e2e/api.e2e.mjs"
   }
 }

@@ -26,6 +26,17 @@ pnpm dev                          # web en :5173, API en :3001
 
 `pnpm typecheck` · `pnpm test` · `pnpm db:generate` (después de cambiar el schema).
 
+### Prueba de punta a punta
+
+`tests/e2e/api.e2e.mjs` recorre toda la API como un usuario (login, clientes,
+tareas, embudo, proyectos, tickets, finanzas, accesos, automatizaciones, logout):
+unos 160 chequeos. **Crea datos**: correrlo solo contra una base de prueba.
+
+```bash
+E2E_BASE=http://localhost:3001 E2E_ORIGIN=http://localhost:5173 \
+E2E_EMAIL=… E2E_PASSWORD=… pnpm test:e2e
+```
+
 ## Producción
 
 Ver [deploy/README.md](deploy/README.md).
