@@ -7,7 +7,7 @@ import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   TICKET_TYPES,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { AppLayout } from "./components/layout/AppLayout";
 import { BASE } from "./lib/base";
 

@@ -3,8 +3,8 @@
  * Las que necesitan WhatsApp o un mail saliente se muestran, pero no se pueden
  * activar hasta conectar esa integración (no prometemos lo que no corre).
  */
-import type { Db } from "@pixs/db";
-import type { AutomationAction, AutomationTrigger } from "@pixs/shared";
+import type { Db } from "@crm/db";
+import type { AutomationAction, AutomationTrigger } from "@crm/shared";
 import * as h from "./handlers";
 
 export interface Recipe {

@@ -1,5 +1,5 @@
 /** Datos de Accesos. La clave en texto plano nunca entra al caché de TanStack Query. */
-import type { AccessLogDto, CredentialCreate, CredentialDto, CredentialUpdate } from "@pixs/shared";
+import type { AccessLogDto, CredentialCreate, CredentialDto, CredentialUpdate } from "@crm/shared";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 

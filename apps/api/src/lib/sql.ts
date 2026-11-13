@@ -1,4 +1,4 @@
-import { sql } from "@pixs/db";
+import { sql } from "@crm/db";
 
 /** Hoy en Argentina como `date` de Postgres (los vencimientos son días locales, no UTC). */
 export const todayAr = sql`(now() at time zone 'America/Argentina/Buenos_Aires')::date`;

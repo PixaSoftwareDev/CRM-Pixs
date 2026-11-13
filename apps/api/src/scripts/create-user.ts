@@ -3,10 +3,10 @@
  * pide por teclado sin mostrarla; nunca va como argumento (quedaría en el
  * historial de la terminal).
  *
- *   node dist/create-user.js "Guillermo" guillermo@pixs.com.ar admin
+ *   node dist/create-user.js "Guillermo" nombre@empresa.com admin
  */
 import { createInterface } from "node:readline";
-import { accounts, and, eq, users } from "@pixs/db";
+import { accounts, and, eq, users } from "@crm/db";
 import { closeDb, db } from "../lib/db";
 import { auth } from "../modules/auth/auth";
 

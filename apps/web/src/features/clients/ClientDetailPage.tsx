@@ -1,4 +1,4 @@
-import type { ClientDetail } from "@pixs/shared";
+import type { ClientDetail } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Check, Copy, Mail, Phone } from "lucide-react";
 import { useState } from "react";

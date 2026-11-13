@@ -1,4 +1,4 @@
-import { type ActivityCreate, MANUAL_ACTIVITY_KINDS } from "@pixs/shared";
+import { type ActivityCreate, MANUAL_ACTIVITY_KINDS } from "@crm/shared";
 import { Bot, CalendarCheck, FileText, LifeBuoy, Mail, MessageCircle, Phone, StickyNote, Wallet } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Button } from "../../../components/ui/Button";

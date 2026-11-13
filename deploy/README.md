@@ -1,19 +1,19 @@
 # Deploy en el VPS
 
-El CRM corre en `/opt/crm-pixs` con Docker Compose: Postgres, API y front. El
+El CRM corre en `/opt/crm` con Docker Compose: Postgres, API y front. El
 nginx de borde (`ia_nginx`, compartido con otros proyectos) ya publica:
 
 | URL pública | Contenedor |
 |---|---|
-| `/crmpixs/api/*` (reescrito a `/api/*`) | `crm-pixs-api:3005` |
-| `/crmpixs/*` | `crm-pixs-web:3020` |
+| `/crm/api/*` (reescrito a `/api/*`) | `crm-api:3005` |
+| `/crm/*` | `crm-web:3020` |
 
 Por eso los nombres y puertos de `docker-compose.yml` no se cambian.
 
 ## Primera vez
 
 ```bash
-cd /opt/crm-pixs/deploy
+cd /opt/crm/deploy
 cp .env.example .env
 # Completar .env generando cada secreto en el server (no los copies a chats ni al repo):
 #   openssl rand -base64 32
@@ -29,14 +29,14 @@ La API aplica las migraciones y siembra los catálogos sola cada vez que arranca
 ```bash
 # desde la máquina de desarrollo
 rsync -az --delete --exclude node_modules --exclude dist --exclude .git --exclude '.env*' --exclude 'deploy/.env' \
-  -e "ssh -p 2251" ./ root@VPS:/opt/crm-pixs/
+  -e "ssh -p 2251" ./ root@VPS:/opt/crm/
 # en el VPS
-cd /opt/crm-pixs/deploy && docker compose up -d --build
+cd /opt/crm/deploy && docker compose up -d --build
 ```
 
 ## Respaldos
 
-`/usr/local/bin/satelites-backup.sh` (cron 03:45) hace `pg_dump` de `crm-pixs-db`
-a `/backups/satelites/crmpixs/`, con 7 días de retención.
+`/usr/local/bin/satelites-backup.sh` (cron 03:45) hace `pg_dump` de `crm-db`
+a `/backups/satelites/crm/`, con 7 días de retención.
 
-Restaurar: `gunzip -c pg_crm_pixs_<fecha>.sql.gz | docker exec -i crm-pixs-db psql -U pixs -d crm_pixs`.
+Restaurar: `gunzip -c pg_crm_<fecha>.sql.gz | docker exec -i crm-db psql -U crm -d crm`.

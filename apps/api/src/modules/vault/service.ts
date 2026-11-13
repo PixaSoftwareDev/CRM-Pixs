@@ -5,7 +5,7 @@
  *  - Crear, editar y borrar también quedan en el historial.
  *  - Borrar es lógico: el historial de un acceso borrado se conserva.
  */
-import { credentialAccessLogs, credentials, type Db, type DbOrTx, eq, sql } from "@pixs/db";
+import { credentialAccessLogs, credentials, type Db, type DbOrTx, eq, sql } from "@crm/db";
 import {
   type AccessLogDto,
   type AccessLogQuery,
@@ -18,7 +18,7 @@ import {
   credentialCreate,
   credentialReveal,
   credentialUpdate,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { likePattern } from "../../lib/cursor";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
 import { toIso } from "../../lib/sql";

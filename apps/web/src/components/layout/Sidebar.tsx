@@ -53,8 +53,8 @@ export function Sidebar() {
   return (
     <aside className="flex flex-col gap-4 bg-ink px-3.5 py-5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0">
       <div className="flex items-center gap-2.5 px-2">
-        <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-soft font-bold text-white">P</span>
-        <span className="text-[17px] font-bold tracking-tight text-white">Pixs</span>
+        <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-soft font-bold text-white">C</span>
+        <span className="text-[17px] font-bold tracking-tight text-white">CRM</span>
       </div>
 
       <nav aria-label="Principal" className="flex gap-0.5 overflow-x-auto md:flex-1 md:flex-col md:overflow-visible">

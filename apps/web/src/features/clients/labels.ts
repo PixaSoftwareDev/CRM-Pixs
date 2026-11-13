@@ -1,4 +1,4 @@
-import type { ClientPriority, ClientStatus } from "@pixs/shared";
+import type { ClientPriority, ClientStatus } from "@crm/shared";
 import type { Tone } from "../../components/ui/Chip";
 
 export const STATUS: Record<ClientStatus, { label: string; tone: Tone }> = {

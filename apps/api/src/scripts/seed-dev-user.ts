@@ -3,7 +3,7 @@
  * Toma las credenciales de apps/web/.env.development.local para que front y
  * base usen siempre las mismas. Se niega a correr en producción.
  */
-import { accounts, and, eq, users } from "@pixs/db";
+import { accounts, and, eq, users } from "@crm/db";
 import { env } from "../env";
 import { closeDb, db } from "../lib/db";
 import { auth } from "../modules/auth/auth";

@@ -1,7 +1,7 @@
 /**
  * Rutas HTTP de Tareas, tipos de tarea y equipo. Todas exigen sesión.
  */
-import { idParams, taskCommentCreate, taskCreate, taskRangeQuery, taskTypeCreate, taskUpdate } from "@pixs/shared";
+import { idParams, taskCommentCreate, taskCreate, taskRangeQuery, taskTypeCreate, taskUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { requireUser, sessionOf } from "../auth/guard";

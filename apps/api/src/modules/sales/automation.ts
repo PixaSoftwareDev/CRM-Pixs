@@ -9,8 +9,8 @@
  *     … con un comentario que dice "aceptó" → Cierre de venta
  *   Cualquier tarea en curso en Propuesta → Seguimiento
  */
-import { type DbOrTx, eq, opportunities, opportunityStageChanges, sql } from "@pixs/db";
-import type { StageKey } from "@pixs/shared";
+import { type DbOrTx, eq, opportunities, opportunityStageChanges, sql } from "@crm/db";
+import type { StageKey } from "@crm/shared";
 
 export type TaskEvent = "scheduled" | "done" | "in_progress";
 

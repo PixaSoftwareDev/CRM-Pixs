@@ -1,5 +1,5 @@
 /**
- * Datos de ejemplo para desarrollo (los del diseño "Pixs CRM — Vistas").
+ * Datos de ejemplo para desarrollo (los del diseño del CRM).
  * Borra y recrea solo los clientes de ejemplo; se niega a correr en producción.
  * Uso: pnpm seed:demo
  */
@@ -32,7 +32,7 @@ import {
   tickets,
   timeEntries,
   users,
-} from "@pixs/db";
+} from "@crm/db";
 import { env } from "../env";
 import { closeDb, db } from "../lib/db";
 import { encryptSecret } from "../lib/vault";
@@ -177,7 +177,7 @@ async function main() {
   const team = ["Guillermo", "Enzo", "Alejo"];
   const userIds: Record<string, string> = {};
   for (const name of team) {
-    const email = `${name.toLowerCase()}@pixs.local`;
+    const email = `${name.toLowerCase()}@crm.local`;
     const [u] = await db
       .insert(users)
       .values({ name, email, emailVerified: true })

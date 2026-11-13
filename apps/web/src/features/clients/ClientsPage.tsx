@@ -1,4 +1,4 @@
-import { CLIENT_PRIORITIES, type ClientListItem, type ClientPriority, type ClientStatus } from "@pixs/shared";
+import { CLIENT_PRIORITIES, type ClientListItem, type ClientPriority, type ClientStatus } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";

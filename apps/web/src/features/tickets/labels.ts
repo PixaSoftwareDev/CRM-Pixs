@@ -1,4 +1,4 @@
-import type { TicketChannel, TicketPriority, TicketStatus, TicketType } from "@pixs/shared";
+import type { TicketChannel, TicketPriority, TicketStatus, TicketType } from "@crm/shared";
 import type { Tone } from "../../components/ui/Chip";
 
 export const TICKET_STATUS: Record<TicketStatus, { label: string; tone: Tone }> = {

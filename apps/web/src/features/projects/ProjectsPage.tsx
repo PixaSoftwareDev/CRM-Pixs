@@ -1,4 +1,4 @@
-import { PROJECT_HEALTHS, type ProjectListItem } from "@pixs/shared";
+import { PROJECT_HEALTHS, type ProjectListItem } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Zap } from "lucide-react";
 import { useState } from "react";

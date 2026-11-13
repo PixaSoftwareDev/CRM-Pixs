@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_TYPES } from "@pixs/shared";
+import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_TYPES } from "@crm/shared";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

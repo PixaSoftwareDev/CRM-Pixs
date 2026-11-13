@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  // En el VPS la app se sirve bajo /crmpixs (BASE_PATH=/crmpixs/ al compilar).
+  // En el VPS la app se sirve bajo /crm (BASE_PATH=/crm/ al compilar).
   base: process.env.BASE_PATH ?? "/",
   plugins: [react(), tailwindcss()],
   server: {

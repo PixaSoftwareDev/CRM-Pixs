@@ -1,4 +1,4 @@
-import type { ReceivableDto, SubscriptionDto } from "@pixs/shared";
+import type { ReceivableDto, SubscriptionDto } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Plus, Wallet } from "lucide-react";
 import { useState } from "react";
@@ -200,7 +200,7 @@ function ReceivablesTab({ onPay, onNotice }: { onPay: (t: PaymentTarget) => void
   if (receivables.data.length === 0) return <Empty>No hay nada por cobrar.</Empty>;
 
   const reminderText = (r: ReceivableDto) =>
-    `Hola! Te escribimos de Pixs: ${r.daysToDue !== null && r.daysToDue < 0 ? "quedó pendiente" : "te recordamos"} el pago de ${r.concept} por ${money(r.amount)}${r.dueOn ? ` (vencimiento ${day(r.dueOn)})` : ""}. Cualquier cosa avisanos. ¡Gracias!`;
+    `Hola! Te escribimos para avisarte: ${r.daysToDue !== null && r.daysToDue < 0 ? "quedó pendiente" : "te recordamos"} el pago de ${r.concept} por ${money(r.amount)}${r.dueOn ? ` (vencimiento ${day(r.dueOn)})` : ""}. Cualquier cosa avisanos. ¡Gracias!`;
 
   return (
     <Card className="divide-y divide-slate-100">

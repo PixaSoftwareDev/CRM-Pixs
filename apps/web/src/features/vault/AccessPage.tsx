@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CREDENTIAL_KINDS, type CredentialDto, credentialCreate } from "@pixs/shared";
+import { CREDENTIAL_KINDS, type CredentialDto, credentialCreate } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { Check, Copy, Download, Eye, EyeOff, ExternalLink, History, Lock, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

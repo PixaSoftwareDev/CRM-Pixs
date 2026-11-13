@@ -1,4 +1,4 @@
-import type { ProjectDetail } from "@pixs/shared";
+import type { ProjectDetail } from "@crm/shared";
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";

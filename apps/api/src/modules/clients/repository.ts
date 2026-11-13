@@ -18,7 +18,7 @@ import {
   type SQL,
   sql,
   users,
-} from "@pixs/db";
+} from "@crm/db";
 import type {
   ActivityDto,
   ClientDetail,
@@ -32,7 +32,7 @@ import type {
   ProjectStatus,
   StatementRow,
   TaskStatus,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { z } from "zod";
 import { decodeCursor, likePattern, toPage } from "../../lib/cursor";
 import { todayAr, toIso, toNumber } from "../../lib/sql";

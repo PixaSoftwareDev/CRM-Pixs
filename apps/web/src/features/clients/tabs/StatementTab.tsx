@@ -1,4 +1,4 @@
-import type { ClientDetail } from "@pixs/shared";
+import type { ClientDetail } from "@crm/shared";
 import { Plus, Printer, Receipt } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
@@ -8,7 +8,7 @@ import { cn } from "../../../components/ui/cn";
 import { Input } from "../../../components/ui/Field";
 import { Empty, ErrorBox, Skeleton } from "../../../components/ui/States";
 import { day, money, todayIso } from "../../../lib/format";
-import { formatCuit } from "@pixs/shared";
+import { formatCuit } from "@crm/shared";
 import { Notice, useNotice } from "../../../components/ui/Notice";
 import { InvoiceDialog, type PaymentTarget, PaymentDialog } from "../../finance/dialogs";
 import { useStatement } from "../api";
@@ -48,8 +48,8 @@ export function StatementTab({ client }: { client: ClientDetail }) {
       {/* Encabezado que solo aparece en el papel. */}
       <div className="hidden items-start justify-between border-b border-line pb-3 print:flex">
         <div>
-          <strong className="text-xl">Pixs</strong>
-          <p className="text-xs text-muted">Estado de cuenta emitido el {day(today)}</p>
+          <strong className="text-xl">Estado de cuenta</strong>
+          <p className="text-xs text-muted">Emitido el {day(today)}</p>
         </div>
         <p className="text-right text-xs text-muted">
           Período: {from ? day(from) : "desde el inicio"} al {day(to ?? today)}

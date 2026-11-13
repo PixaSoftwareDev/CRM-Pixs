@@ -5,7 +5,7 @@ import {
   type ClientStatusChange,
   clientStatusChange,
   STATUSES_WITH_REASON,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "../../components/ui/Button";

@@ -9,7 +9,7 @@ import {
   ticketNote,
   ticketUpdate,
   ticketWorkDone,
-} from "@pixs/shared";
+} from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { requireUser, sessionOf } from "../auth/guard";

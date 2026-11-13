@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ProjectDetail } from "@pixs/shared";
+import type { ProjectDetail } from "@crm/shared";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

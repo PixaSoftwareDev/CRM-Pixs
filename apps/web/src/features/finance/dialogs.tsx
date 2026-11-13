@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PAYMENT_METHODS, type PaymentMethod } from "@pixs/shared";
+import { PAYMENT_METHODS, type PaymentMethod } from "@crm/shared";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

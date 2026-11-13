@@ -1,5 +1,5 @@
 /** Datos de Proyectos para el front. */
-import type { ProjectCreate, ProjectDetail, ProjectListItem, ProjectUpdate } from "@pixs/shared";
+import type { ProjectCreate, ProjectDetail, ProjectListItem, ProjectUpdate } from "@crm/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 

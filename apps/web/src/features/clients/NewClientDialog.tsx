@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CLIENT_PRIORITIES, type ClientCreate, clientCreate } from "@pixs/shared";
+import { CLIENT_PRIORITIES, type ClientCreate, clientCreate } from "@crm/shared";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { Button } from "../../components/ui/Button";

@@ -1,4 +1,4 @@
-import type { CredentialKind } from "@pixs/shared";
+import type { CredentialKind } from "@crm/shared";
 
 export const KIND: Record<CredentialKind, string> = {
   panel: "Panel",

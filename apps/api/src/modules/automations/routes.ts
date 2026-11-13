@@ -1,5 +1,5 @@
 /** Rutas de Automatizaciones. Todas exigen sesión. */
-import { idParams, ruleCreate, ruleUpdate } from "@pixs/shared";
+import { idParams, ruleCreate, ruleUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { requireUser, sessionOf } from "../auth/guard";

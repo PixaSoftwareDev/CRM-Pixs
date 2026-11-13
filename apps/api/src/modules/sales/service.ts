@@ -15,7 +15,7 @@ import {
   projects,
   sql,
   tasks,
-} from "@pixs/db";
+} from "@crm/db";
 import {
   type OpportunityCreate,
   type OpportunityLose,
@@ -25,7 +25,7 @@ import {
   opportunityLose,
   opportunityMove,
   opportunityWin,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr } from "../../lib/sql";
 import { isRuleEnabled, recordRun } from "../automations/service";

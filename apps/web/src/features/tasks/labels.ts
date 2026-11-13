@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@pixs/shared";
+import type { TaskStatus } from "@crm/shared";
 import type { Tone } from "../../components/ui/Chip";
 
 export const TASK_STATUS: Record<TaskStatus, { label: string; tone: Tone }> = {

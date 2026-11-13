@@ -1,4 +1,4 @@
-import { TICKET_PRIORITIES, type TicketDetail, type TaskDto } from "@pixs/shared";
+import { TICKET_PRIORITIES, type TicketDetail, type TaskDto } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, CalendarCheck, Check, Phone, X } from "lucide-react";
 import { type ReactNode, useState } from "react";

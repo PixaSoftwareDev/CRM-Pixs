@@ -2,8 +2,8 @@
  * Lecturas de Tareas. Una sola forma de fila (TASK_SELECT) alimenta la agenda,
  * "Mi día" y el detalle, así el front recibe siempre el mismo DTO.
  */
-import { type DbOrTx, type SQL, sql } from "@pixs/db";
-import type { TaskCommentDto, TaskDetailDto, TaskDto, TaskStatus, TaskTypeDto, TeamMember } from "@pixs/shared";
+import { type DbOrTx, type SQL, sql } from "@crm/db";
+import type { TaskCommentDto, TaskDetailDto, TaskDto, TaskStatus, TaskTypeDto, TeamMember } from "@crm/shared";
 import { toIso, toNumber } from "../../lib/sql";
 
 const AR_TZ = "America/Argentina/Buenos_Aires";

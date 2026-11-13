@@ -14,7 +14,7 @@ import {
   cursorQuery,
   dateRangeQuery,
   idParams,
-} from "@pixs/shared";
+} from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { db } from "../../lib/db";

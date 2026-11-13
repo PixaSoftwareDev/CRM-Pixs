@@ -5,7 +5,7 @@ import type {
   OpportunityLose,
   OpportunityWin,
   PipelineDto,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 

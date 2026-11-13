@@ -1,6 +1,6 @@
-# Pixs CRM
+# CRM
 
-CRM interno de Pixs: clientes, agenda, embudo, proyectos, tickets, finanzas,
+CRM interno: clientes, agenda, embudo, proyectos, tickets, finanzas,
 accesos cifrados y automatizaciones.
 
 **Stack:** pnpm (monorepo) · Fastify 5 + Better Auth · PostgreSQL 16 + Drizzle ·

@@ -1,5 +1,5 @@
 /** Rutas HTTP de Proyectos. Todas exigen sesión. */
-import { idParams, projectCreate, projectUpdate } from "@pixs/shared";
+import { idParams, projectCreate, projectUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { requireUser, sessionOf } from "../auth/guard";

@@ -1,4 +1,4 @@
-import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES, type TicketListItem } from "@pixs/shared";
+import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES, type TicketListItem } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";

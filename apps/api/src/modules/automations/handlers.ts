@@ -3,7 +3,7 @@
  * veces el mismo día no duplica nada (cada una se fija qué ya existe).
  * Devuelven las entidades afectadas, para el registro de ejecuciones.
  */
-import { activities, type Db, eq, inArray, installments, projects, sql, taskComments, tasks } from "@pixs/db";
+import { activities, type Db, eq, inArray, installments, projects, sql, taskComments, tasks } from "@crm/db";
 import { nextWorkdayAt, todayArIso } from "../../lib/dates";
 import { todayAr } from "../../lib/sql";
 import { runAccrual } from "../finance/service";

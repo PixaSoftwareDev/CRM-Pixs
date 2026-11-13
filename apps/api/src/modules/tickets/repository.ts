@@ -2,8 +2,8 @@
  * Lecturas de Tickets. El buscador filtra en la base (los tickets crecen sin
  * techo) y pagina por número descendente (keyset: igual de rápido en la página 50).
  */
-import { and, type DbOrTx, type SQL, sql } from "@pixs/db";
-import type { ticketListQuery } from "@pixs/shared";
+import { and, type DbOrTx, type SQL, sql } from "@crm/db";
+import type { ticketListQuery } from "@crm/shared";
 import type {
   Page,
   TicketChannel,
@@ -12,7 +12,7 @@ import type {
   TicketPriority,
   TicketStatus,
   TicketType,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { z } from "zod";
 import { decodeCursor, likePattern, toPage } from "../../lib/cursor";
 import { toIso } from "../../lib/sql";

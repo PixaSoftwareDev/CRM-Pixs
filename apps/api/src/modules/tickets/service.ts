@@ -21,7 +21,7 @@ import {
   ticketEvents,
   tickets,
   timeEntries,
-} from "@pixs/db";
+} from "@crm/db";
 import {
   type TicketAssign,
   type TicketCancel,
@@ -38,7 +38,7 @@ import {
   ticketNote,
   ticketUpdate,
   ticketWorkDone,
-} from "@pixs/shared";
+} from "@crm/shared";
 import type { z } from "zod";
 import { endOfDayAr, fmtWhen } from "../../lib/dates";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";

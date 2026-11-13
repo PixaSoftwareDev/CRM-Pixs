@@ -3,7 +3,7 @@
  * compañero, cambió de estado) queda como comentario en la tarea, y finalizar
  * una llamada o reunión cuenta como contacto con el cliente.
  */
-import { activities, type Db, type DbOrTx, eq, taskComments, tasks, taskTypes } from "@pixs/db";
+import { activities, type Db, type DbOrTx, eq, taskComments, tasks, taskTypes } from "@crm/db";
 import {
   type TaskCommentCreate,
   type TaskCreate,
@@ -14,7 +14,7 @@ import {
   taskCreate,
   taskTypeCreate,
   taskUpdate,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { fmtWhen, nextWorkdayAt } from "../../lib/dates";
 import { BadRequestError, ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
 import { isRuleEnabled, recordRun } from "../automations/service";

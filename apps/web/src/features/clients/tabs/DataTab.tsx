@@ -13,7 +13,7 @@ import {
   formatCuit,
   INVOICE_LETTERS,
   TAX_CONDITIONS,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";

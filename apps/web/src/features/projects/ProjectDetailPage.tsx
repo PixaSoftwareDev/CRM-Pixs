@@ -1,4 +1,4 @@
-import { PROJECT_PHASES, type ProjectDetail } from "@pixs/shared";
+import { PROJECT_PHASES, type ProjectDetail } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Check, Copy, Mail, Pencil, Phone, Zap } from "lucide-react";
 import { useState } from "react";

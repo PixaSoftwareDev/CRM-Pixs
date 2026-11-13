@@ -2,7 +2,7 @@
  * Lecturas de Finanzas. "Pendiente" de una factura = importe − lo imputado por
  * recibos y notas de crédito; se calcula siempre en la base (una sola verdad).
  */
-import { type DbOrTx, sql } from "@pixs/db";
+import { type DbOrTx, sql } from "@crm/db";
 import type {
   CashMovementDto,
   FinanceSummary,
@@ -10,7 +10,7 @@ import type {
   PriceAdjustmentDto,
   ReceivableDto,
   SubscriptionDto,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { todayAr, toIso, toNumber } from "../../lib/sql";
 
 /** Saldo pendiente de cada factura / nota de débito emitida. */

@@ -18,7 +18,7 @@ import {
   priceAdjustments,
   sql,
   subscriptions,
-} from "@pixs/db";
+} from "@crm/db";
 import {
   type AccrualResult,
   type AccrualRun,
@@ -40,7 +40,7 @@ import {
   type SubscriptionUpdate,
   subscriptionCreate,
   subscriptionUpdate,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr } from "../../lib/sql";
 import * as repo from "./repository";

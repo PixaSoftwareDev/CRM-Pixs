@@ -1,4 +1,4 @@
-import type { OpportunityCardDto, PipelineStageDto } from "@pixs/shared";
+import type { OpportunityCardDto, PipelineStageDto } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { Plus, Trophy, User, Zap } from "lucide-react";
 import { useState } from "react";

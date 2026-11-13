@@ -2,7 +2,7 @@
  * Lecturas de Proyectos. Los contadores (tickets, tareas, horas) salen de
  * subconsultas indexadas por project_id; la salud se calcula en `healthOf`.
  */
-import { type DbOrTx, type SQL, sql } from "@pixs/db";
+import { type DbOrTx, type SQL, sql } from "@crm/db";
 import {
   PROJECT_PHASES,
   type ProjectDetail,
@@ -11,7 +11,7 @@ import {
   type ProjectPhase,
   type ProjectStatus,
   type ProjectTicketDto,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { todayAr, toIso, toNumber } from "../../lib/sql";
 import { listTasksOfProject } from "../tasks/repository";
 

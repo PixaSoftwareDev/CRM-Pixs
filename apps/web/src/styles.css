@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tokens del diseño "Pixs CRM — Vistas" */
+/* Tokens del diseño del CRM */
 @theme {
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --color-brand: #4f46e5;

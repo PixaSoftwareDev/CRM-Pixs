@@ -3,8 +3,8 @@
  * de cada ejecución. El "reclamo" de una corrida diaria es un UPDATE atómico:
  * si hay varias instancias de la API, solo una la ejecuta.
  */
-import { automationRules, automationRuns, type Db, type DbOrTx, eq, sql } from "@pixs/db";
-import { type AutomationRuleDto, type RuleCreate, type RuleRunResult, ruleCreate } from "@pixs/shared";
+import { automationRules, automationRuns, type Db, type DbOrTx, eq, sql } from "@crm/db";
+import { type AutomationRuleDto, type RuleCreate, type RuleRunResult, ruleCreate } from "@crm/shared";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr, toIso, toNumber } from "../../lib/sql";
 import { type Recipe, recipeOf } from "./catalog";

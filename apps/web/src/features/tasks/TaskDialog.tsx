@@ -1,4 +1,4 @@
-import type { TaskDetailDto, TaskStatus, TaskUpdate } from "@pixs/shared";
+import type { TaskDetailDto, TaskStatus, TaskUpdate } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { Check, Receipt, Users } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";

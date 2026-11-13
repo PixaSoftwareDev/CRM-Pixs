@@ -1,4 +1,4 @@
-import type { ProjectHealth, ProjectPhase, ProjectStatus } from "@pixs/shared";
+import type { ProjectHealth, ProjectPhase, ProjectStatus } from "@crm/shared";
 import type { Tone } from "../../components/ui/Chip";
 
 export const HEALTH: Record<ProjectHealth, { label: string; tone: Tone; bar: string }> = {

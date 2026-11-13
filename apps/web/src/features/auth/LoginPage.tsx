@@ -37,9 +37,9 @@ export function LoginPage() {
       <section className="flex flex-[1_1_420px] flex-col justify-between gap-10 bg-ink p-10 text-white sm:p-14">
         <div className="flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-[10px] bg-brand-soft font-bold">
-            P
+            C
           </span>
-          <span className="text-lg font-bold">Pixs</span>
+          <span className="text-lg font-bold">CRM</span>
         </div>
         <div>
           <h1 className="max-w-[440px] text-4xl leading-tight font-bold tracking-tight sm:text-[40px]">
@@ -49,7 +49,7 @@ export function LoginPage() {
             Entrá, mirá qué toca hoy y dejá que el sistema se encargue de los recordatorios.
           </p>
         </div>
-        <p className="text-[13px] text-slate-400">© {new Date().getFullYear()} Pixs</p>
+        <p className="text-[13px] text-slate-400">© {new Date().getFullYear()} CRM</p>
       </section>
 
       <section className="flex flex-[1_1_420px] items-center justify-center px-6 py-10">

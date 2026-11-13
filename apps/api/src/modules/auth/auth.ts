@@ -1,4 +1,4 @@
-import { accounts, sessions, users, verifications } from "@pixs/db";
+import { accounts, sessions, users, verifications } from "@crm/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { env } from "../../env";
@@ -7,7 +7,7 @@ import { db } from "../../lib/db";
 const DAY = 60 * 60 * 24;
 
 export const auth = betterAuth({
-  appName: "Pixs CRM",
+  appName: "CRM",
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
   basePath: "/api/auth",
@@ -44,7 +44,7 @@ export const auth = betterAuth({
   advanced: {
     // Cookies "Secure" solo si la app se sirve por HTTPS (si no, el navegador no las manda).
     useSecureCookies: env.BETTER_AUTH_URL.startsWith("https://"),
-    cookiePrefix: "pixs",
+    cookiePrefix: "crm",
     // Los ids los genera el schema (UUIDv7).
     database: { generateId: false },
   },

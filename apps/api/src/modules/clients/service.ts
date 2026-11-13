@@ -11,7 +11,7 @@ import {
   type Db,
   type DbOrTx,
   eq,
-} from "@pixs/db";
+} from "@crm/db";
 import {
   type ActivityCreate,
   activityCreate,
@@ -28,7 +28,7 @@ import {
   type ContactUpdate,
   contactInput,
   contactUpdate,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
 import * as repo from "./repository";
 

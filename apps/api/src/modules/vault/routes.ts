@@ -2,7 +2,7 @@
  * Rutas de Accesos. Las respuestas que traen una clave salen con
  * Cache-Control: no-store para que no queden en ningún caché.
  */
-import { accessLogQuery, credentialCreate, credentialReveal, credentialUpdate, idParams } from "@pixs/shared";
+import { accessLogQuery, credentialCreate, credentialReveal, credentialUpdate, idParams } from "@crm/shared";
 import type { FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";

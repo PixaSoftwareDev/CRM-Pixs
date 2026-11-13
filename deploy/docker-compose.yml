@@ -1,51 +1,51 @@
-# Producción en el VPS (/opt/crm-pixs). Los nombres y puertos coinciden con lo
-# que ya espera ia_nginx: /crmpixs → crm-pixs-web:3020, /crmpixs/api → crm-pixs-api:3005.
-name: crm-pixs
+# Producción en el VPS (/opt/crm). Los nombres y puertos coinciden con lo
+# que ya espera ia_nginx: /crm → crm-web:3020, /crm/api → crm-api:3005.
+name: crm
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: crm-pixs-db
+    container_name: crm-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: pixs
-      POSTGRES_DB: crm_pixs
+      POSTGRES_USER: crm
+      POSTGRES_DB: crm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks: [internal]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pixs -d crm_pixs"]
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   api:
     build: { context: .., target: api }
-    image: crm-pixs-api
-    container_name: crm-pixs-api
+    image: crm-api
+    container_name: crm-api
     restart: unless-stopped
     env_file: .env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3005"
-      DATABASE_URL: postgres://pixs:${POSTGRES_PASSWORD}@crm-pixs-db:5432/crm_pixs
+      DATABASE_URL: postgres://crm:${POSTGRES_PASSWORD}@crm-db:5432/crm
     depends_on:
       db: { condition: service_healthy }
     networks: [internal, edge]
 
   web:
     build: { context: .., target: web }
-    image: crm-pixs-web
-    container_name: crm-pixs-web
+    image: crm-web
+    container_name: crm-web
     restart: unless-stopped
     depends_on: [api]
     networks: [edge]
 
 volumes:
   pgdata:
-    name: crm-pixs-pgdata
+    name: crm-pgdata
 
 networks:
   internal: {}

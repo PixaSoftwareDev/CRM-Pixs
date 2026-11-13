@@ -18,7 +18,7 @@ import type {
   ContactInput,
   Page,
   StatementDto,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 

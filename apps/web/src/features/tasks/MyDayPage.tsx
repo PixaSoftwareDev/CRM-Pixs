@@ -1,4 +1,4 @@
-import type { TaskDto } from "@pixs/shared";
+import type { TaskDto } from "@crm/shared";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";

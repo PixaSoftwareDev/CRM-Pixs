@@ -1,5 +1,5 @@
 /** Rutas HTTP del Embudo. Todas exigen sesión. */
-import { idParams, opportunityCreate, opportunityLose, opportunityMove, opportunityWin } from "@pixs/shared";
+import { idParams, opportunityCreate, opportunityLose, opportunityMove, opportunityWin } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { requireUser, sessionOf } from "../auth/guard";

@@ -1,12 +1,12 @@
 /** Reglas de Proyectos: alta manual y edición (etapa, estado, fechas, responsable). */
-import { activities, type Db, eq, projects, sql } from "@pixs/db";
+import { activities, type Db, eq, projects, sql } from "@crm/db";
 import {
   type ProjectCreate,
   type ProjectUpdate,
   PROJECT_PHASES,
   projectCreate,
   projectUpdate,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
 import { isActiveUser } from "../tasks/repository";
 import * as repo from "./repository";

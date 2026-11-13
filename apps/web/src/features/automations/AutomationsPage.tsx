@@ -1,4 +1,4 @@
-import type { AutomationRuleDto, RuleRunResult } from "@pixs/shared";
+import type { AutomationRuleDto, RuleRunResult } from "@crm/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, Plug, Zap } from "lucide-react";
 import { PageHeader } from "../../components/layout/AppLayout";

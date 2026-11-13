@@ -11,7 +11,7 @@ import type {
   ticketListQuery,
   TicketUpdate,
   TicketWorkDone,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import { api } from "../../lib/api";

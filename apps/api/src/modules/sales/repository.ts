@@ -1,6 +1,6 @@
 /** Lecturas del Embudo. */
-import { type DbOrTx, sql } from "@pixs/db";
-import type { OpportunityCardDto, OpportunityStatus, PipelineDto, StageKey, TaskStatus } from "@pixs/shared";
+import { type DbOrTx, sql } from "@crm/db";
+import type { OpportunityCardDto, OpportunityStatus, PipelineDto, StageKey, TaskStatus } from "@crm/shared";
 import { todayAr, toIso, toNumber } from "../../lib/sql";
 
 /** Inicio del mes en curso en Argentina. */

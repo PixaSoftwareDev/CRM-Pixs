@@ -11,7 +11,7 @@ import type {
   TaskTypeDto,
   TaskUpdate,
   TeamMember,
-} from "@pixs/shared";
+} from "@crm/shared";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { authClient } from "../../lib/auth-client";

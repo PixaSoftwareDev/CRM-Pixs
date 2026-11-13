@@ -1,4 +1,4 @@
-import { sql } from "@pixs/db";
+import { sql } from "@crm/db";
 import type { FastifyPluginAsync } from "fastify";
 import { db } from "../../lib/db";
 

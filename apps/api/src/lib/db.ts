@@ -1,4 +1,4 @@
-import { createDb } from "@pixs/db";
+import { createDb } from "@crm/db";
 import { env } from "../env";
 
 /** Pool único del proceso. Se cierra en el shutdown (ver index.ts). */

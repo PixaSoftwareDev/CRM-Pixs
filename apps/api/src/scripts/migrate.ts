@@ -2,8 +2,8 @@
  * Arranque en producción: aplica las migraciones pendientes y siembra los
  * catálogos (las dos cosas son idempotentes). Corre antes de levantar la API.
  */
-import { createDb, migrate } from "@pixs/db";
-import { seedCatalogs } from "@pixs/db/seed";
+import { createDb, migrate } from "@crm/db";
+import { seedCatalogs } from "@crm/db/seed";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("Falta DATABASE_URL");
