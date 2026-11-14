@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
-import { parsePesos } from "../../lib/format";
+import { centsToInput, parsePesos } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useClientOptions, useTeam } from "../tasks/api";
 import { todayAr } from "../tasks/time";
@@ -61,10 +61,11 @@ export function ProjectFormDialog({
       name: project?.name ?? "",
       clientId: project?.client.id ?? "",
       implementerId: project?.implementer?.id ?? "",
-      startsOn: project?.startsOn ?? todayAr(),
+      // Hoy solo como sugerencia en el alta: al editar, un proyecto sin inicio sigue sin inicio.
+      startsOn: project ? (project.startsOn ?? "") : todayAr(),
       dueOn: project?.dueOn ?? "",
       estimatedHours: project?.estimatedHours?.toString() ?? "",
-      saleAmount: project?.sale.amount ? String(project.sale.amount / 100) : "",
+      saleAmount: project?.sale.amount ? centsToInput(project.sale.amount) : "",
       paymentTerms: project?.sale.paymentTerms ?? "",
       scope: project?.scope ?? "",
     });

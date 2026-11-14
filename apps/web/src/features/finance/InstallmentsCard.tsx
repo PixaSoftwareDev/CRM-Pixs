@@ -5,7 +5,7 @@ import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { Field, Input } from "../../components/ui/Field";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
-import { day, money, parsePesos } from "../../lib/format";
+import { centsToInput, day, money, parsePesos } from "../../lib/format";
 import { addMonths, todayAr } from "../tasks/time";
 import { useCreatePlan, useInstallmentPlans } from "./api";
 import { type PaymentTarget, PaymentDialog } from "./dialogs";
@@ -54,7 +54,7 @@ export function InstallmentsCard({
   const create = useCreatePlan(p.id);
   const [pay, setPay] = useState<PaymentTarget | null>(null);
   const today = todayAr();
-  const [total, setTotal] = useState(p.sale.amount ? String(p.sale.amount / 100) : "");
+  const [total, setTotal] = useState(p.sale.amount ? centsToInput(p.sale.amount) : "");
   const [advance, setAdvance] = useState("0");
   const [count, setCount] = useState("3");
   const [firstDue, setFirstDue] = useState(addMonths(today, 1).slice(0, 8) + "10");

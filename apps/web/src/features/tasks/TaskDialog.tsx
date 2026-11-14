@@ -41,7 +41,9 @@ function diff(t: TaskDetailDto, e: Edit, comment: string): TaskUpdate {
   const patch: TaskUpdate = {};
   if (e.date && e.start && e.end && (e.date !== o.date || e.start !== o.start || e.end !== o.end)) {
     patch.startsAt = toInstant(e.date, e.start);
-    patch.durationMinutes = toMinutes(e.end) - toMinutes(e.start);
+    // Si solo cambió el día, se conserva la duración: el "Hasta" se muestra topeado
+    // a 23:59 y recalcularla recortaba las tareas que pasan la medianoche.
+    if (e.start !== o.start || e.end !== o.end) patch.durationMinutes = toMinutes(e.end) - toMinutes(e.start);
   }
   if (e.assigneeId !== o.assigneeId) patch.assigneeId = e.assigneeId;
   if (e.status !== o.status) patch.status = e.status;
@@ -127,9 +129,21 @@ function TaskBody({
 
   const t = task.data;
   const patch = diff(t, edit, comment);
-  const dirty = Object.keys(patch).length > 0;
+  const saved = editOf(t);
+  const scheduleChanged = edit.date !== saved.date || edit.start !== saved.start || edit.end !== saved.end;
+  // Un horario a medio cargar no entra en el PATCH, pero cuenta como cambio: si no,
+  // "Guardar" cerraba sin guardar y "Cerrar" no avisaba.
+  const dirty = Object.keys(patch).length > 0 || scheduleChanged;
   const minutes = edit.start && edit.end ? toMinutes(edit.end) - toMinutes(edit.start) : 0;
-  const badRange = !!edit.start && !!edit.end && minutes <= 0;
+  const scheduleError =
+    scheduleChanged && !(edit.date && edit.start && edit.end)
+      ? "Completá fecha, desde y hasta"
+      : edit.start && edit.end && minutes <= 0
+        ? "Revisá el horario"
+        : edit.start && edit.end && minutes < 5
+          ? "Mínimo 5 minutos"
+          : undefined;
+  const badRange = !!scheduleError;
   const set = (k: keyof Edit) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setEdit({ ...edit, [k]: e.target.value });
 
@@ -155,7 +169,8 @@ function TaskBody({
   };
 
   const sendComment = async () => {
-    if (!comment.trim()) return;
+    // Enter dos veces rápido duplicaba el comentario.
+    if (!comment.trim() || addComment.isPending) return;
     await addComment.mutateAsync({ body: comment.trim() });
     setComment("");
   };
@@ -276,7 +291,7 @@ function TaskBody({
           <Field label="De">
             <Input type="time" step={300} value={edit.start} onChange={set("start")} className="w-28" />
           </Field>
-          <Field label="Hasta" error={badRange ? "Revisá el horario" : undefined}>
+          <Field label="Hasta" error={scheduleError}>
             <Input type="time" step={300} value={edit.end} onChange={set("end")} aria-invalid={badRange} className="w-28" />
           </Field>
           {minutes > 0 && <span className="pb-2.5 text-xs text-muted">{durationLabel(minutes)}</span>}
@@ -325,7 +340,8 @@ function TaskBody({
                 <Check size={16} aria-hidden /> Finalizar
               </Button>
             )}
-            <Button onClick={() => void saveAnd(onClose)} disabled={!dirty || badRange || update.isPending}>
+            {/* Siempre activo: tras "Comentar" no queda nada pendiente y apagarlo parecía un error; sin cambios, cierra. */}
+            <Button onClick={() => void (dirty ? saveAnd(onClose) : onClose())} disabled={badRange || update.isPending}>
               Guardar
             </Button>
           </div>

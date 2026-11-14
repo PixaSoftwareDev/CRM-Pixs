@@ -73,6 +73,12 @@ export function initials(name: string): string {
 /** plural(1, "activo", "activos") → "1 activo". */
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * Centavos → texto para un input de pesos ("1234,56"), el inverso de parsePesos.
+ * Con punto decimal parsePesos lo tomaba como miles y multiplicaba el monto por 100.
+ */
+export const centsToInput = (cents: number) => String(cents / 100).replace(".", ",");
+
 /** "150.000,50" o "150000" (pesos escritos a mano) → centavos. null si no es un número. */
 export function parsePesos(input: string): number | null {
   const clean = input.replace(/[$\s]/g, "").replace(/\./g, "").replace(",", ".");
