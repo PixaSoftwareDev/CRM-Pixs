@@ -236,6 +236,18 @@ await section("Embudo: potencial → reglas automáticas → ganada / perdida", 
   const lost = await post("/api/opportunities", { title: "Para perder", amount: 0, clientId: ctx.clientId });
   expectStatus("perdida sin motivo → 400", await post(`/api/opportunities/${lost.data?.id}/lose`, { reason: "" }), 400);
   expectStatus("marcar perdida", await post(`/api/opportunities/${lost.data?.id}/lose`, { reason: "Precio" }), 204);
+  // "Comentar" que aceptó y después "Finalizar" (sin texto en la caja) también cierra la venta.
+  const o2 = await post("/api/opportunities", { title: "Acepta E2E", amount: 0, newClient: { name: `Acepta E2E ${RUN}`, contactName: "Bea", phone: "5678" } });
+  expectStatus("otro potencial", o2, 201);
+  const sale = await post("/api/tasks", { title: "Propuesta E2E", typeId: ctx.type["Ventas"], clientId: o2.data?.clientId, startsAt: at(TODAY, "11:00") });
+  expectStatus("tarea de ventas", sale, 201);
+  expectStatus("comentar que aceptó", await post(`/api/tasks/${sale.data?.id}/comments`, { body: "El cliente aceptó la propuesta" }), 201);
+  expectStatus("finalizar sin comentario", await patch(`/api/tasks/${sale.data?.id}`, { status: "hecha" }), 204);
+  const pipe = await get("/api/pipeline");
+  const cierre = pipe.data?.stages?.find((x) => x.key === "cierre");
+  const inCierre = await get(`/api/pipeline/stages/${cierre?.id}/opportunities`);
+  check("regla: el comentario ya guardado cuenta → Cierre", inCierre.data?.some((o) => o.id === o2.data?.id));
+  await post(`/api/opportunities/${o2.data?.id}/lose`, { reason: "Prueba E2E" });
 });
 
 await section("Proyectos", async () => {
@@ -303,6 +315,77 @@ await section("Tickets: flujo completo", async () => {
   const pr = await get(`/api/projects/${ctx.projectId}`);
   // 1,5 h del primer "trabajo terminado" + 1 h de la tarea de retrabajo finalizada en Mi día (su duración).
   check("las horas del ticket se sumaron al proyecto", pr.data?.hoursUsed === 2.5, pr.data?.hoursUsed);
+});
+
+await section("Tickets: varias tareas a varias personas", async () => {
+  const team = (await get("/api/team")).data ?? [];
+  const others = team.filter((u) => u.id !== ctx.me.id).slice(0, 2);
+  check("hay al menos 3 personas en el equipo", others.length === 2, team.length);
+  const [p2, p3] = others;
+  const t = await post("/api/tickets", { clientId: ctx.oppClientId, projectId: ctx.projectId, type: "implementacion", channel: "presencial", title: `Reunión de diseño E2E ${RUN}` });
+  expectStatus("cargar ticket", t, 201);
+  const id = t.data?.id;
+  const path = `/api/tickets/${id}`;
+  const task = (who, hhmm, title = "Reu de diseño", typeId = ctx.type["Reunión"]) => ({ title, typeId, assigneeId: who, startsAt: at(addDays(TODAY, 1), hhmm), durationMinutes: 60 });
+
+  expectStatus("tarea sin título → 400", await post(`${path}/tasks`, { ...task(ctx.me.id, "09:00"), title: " " }), 400);
+  expectStatus("la primera tarea de un ticket nuevo lo asigna", await post(`${path}/tasks`, task(ctx.me.id, "09:00", "Preparar la reu")), 201);
+  let d = (await get(path)).data;
+  check("quedó en curso a mi nombre", d?.status === "en_curso" && d?.assignee?.id === ctx.me.id, d?.status);
+  check("es la tarea principal", d?.tasks?.[0]?.ticketRole === "principal", d?.tasks?.[0]?.ticketRole);
+  expectStatus("tarea para otra persona", await post(`${path}/tasks`, task(p2.id, "10:00")), 201);
+  expectStatus("tarea para una tercera persona", await post(`${path}/tasks`, task(p3.id, "10:00")), 201);
+  d = (await get(path)).data;
+  check("3 tareas abiertas, a 3 personas", new Set(d?.tasks?.filter((x) => x.status === "pendiente").map((x) => x.assignee.id)).size === 3, d?.tasks?.length);
+  check("2 adicionales", d?.tasks?.filter((x) => x.ticketRole === "adicional").length === 2);
+  check("heredan el cliente del ticket", d?.tasks?.every((x) => x.client?.id === ctx.oppClientId));
+  const agenda = (await get(`/api/tasks?from=${addDays(TODAY, 1)}&to=${addDays(TODAY, 1)}`)).data ?? [];
+  const agendaIds = new Set(agenda.map((x) => x.id));
+  check("las 3 están en la agenda", d?.tasks?.every((x) => agendaIds.has(x.id)));
+
+  // Doble clic en "Asignar y agendar": la misma asignación dos veces seguidas no reasigna.
+  const same = { assigneeId: ctx.me.id, scheduledAt: at(addDays(TODAY, 1), "09:00"), durationMinutes: 60 };
+  const principal = d?.tasks?.find((x) => x.ticketRole === "principal");
+  const [r1, r2] = await Promise.all([post(`${path}/assign`, same), post(`${path}/assign`, same)]);
+  check("asignación idéntica repetida → 204 las dos", r1.status === 204 && r2.status === 204, [r1.status, r2.status]);
+  d = (await get(path)).data;
+  check("no se canceló ni duplicó la principal", d?.tasks?.filter((x) => x.ticketRole === "principal" && x.status !== "cancelada").length === 1 && d?.tasks?.some((x) => x.id === principal?.id && x.status === "pendiente"), d?.tasks?.map((x) => [x.ticketRole, x.status]));
+
+  // Reasignar cambia solo la principal: las de los demás siguen.
+  expectStatus("reasignar el ticket a otra persona", await post(`${path}/assign`, { assigneeId: p2.id, scheduledAt: at(addDays(TODAY, 1), "11:00") }), 204);
+  d = (await get(path)).data;
+  check("la principal anterior se canceló", d?.tasks?.some((x) => x.id === principal?.id && x.status === "cancelada"));
+  check("las adicionales siguen abiertas", d?.tasks?.filter((x) => x.ticketRole === "adicional" && x.status === "pendiente").length === 2);
+
+  // Un tipo con "Llamada" en el nombre no confunde al flujo (el papel no depende del tipo).
+  const open = d?.tasks?.filter((x) => x.status === "pendiente" && x.ticketRole !== "confirmacion") ?? [];
+  expectStatus("cambiar el tipo de una adicional a Llamada", await patch(`/api/tasks/${open.find((x) => x.ticketRole === "adicional")?.id}`, { typeId: ctx.type["Llamada"], title: "Reu de diseño (corregido)" }), 204);
+  const edited = (await get(`/api/tasks/${open.find((x) => x.ticketRole === "adicional")?.id}`)).data;
+  check("título y tipo editados", edited?.title === "Reu de diseño (corregido)" && edited?.type?.name === "Llamada", edited);
+
+  for (const [i, x] of open.entries()) {
+    expectStatus(`finalizar tarea ${i + 1} de ${open.length}`, await patch(`/api/tasks/${x.id}`, { status: "hecha" }), 204);
+    d = (await get(path)).data;
+    const last = i === open.length - 1;
+    check(last ? "con la última pasa a confirmar" : `con ${i + 1} hecha(s) sigue en curso`, d?.status === (last ? "a_confirmar" : "en_curso"), d?.status);
+  }
+  check("se agendó una sola llamada de confirmación", d?.tasks?.filter((x) => x.ticketRole === "confirmacion").length === 1);
+  expectStatus("con el ticket a confirmar no se agregan tareas → 409", await post(`${path}/tasks`, task(p3.id, "12:00")), 409);
+  expectStatus("cancelar el ticket", await post(`${path}/cancel`, { reason: "Prueba" }), 204);
+
+  // Cancelar tareas desde Mi día: si ya se hizo parte del trabajo pasa a confirmar; si no, vuelve a Nuevo.
+  for (const doneFirst of [true, false]) {
+    const t2 = await post("/api/tickets", { clientId: ctx.oppClientId, type: "consulta", channel: "email", title: `Cancelar tareas E2E ${RUN} ${doneFirst}` });
+    const p2path = `/api/tickets/${t2.data?.id}`;
+    await post(`${p2path}/tasks`, task(ctx.me.id, "13:00", "Parte 1"));
+    await post(`${p2path}/tasks`, task(p2.id, "14:00", "Parte 2"));
+    const [a, b] = (await get(p2path)).data?.tasks ?? [];
+    await patch(`/api/tasks/${a?.id}`, { status: doneFirst ? "hecha" : "cancelada" });
+    expectStatus("cancelar la otra tarea", await patch(`/api/tasks/${b?.id}`, { status: "cancelada" }), 204);
+    const st = (await get(p2path)).data?.status;
+    check(doneFirst ? "una hecha y la otra cancelada → a confirmar" : "todas canceladas → vuelve a Nuevo", st === (doneFirst ? "a_confirmar" : "nuevo"), st);
+    await post(`${p2path}/cancel`, { reason: "Prueba" });
+  }
 });
 
 await section("Finanzas", async () => {

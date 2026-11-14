@@ -24,6 +24,13 @@ describe("reglas del embudo", () => {
     expect(ruleFor("done", "Ventas", "dudaba pero al final aceptó")?.to).toBe("cierre");
   });
 
+  it("cuentan los comentarios ya guardados: manda el último que habla de aceptar", () => {
+    expect(ruleFor("done", "Ventas", ["Le mandé la propuesta", "Aceptó, firma el lunes", "Estado: Pendiente → Finalizada."])?.to).toBe("cierre");
+    expect(ruleFor("done", "Ventas", ["Aceptó el presupuesto", "Al final no la aceptó"])?.to).toBe("propuesta");
+    expect(ruleFor("done", "Ventas", ["no aceptó todavía", "ahora sí aceptó"])?.to).toBe("cierre");
+    expect(ruleFor("done", "Ventas", [])?.to).toBe("propuesta");
+  });
+
   it("cualquier tarea en curso solo pasa a seguimiento desde propuesta", () => {
     expect(ruleFor("in_progress", "Llamada", undefined)).toEqual(
       expect.objectContaining({ to: "seguimiento", onlyFrom: "propuesta" }),

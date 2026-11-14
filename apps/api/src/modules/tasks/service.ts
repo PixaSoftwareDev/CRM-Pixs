@@ -3,7 +3,7 @@
  * compañero, cambió de estado) queda como comentario en la tarea, y finalizar
  * una llamada o reunión cuenta como contacto con el cliente.
  */
-import { activities, type Db, type DbOrTx, eq, sql, taskComments, tasks, taskTypes } from "@crm/db";
+import { activities, type Db, type DbOrTx, eq, sql, taskComments, tasks, taskTypes, ticketEvents } from "@crm/db";
 import {
   type TaskCommentCreate,
   type TaskCreate,
@@ -19,7 +19,14 @@ import { fmtWhen, nextWorkdayAt } from "../../lib/dates";
 import { BadRequestError, ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
 import { isRuleEnabled, recordRun } from "../automations/service";
 import { advanceFromTask, openOpportunityOfClient, type TaskEvent } from "../sales/automation";
-import { syncTicketFromWorkTask, ticketOfWorkTask, workDoneTx } from "../tickets/service";
+import {
+  logTicketWork,
+  openWorkTasks,
+  roundHasDoneWork,
+  syncTicketFromWorkTask,
+  ticketOfWorkTask,
+  workDoneTx,
+} from "../tickets/service";
 import * as repo from "./repository";
 
 export { listTaskTypes, listTeam } from "./repository";
@@ -187,8 +194,13 @@ export async function updateTask(db: Db, actorId: string, id: string, input: Tas
       });
     }
 
-    // Regla "el técnico finalizó la tarea de un ticket → el ticket pasa a confirmar".
-    if (finished) await advanceTicketFromTask(tx, actorId, id, note, duration);
+    // Regla "se finalizó la última tarea de trabajo de un ticket → el ticket pasa a confirmar".
+    if (finished || cancelled) {
+      await advanceTicketFromTask(tx, actorId, id, {
+        note,
+        finished: finished ? { minutes: duration, userId: patch.assigneeId ?? before.assignee.id, title: patch.title ?? before.title } : null,
+      });
+    }
   });
 }
 
@@ -225,15 +237,40 @@ export async function deleteTaskType(db: Db, id: string) {
 }
 
 /**
- * Si la tarea finalizada es el trabajo de un ticket en curso y la regla está
- * activa: llama a confirmar quien cargó el ticket (o quien finalizó), el
- * próximo día hábil a las 10.
+ * Si la tarea finalizada (o cancelada) es trabajo de un ticket en curso y la
+ * regla está activa: sus horas se suman al proyecto a nombre de quien la hizo, y
+ * cuando ya no queda ninguna tarea de trabajo abierta (de nadie) el ticket pasa
+ * a confirmar: llama quien cargó el ticket (o quien finalizó), el próximo día
+ * hábil a las 10.
  */
-async function advanceTicketFromTask(tx: DbOrTx, actorId: string, taskId: string, note: string | undefined, minutes: number) {
+async function advanceTicketFromTask(
+  tx: DbOrTx,
+  actorId: string,
+  taskId: string,
+  change: { note: string | undefined; finished: { minutes: number; userId: string; title: string } | null },
+) {
   const ruleId = await isRuleEnabled(tx, "tarea_de_ticket_hecha", "avanzar_ticket");
   if (!ruleId) return;
-  const ticket = await ticketOfWorkTask(tx, taskId);
-  if (!ticket) return;
+  const ref = await ticketOfWorkTask(tx, taskId);
+  if (!ref) return;
+  const { ticket } = ref;
+  const { note, finished } = change;
+  if (finished) await logTicketWork(tx, ticket, finished.userId, taskId, finished.minutes);
+  const open = await openWorkTasks(tx, ticket.id);
+  if (open > 0) {
+    if (finished) {
+      const who = (await repo.listTeam(tx)).find((u) => u.id === finished.userId)?.name ?? "otra persona";
+      await tx.insert(ticketEvents).values({
+        ticketId: ticket.id,
+        actorId,
+        kind: "estado",
+        message: `Finalizada la tarea de ${who}: "${finished.title}". ${open === 1 ? "Falta 1 tarea" : `Faltan ${open} tareas`} para pasar a confirmar`,
+      });
+    }
+    return;
+  }
+  // Se cancelaron todas sin hacer ninguna: el ticket ya volvió a Nuevo (syncTicketFromWorkTask).
+  if (!(await roundHasDoneWork(tx, ticket.id))) return;
   const confirmerId = ticket.reporter_id ?? actorId;
   const confirmer = (await repo.listTeam(tx)).find((u) => u.id === confirmerId)?.name ?? "quien cargó el ticket";
   await workDoneTx(
@@ -241,8 +278,8 @@ async function advanceTicketFromTask(tx: DbOrTx, actorId: string, taskId: string
     actorId,
     ticket,
     confirmer,
-    // Las horas que se cargan son la duración de la tarea finalizada.
-    { confirmerId, confirmAt: nextWorkdayAt("10:00").toISOString(), minutes, ...(note && { note }) },
+    // Las horas ya se cargaron por tarea (logTicketWork), a nombre de cada persona.
+    { confirmerId, confirmAt: nextWorkdayAt("10:00").toISOString(), ...(finished && note && { note }) },
     { auto: true, closeWork: false },
   );
   await recordRun(tx, ruleId, [{ entityType: "ticket", entityId: ticket.id }]);

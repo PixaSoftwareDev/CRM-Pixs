@@ -1,7 +1,7 @@
-import { TICKET_PRIORITIES, type TicketDetail, type TaskDto } from "@crm/shared";
+import { TICKET_PRIORITIES, type TicketDetail, type TicketTaskRole, type TaskDto } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, CalendarCheck, Check, Phone, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ArrowLeft, CalendarCheck, Check, Phone, Plus, X } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ArchiveButton, ArchivedBanner } from "../../components/ui/Archive";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -11,12 +11,14 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
+import { ApiError } from "../../lib/api";
 import { ago, initials, when } from "../../lib/format";
 import { ticketRoute } from "../../router";
 import { useMyId, useTeam } from "../tasks/api";
 import { TASK_STATUS, tint } from "../tasks/labels";
 import { TaskDialog } from "../tasks/TaskDialog";
-import { addDays, arParts, nextSlot, toHHMM, toInstant, todayAr } from "../tasks/time";
+import { type TaskDraft, TaskFormDialog } from "../tasks/TaskFormDialog";
+import { addDays, arParts, nextSlot, toInstant, todayAr } from "../tasks/time";
 import {
   useAssignTicket,
   useCancelTicket,
@@ -26,6 +28,7 @@ import {
   useUpdateTicket,
   useWorkDone,
 } from "./api";
+import { confirmSlots, validDue } from "./dates";
 import { STEPS, TICKET_CHANNEL, TICKET_PRIORITY, TICKET_STATUS, TICKET_TYPE } from "./labels";
 
 export function TicketDetailPage() {
@@ -33,6 +36,8 @@ export function TicketDetailPage() {
   const ticket = useTicket(ticketId);
   const notice = useNotice();
 
+  // Link viejo o mal copiado (id inválido o ticket inexistente): no tiene sentido "Reintentar".
+  if (ticket.error instanceof ApiError && (ticket.error.status === 400 || ticket.error.status === 404)) return <TicketNotFound />;
   if (ticket.error) return <ErrorBox error={ticket.error} onRetry={() => void ticket.refetch()} />;
   if (!ticket.data) return <Skeleton className="h-[500px]" />;
   const t = ticket.data;
@@ -52,6 +57,35 @@ export function TicketDetailPage() {
       <Notice message={notice.message} />
     </>
   );
+}
+
+function TicketNotFound() {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+      <h1 className="text-xl font-bold">Este ticket no existe</h1>
+      <p className="text-sm text-muted">Puede ser un link viejo o mal copiado.</p>
+      <Link to="/tickets" className="rounded-[10px] bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">
+        Ir al buscador de tickets
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Corre la acción una sola vez aunque se haga doble clic: `isPending` llega un
+ * render tarde y dos clics seguidos alcanzaban a mandar dos pedidos.
+ */
+function useSingleFlight() {
+  const busy = useRef(false);
+  return (action: () => Promise<unknown>) => {
+    if (busy.current) return;
+    busy.current = true;
+    void action()
+      .catch(() => undefined) // el error ya lo muestra la mutación
+      .finally(() => {
+        busy.current = false;
+      });
+  };
 }
 
 function Section({ n, title, aside, children }: { n: number; title: string; aside?: ReactNode; children: ReactNode }) {
@@ -163,12 +197,11 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-muted">Compromiso</dt>
           <dd className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={t.dueAt ? arParts(t.dueAt).date : ""}
+            <DueDateInput
+              saved={t.dueAt ? arParts(t.dueAt).date : ""}
               disabled={closed}
-              onChange={(e) => update.mutate({ dueOn: e.target.value || null }, { onSuccess: () => onNotice("Compromiso actualizado.") })}
-              className={cn("h-8 w-40", t.overdue && "border-red-400 text-red-700")}
+              overdue={t.overdue}
+              onSave={(dueOn) => update.mutate({ dueOn }, { onSuccess: () => onNotice("Compromiso actualizado.") })}
             />
             {t.overdue && <span className="text-xs font-bold text-red-700">vencido</span>}
           </dd>
@@ -188,6 +221,47 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
       )}
       <CancelDialog ticket={t} open={cancelling} onClose={() => setCancelling(false)} onDone={onNotice} />
     </Section>
+  );
+}
+
+/**
+ * Fecha de compromiso: se edita en un estado local y se guarda al salir del
+ * campo (o con Enter) solo si quedó una fecha completa y válida, o vacía.
+ * Antes se mandaba cada tecla y el historial se llenaba de fechas a medio tipear.
+ */
+function DueDateInput({
+  saved,
+  disabled,
+  overdue,
+  onSave,
+}: {
+  saved: string;
+  disabled: boolean;
+  overdue: boolean;
+  onSave: (dueOn: string | null) => void;
+}) {
+  const [value, setValue] = useState(saved);
+  useEffect(() => setValue(saved), [saved]);
+  const invalid = value !== "" && !validDue(value);
+  const commit = () => {
+    if (value === saved) return;
+    if (value === "") onSave(null);
+    else if (validDue(value)) onSave(value);
+  };
+  return (
+    <Input
+      type="date"
+      aria-label="Fecha de compromiso"
+      value={value}
+      disabled={disabled}
+      min="2000-01-01"
+      max="2100-12-31"
+      aria-invalid={invalid}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), commit())}
+      className={cn("h-8 w-40", overdue && "border-red-400 text-red-700")}
+    />
   );
 }
 
@@ -219,23 +293,49 @@ function DetailSection({ ticket: t }: { ticket: TicketDetail }) {
 
 // ─── 3. Tareas, acción del paso y historial ────────────────────────────────
 
+const isOpen = (x: TaskDto) => x.status !== "hecha" && x.status !== "cancelada";
+
 function TasksSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: (m: string) => void }) {
   const [openTask, setOpenTask] = useState<string | null>(null);
-  const live = t.tasks.filter((x) => x.status !== "hecha");
-  const done = t.tasks.filter((x) => x.status === "hecha");
+  const [draft, setDraft] = useState<TaskDraft | null>(null);
+  const open = t.tasks.filter(isOpen).length;
+  // Se agregan tareas mientras el trabajo está por hacerse (en un ticket nuevo, la primera lo asigna).
+  const canAdd = (t.status === "nuevo" || t.status === "en_curso") && !t.archivedAt;
 
   return (
-    <Section n={3} title="Tareas" aside={`${live.length} vigentes · ${done.length + t.events.length} en historial`}>
+    <Section n={3} title="Tareas del ticket" aside={`${open} abiertas · ${t.tasks.length} en total`}>
       <div className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Vigentes</h3>
-        {live.length === 0 && (
-          <p className="text-sm text-muted">
-            {t.tasks.length === 0 ? "Todavía no hay tareas: asigná el trabajo para que aparezca en la agenda." : "No quedan tareas pendientes en este ticket."}
-          </p>
+        {t.tasks.length === 0 && (
+          <p className="text-sm text-muted">Todavía no hay tareas: asigná el trabajo o agregá una tarea para que aparezca en la agenda.</p>
         )}
-        {live.map((x) => (
+        {t.tasks.map((x) => (
           <TaskRow key={x.id} task={x} onOpen={() => setOpenTask(x.id)} />
         ))}
+        {canAdd && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="self-start"
+            onClick={() =>
+              setDraft({
+                ticketId: t.id,
+                clientName: t.client.name,
+                title: `#${t.number} · ${t.title}`,
+                date: todayAr(),
+                start: nextSlot(),
+                durationMinutes: 60,
+              })
+            }
+          >
+            <Plus size={14} aria-hidden /> Agregar tarea
+          </Button>
+        )}
+        {canAdd && t.status === "en_curso" && (
+          <p className="text-xs text-muted">
+            Para repartir el trabajo: cada tarea queda en la agenda de su responsable. El ticket pasa solo a confirmar cuando se
+            finaliza la última.
+          </p>
+        )}
       </div>
 
       {t.status === "nuevo" && <AssignPanel ticket={t} onNotice={onNotice} />}
@@ -250,9 +350,6 @@ function TasksSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Historial</h3>
-        {done.map((x) => (
-          <TaskRow key={x.id} task={x} onOpen={() => setOpenTask(x.id)} />
-        ))}
         <NoteInput ticketId={t.id} />
         <ol className="flex flex-col gap-2">
           {t.events.map((e) => (
@@ -267,26 +364,37 @@ function TasksSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
         </ol>
       </div>
       <TaskDialog taskId={openTask} onClose={() => setOpenTask(null)} onSaved={onNotice} />
+      <TaskFormDialog draft={draft} onClose={() => setDraft(null)} onCreated={onNotice} title={`Agregar tarea al ticket #${t.number}`} />
     </Section>
   );
 }
 
+/** Cómo se muestra el papel de la tarea en el ticket. */
+const ROLE_LABEL: Record<TicketTaskRole, string | null> = {
+  principal: "Responsable",
+  adicional: null,
+  confirmacion: "Confirmación",
+};
+
 function TaskRow({ task: x, onOpen }: { task: TaskDto; onOpen: () => void }) {
   const isDone = x.status === "hecha";
+  const closed = !isOpen(x);
+  const role = x.ticketRole ? ROLE_LABEL[x.ticketRole] : null;
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={cn("flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left hover:brightness-95", isDone && "opacity-70")}
-      style={{ background: tint(x.type.color, isDone), boxShadow: `inset 4px 0 0 ${x.type.color}` }}
+      className={cn("flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left hover:brightness-95", closed && "opacity-70")}
+      style={{ background: tint(x.type.color, closed), boxShadow: `inset 4px 0 0 ${x.type.color}` }}
     >
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold" title={x.assignee.name}>
         {initials(x.assignee.name)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-sm font-semibold", isDone && "line-through")}>{x.title}</span>
+        <span className={cn("block truncate text-sm font-semibold", closed && "line-through")}>{x.title}</span>
         <span className="block text-xs text-slate-600">
-          {x.assignee.name} · {when(x.startsAt)}
+          {x.assignee.name} · {x.type.name} · {when(x.startsAt)}
+          {role && <strong className="ml-1.5 font-semibold text-slate-700">· {role}</strong>}
         </span>
       </span>
       <Chip tone={TASK_STATUS[x.status].tone} className="bg-white/70">
@@ -298,8 +406,12 @@ function TaskRow({ task: x, onOpen }: { task: TaskDto; onOpen: () => void }) {
 
 function NoteInput({ ticketId }: { ticketId: string }) {
   const note = useTicketNote(ticketId);
+  const once = useSingleFlight();
   const [body, setBody] = useState("");
-  const send = () => body.trim() && note.mutate({ body: body.trim() }, { onSuccess: () => setBody("") });
+  const send = () => {
+    const text = body.trim();
+    if (text) once(() => note.mutateAsync({ body: text }).then(() => setBody("")));
+  };
   return (
     <div className="flex gap-2">
       <label className="min-w-0 flex-1">
@@ -337,6 +449,12 @@ function PersonSelect({ value, onChange, label }: { value: string; onChange: (v:
   return (
     <Field label={label}>
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
+        {/* Sin esto el desplegable mostraba a la primera persona aunque no hubiera nadie elegido. */}
+        {!value && (
+          <option value="" disabled>
+            Elegí a alguien…
+          </option>
+        )}
         {team.data?.map((u) => (
           <option key={u.id} value={u.id}>
             {u.id === me ? `${u.name} (yo)` : u.name}
@@ -349,6 +467,7 @@ function PersonSelect({ value, onChange, label }: { value: string; onChange: (v:
 
 function AssignPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: (m: string) => void }) {
   const assign = useAssignTicket(t.id);
+  const once = useSingleFlight();
   const team = useTeam();
   const [who, setWho] = useState(t.suggestedAssignee?.id ?? "");
   const [date, setDate] = useState(todayAr());
@@ -374,9 +493,10 @@ function AssignPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: 
         <Button
           disabled={!who || !date || !time || assign.isPending}
           onClick={() =>
-            assign.mutate(
-              { assigneeId: who, scheduledAt: toInstant(date, time) },
-              { onSuccess: () => onNotice(`Asignado a ${name}: quedó en su agenda.`) },
+            once(() =>
+              assign
+                .mutateAsync({ assigneeId: who, scheduledAt: toInstant(date, time) })
+                .then(() => onNotice(`Asignado a ${name}: quedó en su agenda.`)),
             )
           }
         >
@@ -387,52 +507,53 @@ function AssignPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: 
   );
 }
 
-/** Opciones rápidas para agendar la llamada de confirmación. */
-function confirmSlots() {
-  const now = arParts(new Date().toISOString());
-  const inTwo = Math.min(now.minutes + 120, 19 * 60);
-  const tomorrow = addDays(todayAr(), 1);
-  return [
-    { label: `Hoy ${toHHMM(Math.ceil(inTwo / 15) * 15)}`, at: toInstant(todayAr(), toHHMM(Math.ceil(inTwo / 15) * 15)) },
-    { label: "Mañana 10:00", at: toInstant(tomorrow, "10:00") },
-    { label: "Pasado mañana 10:00", at: toInstant(addDays(tomorrow, 1), "10:00") },
-  ];
-}
-
 function WorkDonePanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: (m: string) => void }) {
   const done = useWorkDone(t.id);
   const assign = useAssignTicket(t.id);
+  const once = useSingleFlight();
   const me = useMyId();
   const team = useTeam();
-  const slots = confirmSlots();
+  const [slots] = useState(() => confirmSlots(arParts(new Date().toISOString()).minutes, todayAr()));
   const [confirmer, setConfirmer] = useState(t.reportedBy?.id ?? me);
-  const [slot, setSlot] = useState(1);
+  // Por defecto, mañana a las 10.
+  const [slot, setSlot] = useState(() => slots.findIndex((s) => s.label.startsWith("Mañana")));
   const [hours, setHours] = useState("");
   const [note, setNote] = useState("");
   const [reassigning, setReassigning] = useState(false);
-  const work = t.tasks.find((x) => x.status !== "hecha");
+  const work = t.tasks.find((x) => isOpen(x) && x.ticketRole === "principal");
+  const others = t.tasks.filter((x) => isOpen(x) && x.ticketRole === "adicional");
   const tech = t.assignee?.name ?? "el técnico";
   const name = team.data?.find((u) => u.id === confirmer)?.name ?? "";
 
   return (
     <StepPanel
       title={`2. Cuando ${tech} termina el trabajo`}
-      hint="Se agenda sola la llamada de confirmación. El ticket no se cierra hasta que el cliente confirme."
+      hint={`Se agenda sola la llamada de confirmación. El ticket no se cierra hasta que el cliente confirme.${
+        others.length
+          ? ` Quedan ${others.length === 1 ? "1 tarea abierta" : `${others.length} tareas abiertas`} de otras personas: "Trabajo terminado" las finaliza todas.`
+          : ""
+      }`}
       error={done.error ?? assign.error}
     >
-      {work && (
-        <p className="text-sm">
-          <CalendarCheck size={16} aria-hidden className="mr-1.5 inline align-[-3px] text-brand" />
-          Tarea en la agenda de <strong>{tech}</strong> · {when(work.startsAt)}
-          <Button size="sm" variant="ghost" onClick={() => setReassigning((r) => !r)}>
-            {reassigning ? "No reasignar" : "Reasignar"}
-          </Button>
-        </p>
-      )}
+      <p className="text-sm">
+        <CalendarCheck size={16} aria-hidden className="mr-1.5 inline align-[-3px] text-brand" />
+        {work ? (
+          <>
+            Tarea en la agenda de <strong>{tech}</strong> · {when(work.startsAt)}
+          </>
+        ) : (
+          <>El responsable no tiene una tarea abierta</>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setReassigning((r) => !r)}>
+          {reassigning ? "No reasignar" : "Reasignar"}
+        </Button>
+      </p>
       {reassigning ? (
         <ReassignForm
           onSubmit={(assigneeId, at, who) =>
-            assign.mutate({ assigneeId, scheduledAt: at }, { onSuccess: () => (setReassigning(false), onNotice(`Reasignado a ${who}.`)) })
+            once(() =>
+              assign.mutateAsync({ assigneeId, scheduledAt: at }).then(() => (setReassigning(false), onNotice(`Reasignado a ${who}.`))),
+            )
           }
         />
       ) : (
@@ -462,10 +583,16 @@ function WorkDonePanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
             disabled={done.isPending}
             onClick={() => {
               const h = Number(hours.replace(",", "."));
-              const at = slots[slot]?.at ?? slots[1]!.at;
-              done.mutate(
-                { confirmerId: confirmer, confirmAt: at, ...(h > 0 && { minutes: Math.round(h * 60) }), ...(note.trim() && { note: note.trim() }) },
-                { onSuccess: () => onNotice(`Listo: la llamada de confirmación quedó en la agenda de ${name}.`) },
+              const at = slots[slot]?.at ?? slots[0]!.at;
+              once(() =>
+                done
+                  .mutateAsync({
+                    confirmerId: confirmer,
+                    confirmAt: at,
+                    ...(h > 0 && { minutes: Math.round(h * 60) }),
+                    ...(note.trim() && { note: note.trim() }),
+                  })
+                  .then(() => onNotice(`Listo: la llamada de confirmación quedó en la agenda de ${name}.`)),
               );
             }}
           >
@@ -498,6 +625,7 @@ function ReassignForm({ onSubmit }: { onSubmit: (assigneeId: string, at: string,
 
 function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: (m: string) => void }) {
   const confirm = useConfirmTicket(t.id);
+  const once = useSingleFlight();
   const [note, setNote] = useState("");
   const [retry, setRetry] = useState(false);
   const [date, setDate] = useState(addDays(todayAr(), 1));
@@ -529,7 +657,7 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
         {!retry && (
           <Button
             disabled={confirm.isPending}
-            onClick={() => confirm.mutate({ ok: true, ...extra }, { onSuccess: () => onNotice(`Ticket #${t.number} cerrado.`) })}
+            onClick={() => once(() => confirm.mutateAsync({ ok: true, ...extra }).then(() => onNotice(`Ticket #${t.number} cerrado.`)))}
           >
             <Check size={16} aria-hidden /> Confirmó que quedó bien → Cerrar ticket
           </Button>
@@ -540,9 +668,10 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
               variant="danger"
               disabled={confirm.isPending || !date || !time}
               onClick={() =>
-                confirm.mutate(
-                  { ok: false, retryAt: toInstant(date, time), ...extra },
-                  { onSuccess: () => (setRetry(false), onNotice(`Vuelve a ${tech}: quedó en su agenda.`)) },
+                once(() =>
+                  confirm
+                    .mutateAsync({ ok: false, retryAt: toInstant(date, time), ...extra })
+                    .then(() => (setRetry(false), onNotice(`Vuelve a ${tech}: quedó en su agenda.`))),
                 )
               }
             >

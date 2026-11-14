@@ -6,7 +6,8 @@
  *   Llamada hecha                         → Primer contacto
  *   Reunión agendada o hecha              → Reunión
  *   Tarea de Ventas hecha                 → Propuesta comercial
- *     … con un comentario que dice "aceptó" → Cierre de venta
+ *     … con un comentario que dice "aceptó" → Cierre de venta (manda el último
+ *       comentario de la tarea que habla de aceptar, aunque se haya guardado antes)
  *   Cualquier tarea en curso en Propuesta → Seguimiento
  */
 import { type DbOrTx, eq, opportunities, opportunityStageChanges, sql } from "@crm/db";
@@ -26,7 +27,14 @@ const ACCEPTED = /\bacept[oóa]/i;
 const NEGATED = /\b(no|nunca|tampoco|ni)\s+(\S+\s+){0,2}acept/i;
 const accepted = (note: string) => ACCEPTED.test(note) && !NEGATED.test(note);
 
-export function ruleFor(event: TaskEvent, typeName: string, note: string | undefined): Rule | null {
+/** Entre los comentarios (del más viejo al más nuevo), decide el último que habla de aceptar. */
+export function acceptedIn(notes: string | readonly string[] | undefined): boolean {
+  const list = typeof notes === "string" ? [notes] : (notes ?? []);
+  const last = list.findLast((n) => /acept/i.test(n));
+  return !!last && accepted(last);
+}
+
+export function ruleFor(event: TaskEvent, typeName: string, notes: string | readonly string[] | undefined): Rule | null {
   if (event === "in_progress") return { to: "seguimiento", reason: "tarea de seguimiento en curso", onlyFrom: "propuesta" };
   if (typeName === "Reunión") {
     return { to: "reunion", reason: event === "done" ? "reunión hecha" : "reunión agendada" };
@@ -34,7 +42,7 @@ export function ruleFor(event: TaskEvent, typeName: string, note: string | undef
   if (event !== "done") return null;
   if (typeName === "Llamada") return { to: "primer_contacto", reason: "llamada marcada hecha" };
   if (typeName === "Ventas") {
-    return note && accepted(note)
+    return acceptedIn(notes)
       ? { to: "cierre", reason: "el cliente aceptó (comentario en la tarea)" }
       : { to: "propuesta", reason: "propuesta enviada (tarea hecha)" };
   }
@@ -99,7 +107,12 @@ export async function advanceFromTask(
   actorId: string,
   input: { taskId: string; typeName: string; event: TaskEvent; note?: string | undefined },
 ): Promise<void> {
-  const rule = ruleFor(input.event, input.typeName, input.note);
+  // Al finalizar cuentan también los comentarios que ya tenía la tarea ("Comentar" y después "Finalizar").
+  const saved =
+    input.event === "done"
+      ? (await db.execute<{ body: string }>(sql`select body from task_comments where task_id = ${input.taskId} order by created_at, id`)).map((c) => c.body)
+      : [];
+  const rule = ruleFor(input.event, input.typeName, input.note ? [...saved, input.note] : saved);
   if (!rule) return;
   const opp = await openOpportunityFor(db, input.taskId);
   if (!opp) return;

@@ -7,6 +7,7 @@ import {
   ticketCreate,
   ticketListQuery,
   ticketNote,
+  ticketTaskCreate,
   ticketUpdate,
   ticketWorkDone,
 } from "@crm/shared";
@@ -32,6 +33,11 @@ export const ticketRoutes: FastifyPluginAsyncZod = async (app) => {
     await service.updateTicket(db, actor(req), req.params.id, req.body);
     return reply.status(204).send();
   });
+
+  // Otra tarea de trabajo en el ticket (para cualquier persona y de cualquier tipo).
+  app.post("/api/tickets/:id/tasks", { schema: { params: idParams, body: ticketTaskCreate } }, async (req, reply) =>
+    reply.status(201).send(await service.addTicketTask(db, actor(req), req.params.id, req.body)),
+  );
 
   // Acciones del flujo: cada una responde 204 y el front vuelve a pedir el detalle.
   const action = <B>(path: string, body: import("zod").ZodType<B>, run: (actorId: string, id: string, b: B) => Promise<void>) =>

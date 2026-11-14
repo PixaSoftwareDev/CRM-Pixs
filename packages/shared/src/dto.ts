@@ -1,6 +1,6 @@
 import type { AutomationAction, AutomationTrigger } from "./automations";
 import type { CredentialKind } from "./vault";
-import type { TicketChannel, TicketPriority, TicketStatus, TicketType } from "./tickets";
+import type { TicketChannel, TicketPriority, TicketStatus, TicketTaskRole, TicketType } from "./tickets";
 import type { ProjectHealth, ProjectPhase, ProjectStatus } from "./projects";
 import type { OpportunityStatus, StageKey } from "./sales";
 import type { TaskStatus } from "./tasks";
@@ -170,6 +170,8 @@ export interface TaskDto {
   assignee: Ref;
   /** Quién se la pasó, si la reasignó un compañero. */
   assignedBy: Ref | null;
+  /** Papel dentro de su ticket (null si no cuelga de un ticket). */
+  ticketRole: TicketTaskRole | null;
 }
 
 export interface TaskCommentDto {

@@ -78,10 +78,22 @@ function useInvalidateTasks() {
     ]);
 }
 
+/** Con `ticketId`, la tarea se agrega al ticket (hereda su cliente y proyecto). */
+export type NewTask = TaskCreate & { ticketId?: string };
+
 export function useCreateTask() {
   const invalidate = useInvalidateTasks();
   return useMutation({
-    mutationFn: (body: TaskCreate) => api.post<{ id: string }>("/api/tasks", body),
+    mutationFn: ({ ticketId, ...body }: NewTask) =>
+      ticketId
+        ? api.post<{ id: string }>(`/api/tickets/${ticketId}/tasks`, {
+            title: body.title,
+            typeId: body.typeId,
+            assigneeId: body.assigneeId,
+            startsAt: body.startsAt,
+            durationMinutes: body.durationMinutes,
+          })
+        : api.post<{ id: string }>("/api/tasks", body),
     onSuccess: invalidate,
   });
 }

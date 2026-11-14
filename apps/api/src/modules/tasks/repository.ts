@@ -3,7 +3,7 @@
  * "Mi día" y el detalle, así el front recibe siempre el mismo DTO.
  */
 import { type DbOrTx, type SQL, sql } from "@crm/db";
-import type { TaskCommentDto, TaskDetailDto, TaskDto, TaskStatus, TaskTypeDto, TeamMember } from "@crm/shared";
+import type { TaskCommentDto, TaskDetailDto, TaskDto, TaskStatus, TaskTypeDto, TeamMember, TicketTaskRole } from "@crm/shared";
 import { toIso, toNumber } from "../../lib/sql";
 
 const AR_TZ = "America/Argentina/Buenos_Aires";
@@ -24,6 +24,7 @@ interface TaskRow extends Record<string, unknown> {
   assignee_name: string;
   assigned_by_id: string | null;
   assigned_by_name: string | null;
+  ticket_role: TicketTaskRole | null;
 }
 
 const TASK_SELECT = sql`
@@ -31,7 +32,8 @@ const TASK_SELECT = sql`
          tt.id as type_id, tt.name as type_name, tt.color as type_color,
          c.id as client_id, c.name as client_name,
          a.id as assignee_id, a.name as assignee_name,
-         b.id as assigned_by_id, b.name as assigned_by_name
+         b.id as assigned_by_id, b.name as assigned_by_name,
+         case when t.ticket_id is null then null else t.ticket_role end as ticket_role
   from tasks t
   join task_types tt on tt.id = t.type_id
   join users a on a.id = t.assignee_id
@@ -50,6 +52,7 @@ function toDto(r: TaskRow): TaskDto {
     client: r.client_id && r.client_name ? { id: r.client_id, name: r.client_name } : null,
     assignee: { id: r.assignee_id, name: r.assignee_name },
     assignedBy: r.assigned_by_id && r.assigned_by_name ? { id: r.assigned_by_id, name: r.assigned_by_name } : null,
+    ticketRole: r.ticket_role,
   };
 }
 
@@ -164,16 +167,22 @@ export async function existsIn(db: DbOrTx, table: "task_types" | "clients", id: 
   return !!row;
 }
 
-/** Tareas abiertas primero (por fecha), después las hechas más recientes. */
-async function listTasksWhere(db: DbOrTx, where: SQL): Promise<TaskDto[]> {
+/**
+ * Tareas abiertas primero (por fecha), después las hechas más recientes y al
+ * final las canceladas (solo si se piden).
+ */
+async function listTasksWhere(db: DbOrTx, where: SQL, opts: { cancelled?: boolean } = {}): Promise<TaskDto[]> {
+  const closed = sql`t.status in ('hecha', 'cancelada')`;
   const rows = await db.execute<TaskRow>(sql`
     ${TASK_SELECT}
-    where ${where} and t.archived_at is null and t.status <> 'cancelada'
-    order by (t.status = 'hecha'), case when t.status = 'hecha' then null else t.starts_at end nulls last,
-             t.completed_at desc nulls last
+    where ${where} and t.archived_at is null ${opts.cancelled ? sql`` : sql`and t.status <> 'cancelada'`}
+    order by (t.status = 'cancelada'), ${closed}, case when ${closed} then null else t.starts_at end nulls last,
+             t.completed_at desc nulls last, t.updated_at desc
     limit 200`);
   return rows.map(toDto);
 }
 
 export const listTasksOfProject = (db: DbOrTx, projectId: string) => listTasksWhere(db, sql`t.project_id = ${projectId}`);
-export const listTasksOfTicket = (db: DbOrTx, ticketId: string) => listTasksWhere(db, sql`t.ticket_id = ${ticketId}`);
+/** En el ticket se ven también las canceladas: cuentan la historia de las reasignaciones. */
+export const listTasksOfTicket = (db: DbOrTx, ticketId: string) =>
+  listTasksWhere(db, sql`t.ticket_id = ${ticketId}`, { cancelled: true });

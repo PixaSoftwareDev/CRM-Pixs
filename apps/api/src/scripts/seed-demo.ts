@@ -501,13 +501,13 @@ async function main() {
     const G = uid("Guillermo");
     const demoTasks: (typeof tasks.$inferInsert & { notes?: [string, string][] })[] = [
       { title: "Implementación de turnos online", typeId: typeId("Implementación"), assigneeId: G, clientId: r, startsAt: at(0, 9), durationMinutes: 120, notes: [["Guillermo", "Llevar el checklist de migración."]] },
-      { title: "Revisar pasarela de pago", typeId: typeId("Implementación"), ticketId: ticketId("Revisar pasarela de pago"), assigneeId: G, assignedById: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(0, 11.5), notes: [["Alejo", "Te la paso, el error es en el checkout con tarjeta."]] },
+      { title: "Revisar pasarela de pago", typeId: typeId("Implementación"), ticketId: ticketId("Revisar pasarela de pago"), ticketRole: "principal" as const, assigneeId: G, assignedById: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(0, 11.5), notes: [["Alejo", "Te la paso, el error es en el checkout con tarjeta."]] },
       { title: "Demo de la app de reservas", typeId: typeId("Reunión"), assigneeId: G, clientId: id("fitzone"), startsAt: at(0, 14) },
       { title: "Llamar por cuota vencida", typeId: typeId("Cobranza"), assigneeId: G, clientId: e, projectId: pe?.id ?? null, startsAt: at(0, 15.5), durationMinutes: 30, notes: [["Guillermo", "Ayer dijeron que transferían hoy; confirmar."]] },
       { title: "Reunión con Clínica del Sol", typeId: typeId("Reunión"), assigneeId: G, clientId: id("sol"), startsAt: at(0, 16) },
       { title: "Llamar a FitZone por la demo", typeId: typeId("Llamada"), assigneeId: G, clientId: id("fitzone"), startsAt: at(0, 16.5), durationMinutes: 30 },
       { title: "Recordatorio de pago", typeId: typeId("Cobranza"), assigneeId: G, clientId: r, startsAt: at(0, 17), durationMinutes: 30 },
-      { title: "Arreglar error de reservas de las 19hs", typeId: typeId("Falla"), ticketId: ticketId("Error al reservar la clase de las 19 hs"), assigneeId: uid("Enzo"), assignedById: G, clientId: id("fitzone"), startsAt: at(0, 10), durationMinutes: 90, notes: [["Guillermo", "Urgente, los socios no pueden reservar."]] },
+      { title: "Arreglar error de reservas de las 19hs", typeId: typeId("Falla"), ticketId: ticketId("Error al reservar la clase de las 19 hs"), ticketRole: "principal" as const, assigneeId: uid("Enzo"), assignedById: G, clientId: id("fitzone"), startsAt: at(0, 10), durationMinutes: 90, notes: [["Guillermo", "Urgente, los socios no pueden reservar."]] },
       { title: "Propuesta de mantenimiento", typeId: typeId("Ventas"), assigneeId: uid("Alejo"), clientId: id("sol"), startsAt: at(0, 12) },
       { title: "Revisión del catálogo", typeId: typeId("Reunión"), assigneeId: uid("Enzo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(4, 10) },
       { title: "Seguimiento propuesta", typeId: typeId("Ventas"), assigneeId: uid("Alejo"), clientId: r, startsAt: at(1, 10), durationMinutes: 30 },
@@ -520,8 +520,8 @@ async function main() {
       { title: "Reunión · relevamiento", typeId: typeId("Reunión"), assigneeId: G, clientId: id("norte"), startsAt: at(-2, 10), status: "en_curso" },
       { title: "Ventas · cierre", typeId: typeId("Ventas"), assigneeId: G, clientId: id("panif"), startsAt: at(3, 12) },
       { title: "Revisión del catálogo con María", typeId: typeId("Reunión"), assigneeId: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(2, 10) },
-      { title: "Ajustar cálculo de envío a provincia", typeId: typeId("Implementación"), ticketId: ticketId("Ajustar cálculo de envío a provincia"), assigneeId: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(-1, 10), status: "hecha", completedAt: at(-1, 12) },
-      { title: "Confirmar con el cliente · Ajustar cálculo de envío a provincia", typeId: typeId("Llamada"), ticketId: ticketId("Ajustar cálculo de envío a provincia"), assigneeId: G, assignedById: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(0, 16.75), durationMinutes: 15 },
+      { title: "Ajustar cálculo de envío a provincia", typeId: typeId("Implementación"), ticketId: ticketId("Ajustar cálculo de envío a provincia"), ticketRole: "principal" as const, assigneeId: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(-1, 10), status: "hecha", completedAt: at(-1, 12) },
+      { title: "Confirmar con el cliente · Ajustar cálculo de envío a provincia", typeId: typeId("Llamada"), ticketId: ticketId("Ajustar cálculo de envío a provincia"), ticketRole: "confirmacion" as const, assigneeId: G, assignedById: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(0, 16.75), durationMinutes: 15 },
       { title: "Presentar diseño de la home", typeId: typeId("Reunión"), assigneeId: uid("Alejo"), clientId: e, projectId: pe?.id ?? null, startsAt: at(-13, 11), status: "hecha", completedAt: at(-13, 12) },
     ];
     for (const { notes, ...t } of demoTasks) {

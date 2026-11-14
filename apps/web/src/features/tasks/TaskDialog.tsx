@@ -1,5 +1,5 @@
-import type { TaskDetailDto, TaskStatus, TaskUpdate } from "@crm/shared";
-import { Link } from "@tanstack/react-router";
+import { type TaskDetailDto, type TaskStatus, type TaskUpdate, taskTitle } from "@crm/shared";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Receipt, Users } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
@@ -12,11 +12,13 @@ import { ago, initials } from "../../lib/format";
 import { useClient, useClientTasks } from "../clients/api";
 import { ContactsSection } from "../clients/tabs/DataTab";
 import { StatementTab } from "../clients/tabs/StatementTab";
-import { useAddTaskComment, useMyId, useTask, useTeam, useUpdateTask } from "./api";
+import { useAddTaskComment, useMyId, useTask, useTaskTypes, useTeam, useUpdateTask } from "./api";
 import { EDITABLE_STATUSES, TASK_STATUS, tint } from "./labels";
 import { arParts, durationLabel, shortDay, toHHMM, toInstant, toMinutes } from "./time";
 
 interface Edit {
+  title: string;
+  typeId: string;
   date: string;
   start: string;
   end: string;
@@ -27,6 +29,8 @@ interface Edit {
 function editOf(t: TaskDetailDto): Edit {
   const p = t.startsAt ? arParts(t.startsAt) : null;
   return {
+    title: t.title,
+    typeId: t.type.id,
     date: p?.date ?? "",
     start: p?.time ?? "",
     end: p ? toHHMM(p.minutes + t.durationMinutes) : "",
@@ -45,6 +49,8 @@ function diff(t: TaskDetailDto, e: Edit, comment: string): TaskUpdate {
     // a 23:59 y recalcularla recortaba las tareas que pasan la medianoche.
     if (e.start !== o.start || e.end !== o.end) patch.durationMinutes = toMinutes(e.end) - toMinutes(e.start);
   }
+  if (e.title.trim() !== o.title) patch.title = e.title.trim();
+  if (e.typeId !== o.typeId) patch.typeId = e.typeId;
   if (e.assigneeId !== o.assigneeId) patch.assigneeId = e.assigneeId;
   if (e.status !== o.status) patch.status = e.status;
   if (comment.trim()) patch.comment = comment.trim();
@@ -101,6 +107,8 @@ function TaskBody({
   const me = useMyId();
   const task = useTask(id);
   const team = useTeam();
+  const types = useTaskTypes();
+  const navigate = useNavigate();
   const update = useUpdateTask();
   const addComment = useAddTaskComment(id);
   const [edit, setEdit] = useState<Edit | null>(null);
@@ -143,7 +151,11 @@ function TaskBody({
         : edit.start && edit.end && minutes < 5
           ? "Mínimo 5 minutos"
           : undefined;
-  const badRange = !!scheduleError;
+  // La misma validación que el server (taskUpdate): sin título no se puede guardar.
+  const titleCheck = taskTitle.safeParse(edit.title);
+  const titleError = titleCheck.success ? undefined : titleCheck.error.issues[0]?.message;
+  const badRange = !!scheduleError || !!titleError;
+  const type = types.data?.find((x) => x.id === edit.typeId) ?? t.type;
   const set = (k: keyof Edit) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setEdit({ ...edit, [k]: e.target.value });
 
@@ -155,10 +167,11 @@ function TaskBody({
     if (Object.keys(body).length) await update.mutateAsync({ id, ...body });
     const who = body.assigneeId ? team.data?.find((u) => u.id === body.assigneeId)?.name : null;
     const when = body.startsAt ? ` para el ${shortDay(edit.date)} ${edit.start}` : "";
+    const name = body.title ?? t.title;
     onSaved?.(
       body.status === "hecha"
-        ? `Finalizada "${t.title}".`
-        : `Guardado "${t.title}"${who ? `: ahora está en la agenda de ${who}` : ""}${when}.`,
+        ? `Finalizada "${name}".`
+        : `Guardado "${name}"${who ? `: ahora está en la agenda de ${who}` : ""}${when}.`,
     );
   };
 
@@ -188,6 +201,13 @@ function TaskBody({
               to="/clientes/$clientId"
               params={{ clientId: t.client.id }}
               className="font-bold text-ink hover:underline"
+              onClick={(e) => {
+                // Salir al cliente también pasa por el aviso de cambios sin guardar.
+                if (!dirty || !t.client) return;
+                e.preventDefault();
+                const clientId = t.client.id;
+                guard(() => void navigate({ to: "/clientes/$clientId", params: { clientId } }));
+              }}
             >
               {t.client.name} ↗
             </Link>
@@ -214,25 +234,50 @@ function TaskBody({
         <section className="flex min-h-0 min-w-0 flex-col gap-3">
           <div
             className="flex flex-wrap items-start justify-between gap-3 rounded-xl px-4 py-3"
-            style={{ background: tint(t.type.color), boxShadow: `inset 5px 0 0 ${t.type.color}` }}
+            style={{ background: tint(type.color), boxShadow: `inset 5px 0 0 ${type.color}` }}
           >
-            <div className="min-w-0">
-              <h3 className={cn("font-bold", t.status === "hecha" && "line-through")}>{t.title}</h3>
+            <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+              <Input
+                aria-label="Título de la tarea"
+                value={edit.title}
+                onChange={set("title")}
+                maxLength={200}
+                aria-invalid={!!titleError}
+                className={cn("h-9 bg-white/80 font-bold", (t.status === "hecha" || t.status === "cancelada") && "line-through")}
+              />
+              {titleError && (
+                <p role="alert" className="text-xs text-red-700">
+                  {titleError}
+                </p>
+              )}
               <p className="text-xs text-slate-600">
-                {t.type.name} · {when} · responsable: {resp}
+                {when} · responsable: {resp}
                 {passedBy}
               </p>
             </div>
-            <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-              Estado
-              <Select value={edit.status} onChange={set("status")} className="h-8 w-auto bg-white">
-                {EDITABLE_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {TASK_STATUS[s].label}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                Tipo
+                <Select aria-label="Tipo de tarea" value={edit.typeId} onChange={set("typeId")} className="h-8 w-auto max-w-48 bg-white">
+                  {/* Mientras cargan los tipos, el de la tarea (para no mostrar otro). */}
+                  {(types.data ?? [t.type]).map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                Estado
+                <Select aria-label="Estado de la tarea" value={edit.status} onChange={set("status")} className="h-8 w-auto bg-white">
+                  {EDITABLE_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {TASK_STATUS[s].label}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            </div>
           </div>
 
           <h4 className="text-sm font-bold">Comentarios</h4>
@@ -331,7 +376,7 @@ function TaskBody({
             <Button variant="secondary" onClick={() => guard(onClose)}>
               Cerrar
             </Button>
-            {t.status !== "hecha" && (
+            {t.status !== "hecha" && t.status !== "cancelada" && (
               <Button
                 variant="secondary"
                 onClick={() => void saveAnd(onClose, { status: "hecha" })}

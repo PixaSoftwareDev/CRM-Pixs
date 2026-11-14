@@ -12,7 +12,9 @@ export const MAX_RANGE_DAYS = 42;
 
 const isoDate = z.iso.date({ message: "Fecha inválida" });
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, { message: "Color inválido" });
-const title = z.string().trim().min(1, { message: "Escribí qué hay que hacer" }).max(200);
+/** Título de una tarea (alta, edición y tareas agregadas a un ticket). */
+export const taskTitle = z.string().trim().min(1, { message: "Escribí qué hay que hacer" }).max(200);
+const title = taskTitle;
 const minutes = z.number().int().min(5).max(24 * 60);
 
 export const taskRangeQuery = z

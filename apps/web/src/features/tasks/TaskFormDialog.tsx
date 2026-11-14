@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
@@ -19,7 +19,12 @@ const formSchema = z
     start: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
     end: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
   })
-  .refine((v) => toMinutes(v.end) > toMinutes(v.start), { message: "Tiene que terminar después de empezar", path: ["end"] });
+  .refine((v) => toMinutes(v.end) > toMinutes(v.start), { message: "Tiene que terminar después de empezar", path: ["end"] })
+  // El server no acepta menos de 5 minutos: avisarlo acá en vez de fallar al guardar.
+  .refine((v) => toMinutes(v.end) <= toMinutes(v.start) || toMinutes(v.end) - toMinutes(v.start) >= 5, {
+    message: "Mínimo 5 minutos",
+    path: ["end"],
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -28,6 +33,10 @@ export interface TaskDraft {
   clientId?: string | null;
   /** Se guarda sin mostrarse (tareas creadas desde un proyecto). */
   projectId?: string;
+  /** Tarea agregada a un ticket: hereda su cliente y proyecto (no se elige cliente). */
+  ticketId?: string;
+  /** Cliente que se muestra cuando no se puede elegir (el del ticket). */
+  clientName?: string;
   typeName?: string | null;
   typeId?: string;
   assigneeId?: string;
@@ -60,31 +69,49 @@ export function TaskFormDialog({
   const serverError = useServerErrors(form, create.error);
   const [start, end] = form.watch(["start", "end"]);
 
+  const typeOf = (d: TaskDraft) =>
+    types.data?.find((t) => t.id === d.typeId) ?? types.data?.find((t) => t.name === d.typeName) ?? types.data?.[0];
+
   useEffect(() => {
     if (!draft) return;
     create.reset();
-    const type =
-      types.data?.find((t) => t.id === draft.typeId) ??
-      types.data?.find((t) => t.name === draft.typeName) ??
-      types.data?.[0];
     form.reset({
       title: draft.title ?? "",
       clientId: draft.clientId ?? "",
-      typeId: type?.id ?? "",
+      typeId: typeOf(draft)?.id ?? "",
       assigneeId: draft.assigneeId ?? me,
       date: draft.date,
       start: draft.start,
       end: toHHMM(toMinutes(draft.start) + (draft.durationMinutes ?? 30)),
     });
-    // Solo al abrir con un borrador nuevo; los catálogos ya están en caché.
-  }, [draft, types.data]);
+    // Solo al abrir con un borrador nuevo: si se resetea cuando se refrescan los
+    // tipos, se borra lo que el usuario ya tipeó.
+  }, [draft]);
 
+  // Si los tipos llegan con el formulario ya abierto, se completa solo el tipo.
+  useEffect(() => {
+    if (draft && types.data && !form.getValues("typeId")) form.setValue("typeId", typeOf(draft)?.id ?? "");
+  }, [types.data]);
+
+  // Doble clic en "Confirmar y agendar": una sola tarea.
+  const sending = useRef(false);
   const onSubmit = form.handleSubmit(async (v) => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await save(v);
+    } finally {
+      sending.current = false;
+    }
+  });
+
+  const save = async (v: FormValues) => {
     await create.mutateAsync({
       title: v.title,
       typeId: v.typeId,
       clientId: v.clientId || null,
       ...(draft?.projectId && { projectId: draft.projectId }),
+      ...(draft?.ticketId && { ticketId: draft.ticketId }),
       assigneeId: v.assigneeId,
       startsAt: toInstant(v.date, v.start),
       durationMinutes: toMinutes(v.end) - toMinutes(v.start),
@@ -92,7 +119,7 @@ export function TaskFormDialog({
     const who = team.data?.find((u) => u.id === v.assigneeId);
     onCreated?.(`Agendada "${v.title}"${v.assigneeId !== me && who ? ` en la agenda de ${who.name}` : ""}.`);
     onClose();
-  });
+  };
 
   const minutes = start && end ? toMinutes(end) - toMinutes(start) : 0;
   const err = form.formState.errors;
@@ -104,16 +131,22 @@ export function TaskFormDialog({
           <Input autoFocus placeholder="Qué hay que hacer…" aria-invalid={!!err.title} {...form.register("title")} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Cliente">
-            <Select {...form.register("clientId")}>
-              <option value="">Sin cliente</option>
-              {clients.data?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {draft?.ticketId ? (
+            <Field label="Cliente" hint="El del ticket">
+              <Input value={draft.clientName ?? ""} readOnly disabled />
+            </Field>
+          ) : (
+            <Field label="Cliente">
+              <Select {...form.register("clientId")}>
+                <option value="">Sin cliente</option>
+                {clients.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Tipo de tarea" error={err.typeId?.message}>
             <Select {...form.register("typeId")}>
               {types.data?.map((t) => (

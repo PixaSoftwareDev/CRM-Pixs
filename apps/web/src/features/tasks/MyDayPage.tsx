@@ -78,11 +78,12 @@ export function MyDayPage() {
 
   const quickAdd = () => {
     if (!text.trim()) return;
-    const d = parseQuickTask(text, {
+    const { warning, ...d } = parseQuickTask(text, {
       clients: clients.data ?? [],
       baseDate: date,
       defaultStart: isToday ? nextSlot() : "10:00",
     });
+    if (warning) notice.show(warning);
     setDraft({ ...d, assigneeId: userId });
   };
 

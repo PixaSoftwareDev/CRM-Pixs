@@ -57,6 +57,13 @@
       "when": 1794663440791,
       "tag": "0007_baja_logica",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794664054272,
+      "tag": "0008_tareas_de_ticket",
+      "breakpoints": true
     }
   ]
 }

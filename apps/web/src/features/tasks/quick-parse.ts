@@ -12,6 +12,8 @@ export interface QuickDraft {
   date: string;
   start: string;
   durationMinutes: number;
+  /** Algo de la frase que no se pudo usar (p. ej. una fecha que no existe), para avisarle al usuario. */
+  warning: string | null;
 }
 
 interface Options {
@@ -54,29 +56,43 @@ function matchClient(text: string, clients: Options["clients"]): string | null {
   return best?.id ?? null;
 }
 
-function matchDate(text: string, base: string): string {
-  if (/\bpasado manana\b/.test(text)) return addDays(base, 2);
-  if (/\bmanana\b/.test(text)) return addDays(base, 1);
+/** "2026-11-31" no existe aunque Date.parse lo acepte (lo corre al 1/12). */
+function realDate(year: number, month: number, day: number): string | null {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function matchDate(text: string, base: string): { date: string; warning: string | null } {
+  const ok = (date: string) => ({ date, warning: null });
+  if (/\bpasado manana\b/.test(text)) return ok(addDays(base, 2));
+  // "mañana" es el día siguiente; "por/a/de la mañana" es un horario, no un día.
+  if (/(?<!\bla )\bmanana\b/.test(text)) return ok(addDays(base, 1));
   const dm = text.match(/\b(\d{1,2})\/(\d{1,2})\b/);
   if (dm) {
-    const date = `${base.slice(0, 4)}-${dm[2]?.padStart(2, "0")}-${dm[1]?.padStart(2, "0")}`;
-    if (!Number.isNaN(Date.parse(date))) return date;
+    const date = realDate(Number(base.slice(0, 4)), Number(dm[2]), Number(dm[1]));
+    if (date) return ok(date);
+    return { date: base, warning: `La fecha ${dm[0]} no existe: revisá el día antes de agendar.` };
   }
   const wd = WEEKDAYS.findIndex((d) => new RegExp(`\\b${d}\\b`).test(text));
   if (wd >= 0) {
     // El próximo día con ese nombre (si es hoy, el de la semana que viene).
     const diff = (wd - weekday(base) + 7) % 7 || 7;
-    return addDays(base, diff);
+    return ok(addDays(base, diff));
   }
-  return base;
+  return ok(base);
 }
 
 function matchTime(text: string): string | null {
   const m = text.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(?:hs|h|horas)\b/) ?? text.match(/\ba las (\d{1,2})(?:[:.](\d{2}))?\b/);
   if (!m) return null;
-  const h = Number(m[1]);
+  let h = Number(m[1]);
   const min = Number(m[2] ?? 0);
   if (h > 23 || min > 59) return null;
+  const morning = /\b(de|por|a) la manana\b|\bam\b/.test(text);
+  const evening = /\b(de|por|a) la (tarde|noche)\b|\bpm\b/.test(text);
+  // Nadie agenda trabajo a las 3 de la madrugada: de 1 a 7 sin aclarar es de la tarde.
+  if (h >= 1 && h < 12 && (evening || (h <= 7 && !morning))) h += 12;
   return toHHMM(h * 60 + min);
 }
 
@@ -84,12 +100,14 @@ export function parseQuickTask(raw: string, opts: Options): QuickDraft {
   const title = raw.trim().replace(/\s+/g, " ");
   const text = norm(title);
   const typeName = TYPE_RULES.find(([re]) => re.test(text))?.[1] ?? null;
+  const { date, warning } = matchDate(text, opts.baseDate);
   return {
     title: title.charAt(0).toUpperCase() + title.slice(1),
     clientId: matchClient(text, opts.clients),
     typeName,
-    date: matchDate(text, opts.baseDate),
+    date,
     start: matchTime(text) ?? opts.defaultStart,
     durationMinutes: typeName === "Reunión" || typeName === "Implementación" ? 60 : 30,
+    warning,
   };
 }

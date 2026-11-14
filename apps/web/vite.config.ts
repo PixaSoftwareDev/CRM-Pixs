@@ -7,8 +7,9 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? "/",
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5173,
+    port: Number(process.env.WEB_PORT ?? 5173),
     // La API (Fastify) corre aparte; en desarrollo se le habla por el mismo origen.
-    proxy: { "/api": "http://localhost:3001" },
+    // API_PROXY permite apuntar a otra API (p. ej. un segundo checkout en otro puerto).
+    proxy: { "/api": process.env.API_PROXY ?? "http://localhost:3001" },
   },
 });

@@ -33,6 +33,16 @@ export const taskStatus = pgEnum("task_status", [
   "cancelada",
 ]);
 
+/**
+ * Papel de una tarea dentro de su ticket (null si no cuelga de uno). No depende
+ * del tipo: el usuario puede elegir cualquier tipo y el flujo sigue sabiendo cuál
+ * es el trabajo y cuál la llamada de confirmación.
+ *   principal    → el trabajo del responsable del ticket ("Asignar y agendar")
+ *   adicional    → otra parte del trabajo, delegada a alguien más ("Agregar tarea")
+ *   confirmacion → la llamada al cliente para confirmar que quedó bien
+ */
+export const ticketTaskRole = pgEnum("ticket_task_role", ["principal", "adicional", "confirmacion"]);
+
 export const taskTypes = pgTable(
   "task_types",
   {
@@ -66,6 +76,7 @@ export const tasks = pgTable(
     projectId: ref().references(() => projects.id, { onDelete: "set null" }),
     opportunityId: ref().references(() => opportunities.id, { onDelete: "set null" }),
     ticketId: ref().references(() => tickets.id, { onDelete: "set null" }),
+    ticketRole: ticketTaskRole(),
     /** null = sin agendar. */
     startsAt: tstz(),
     durationMinutes: integer().notNull().default(60),

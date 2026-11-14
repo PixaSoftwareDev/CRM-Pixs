@@ -25,6 +25,28 @@ describe("parseQuickTask", () => {
     expect(parseQuickTask("cobrar a ruiz el 2/12 15.30 hs", opts)).toMatchObject({ clientId: "ruiz", date: "2026-12-02", start: "15:30" });
   });
 
+  it("de 1 a 7 sin aclarar es de la tarde; la mañana se respeta", () => {
+    expect(parseQuickTask("llamar a ruiz a las 3", opts).start).toBe("15:00");
+    expect(parseQuickTask("llamar a ruiz 7hs", opts).start).toBe("19:00");
+    expect(parseQuickTask("llamar a ruiz a las 7 de la mañana", opts).start).toBe("07:00");
+    expect(parseQuickTask("llamar a ruiz a las 8", opts).start).toBe("08:00");
+    expect(parseQuickTask("llamar a ruiz a las 9 de la noche", opts).start).toBe("21:00");
+    expect(parseQuickTask("llamar a ruiz 15hs", opts).start).toBe("15:00");
+  });
+
+  it("\"por la mañana\" es un horario, no el día siguiente", () => {
+    expect(parseQuickTask("llamar a ruiz por la mañana", opts).date).toBe("2026-11-13");
+    expect(parseQuickTask("visita a fitzone a la mañana", opts).date).toBe("2026-11-13");
+    expect(parseQuickTask("llamar a ruiz mañana por la mañana", opts).date).toBe("2026-11-14");
+  });
+
+  it("una fecha que no existe no se agenda en otro día: avisa", () => {
+    const d = parseQuickTask("cobrar a ruiz el 31/11", opts);
+    expect(d.date).toBe("2026-11-13");
+    expect(d.warning).toMatch(/31\/11 no existe/);
+    expect(parseQuickTask("cobrar a ruiz el 30/11", opts)).toMatchObject({ date: "2026-11-30", warning: null });
+  });
+
   it("sin pistas usa los valores por defecto", () => {
     expect(parseQuickTask("ordenar el escritorio", opts)).toMatchObject({ clientId: null, typeName: null, date: "2026-11-13", start: "16:00" });
   });

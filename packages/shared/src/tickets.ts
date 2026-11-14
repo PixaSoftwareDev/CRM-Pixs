@@ -4,6 +4,7 @@
  * Si el cliente dice que no quedó bien, vuelve a en_curso.
  */
 import { z } from "zod";
+import { taskTitle } from "./tasks";
 
 export const TICKET_TYPES = ["falla", "implementacion", "consulta", "mejora"] as const;
 export const TICKET_CHANNELS = ["telefono", "whatsapp", "email", "web", "presencial"] as const;
@@ -14,6 +15,13 @@ export type TicketType = (typeof TICKET_TYPES)[number];
 export type TicketChannel = (typeof TICKET_CHANNELS)[number];
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
+
+/**
+ * Papel de una tarea dentro de su ticket: el trabajo del responsable, otra parte
+ * del trabajo delegada a alguien más, o la llamada de confirmación al cliente.
+ */
+export const TICKET_TASK_ROLES = ["principal", "adicional", "confirmacion"] as const;
+export type TicketTaskRole = (typeof TICKET_TASK_ROLES)[number];
 
 const isoDate = z.iso.date({ message: "Fecha inválida" });
 const instant = z.iso.datetime({ offset: true, message: "Fecha y hora inválidas" });
@@ -83,6 +91,19 @@ export const ticketAssign = z.object({
   durationMinutes: z.number().int().min(15).max(8 * 60).default(60),
 });
 export type TicketAssign = z.input<typeof ticketAssign>;
+
+/**
+ * Otra tarea de trabajo colgada del ticket ("Agregar tarea"): para delegar una
+ * parte a otra persona u ocuparle lugar en la agenda. Hereda cliente y proyecto.
+ */
+export const ticketTaskCreate = z.object({
+  title: taskTitle,
+  typeId: z.uuid({ message: "Elegí un tipo" }),
+  assigneeId: z.uuid({ message: "Elegí quién la hace" }),
+  startsAt: instant,
+  durationMinutes: z.number().int().min(5).max(24 * 60).default(60),
+});
+export type TicketTaskCreate = z.input<typeof ticketTaskCreate>;
 
 /** Paso 2: el técnico terminó; se agenda la llamada de confirmación. */
 export const ticketWorkDone = z.object({

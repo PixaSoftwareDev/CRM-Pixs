@@ -2,10 +2,16 @@
  * Flujo de Tickets. Cada paso crea o cierra tareas reales en la agenda, así el
  * trabajo aparece en Mi día de quien lo tiene que hacer:
  *
- *   asignar        → tarea de trabajo para el técnico
- *   trabajo listo  → cierra esa tarea y agenda la llamada de confirmación
+ *   asignar        → tarea principal para el responsable del ticket
+ *   agregar tarea  → otra tarea de trabajo (adicional) para quien sea: un ticket
+ *                    puede repartirse entre varias personas
+ *   trabajo listo  → cierra las tareas de trabajo y agenda la llamada de confirmación
+ *                    (sola, cuando se finaliza la última tarea de trabajo abierta)
  *   confirmar ok   → cierra la llamada y el ticket
- *   no quedó bien  → cierra la llamada y le agenda otra vez el trabajo al técnico
+ *   no quedó bien  → cierra la llamada y le agenda otra vez el trabajo al responsable
+ *
+ * Qué es trabajo y qué es confirmación lo dice `tasks.ticket_role`, no el tipo
+ * de la tarea (el usuario puede elegir cualquier tipo).
  */
 import {
   activities,
@@ -14,7 +20,6 @@ import {
   type DbOrTx,
   eq,
   inArray,
-  ne,
   sql,
   taskComments,
   tasks,
@@ -23,6 +28,8 @@ import {
   timeEntries,
 } from "@crm/db";
 import {
+  type TicketTaskCreate,
+  type TicketTaskRole,
   type TicketAssign,
   type TicketCancel,
   type TicketConfirm,
@@ -36,6 +43,7 @@ import {
   ticketConfirm,
   ticketCreate,
   ticketNote,
+  ticketTaskCreate,
   ticketUpdate,
   ticketWorkDone,
 } from "@crm/shared";
@@ -44,14 +52,20 @@ import { endOfDayAr, fmtWhen } from "../../lib/dates";
 import { archivedChange } from "../../lib/archive";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr } from "../../lib/sql";
-import { isActiveUser, listTaskTypes, listTeam } from "../tasks/repository";
+import { existsIn, isActiveUser, listTaskTypes, listTeam } from "../tasks/repository";
 import * as repo from "./repository";
 
 export { listTickets } from "./repository";
 
 type EventKind = (typeof ticketEvents.$inferInsert)["kind"];
 
-const CONFIRM_TYPE = "Llamada";
+/** Tipo con el que se crea la llamada de confirmación (solo para mostrarla: el flujo usa el papel). */
+const CONFIRM_CALL_TYPE = "Llamada";
+/** Papeles que son trabajo (lo que tiene que estar hecho para pasar a confirmar). */
+const WORK_ROLES = ["principal", "adicional"] as const satisfies readonly TicketTaskRole[];
+const ALL_ROLES = [...WORK_ROLES, "confirmacion"] as const satisfies readonly TicketTaskRole[];
+const OPEN_TASK = sql`status in ('pendiente', 'en_curso', 'esperando')`;
+const WORK_ROLE = sql`ticket_role in ('principal', 'adicional')`;
 const workType = (type: string) => (type === "falla" ? "Falla" : "Implementación");
 
 async function requireTicket(db: DbOrTx, id: string, allowed?: TicketStatus[]) {
@@ -89,9 +103,15 @@ async function userName(db: DbOrTx, id: string) {
 const event = (db: DbOrTx, ticketId: string, actorId: string | null, kind: EventKind, message: string) =>
   db.insert(ticketEvents).values({ ticketId, actorId, kind, message });
 
-/** Cierra las tareas abiertas del ticket de un tipo (trabajo o confirmación). */
-async function closeTasks(db: DbOrTx, ticketId: string, which: "work" | "confirm", status: "hecha" | "cancelada", actorId: string, note?: string) {
-  const confirmType = await typeId(db, CONFIRM_TYPE);
+/** Cierra las tareas abiertas del ticket con alguno de esos papeles. */
+async function closeTasks(
+  db: DbOrTx,
+  ticketId: string,
+  roles: readonly TicketTaskRole[],
+  status: "hecha" | "cancelada",
+  actorId: string,
+  note?: string,
+) {
   const open = await db
     .select({ id: tasks.id })
     .from(tasks)
@@ -99,7 +119,7 @@ async function closeTasks(db: DbOrTx, ticketId: string, which: "work" | "confirm
       and(
         eq(tasks.ticketId, ticketId),
         inArray(tasks.status, ["pendiente", "en_curso", "esperando"]),
-        which === "confirm" ? eq(tasks.typeId, confirmType) : ne(tasks.typeId, confirmType),
+        inArray(tasks.ticketRole, [...roles]),
       ),
     );
   if (!open.length) return;
@@ -120,7 +140,7 @@ interface TicketRef {
   project_id: string | null;
 }
 
-/** Tarea de trabajo en la agenda del técnico. */
+/** Tarea principal (el trabajo del responsable) en la agenda del técnico. */
 async function scheduleWork(db: DbOrTx, t: TicketRef, actorId: string, assigneeId: string, at: Date, minutes = 60) {
   await db.insert(tasks).values({
     title: `#${t.number} · ${t.title}`,
@@ -128,6 +148,7 @@ async function scheduleWork(db: DbOrTx, t: TicketRef, actorId: string, assigneeI
     clientId: t.client_id,
     projectId: t.project_id,
     ticketId: t.id,
+    ticketRole: "principal",
     assigneeId,
     assignedById: assigneeId === actorId ? null : actorId,
     createdById: actorId,
@@ -244,7 +265,10 @@ export async function addNote(db: Db, actorId: string, id: string, input: Ticket
 
 // ─── Flujo ──────────────────────────────────────────────────────────────────
 
-/** Paso 1 (o reasignar mientras está en trabajo). */
+/**
+ * Paso 1 (o reasignar mientras está en trabajo). Define el responsable del
+ * ticket; las tareas que se agregaron para otras personas no se tocan.
+ */
 export async function assignTicket(db: Db, actorId: string, id: string, input: TicketAssign) {
   const data = ticketAssign.parse(input);
   const t = await requireTicket(db, id, ["nuevo", "en_curso"]);
@@ -254,14 +278,68 @@ export async function assignTicket(db: Db, actorId: string, id: string, input: T
   await db.transaction(async (tx) => {
     // Estado leído con la fila bloqueada: si otro pedido ya asignó, esto es una reasignación.
     const status = await lockTicket(tx, id, ["nuevo", "en_curso"]);
-    // Reasignar: la tarea anterior se cancela, la nueva queda en la agenda del nuevo técnico.
-    if (status === "en_curso") await closeTasks(tx, id, "work", "cancelada", actorId, `Reasignado a ${name}.`);
+    if (status === "en_curso") {
+      // Doble clic (o dos personas con lo mismo): la tarea pedida ya está en la agenda.
+      const [same] = await tx.execute(sql`
+        select 1 from tasks
+        where ticket_id = ${id} and ticket_role = 'principal' and ${OPEN_TASK}
+          and assignee_id = ${data.assigneeId} and starts_at = ${at.toISOString()}::timestamptz
+          and duration_minutes = ${data.durationMinutes}`);
+      if (same) return;
+      // Reasignar: se cancela solo la tarea principal del responsable anterior.
+      await closeTasks(tx, id, ["principal"], "cancelada", actorId, `Reasignado a ${name}.`);
+    }
     await scheduleWork(tx, t, actorId, data.assigneeId, at, data.durationMinutes);
     await tx
       .update(tickets)
       .set({ status: "en_curso", assigneeId: data.assigneeId, scheduledAt: at, updatedAt: new Date() })
       .where(eq(tickets.id, id));
     await event(tx, id, actorId, "asignado", `Asignado a ${name}: tarea en su agenda ${fmtWhen(at)}`);
+  });
+}
+
+/**
+ * Otra tarea de trabajo en el ticket, para cualquier persona y de cualquier tipo
+ * (p. ej. una reunión de diseño repartida entre tres). Hereda cliente y proyecto.
+ * En un ticket nuevo la primera tarea es la principal: lo asigna a esa persona.
+ */
+export async function addTicketTask(db: Db, actorId: string, id: string, input: TicketTaskCreate) {
+  const data = ticketTaskCreate.parse(input);
+  const t = await requireTicket(db, id, ["nuevo", "en_curso"]);
+  if (!(await existsIn(db, "task_types", data.typeId))) throw new BadRequestError("El tipo de tarea no existe");
+  const name = await userName(db, data.assigneeId);
+  const at = new Date(data.startsAt);
+
+  return db.transaction(async (tx) => {
+    const status = await lockTicket(tx, id, ["nuevo", "en_curso"]);
+    const role: TicketTaskRole = status === "nuevo" ? "principal" : "adicional";
+    const [row] = await tx
+      .insert(tasks)
+      .values({
+        title: data.title,
+        typeId: data.typeId,
+        clientId: t.client_id,
+        projectId: t.project_id,
+        ticketId: id,
+        ticketRole: role,
+        assigneeId: data.assigneeId,
+        assignedById: data.assigneeId === actorId ? null : actorId,
+        createdById: actorId,
+        startsAt: at,
+        durationMinutes: data.durationMinutes,
+      })
+      .returning({ id: tasks.id });
+    if (!row) throw new Error("No se pudo crear la tarea");
+    if (role === "principal") {
+      await tx
+        .update(tickets)
+        .set({ status: "en_curso", assigneeId: data.assigneeId, scheduledAt: at, updatedAt: new Date() })
+        .where(eq(tickets.id, id));
+      await event(tx, id, actorId, "asignado", `Asignado a ${name}: "${data.title}" en su agenda ${fmtWhen(at)}`);
+    } else {
+      await event(tx, id, actorId, "asignado", `Tarea para ${name}: "${data.title}" en su agenda ${fmtWhen(at)}`);
+    }
+    return row;
   });
 }
 
@@ -292,47 +370,88 @@ export async function workDoneTx(
 ) {
   const at = new Date(data.confirmAt);
   const tech = t.assignee_name ?? "El técnico";
-  if (opts.closeWork !== false) await closeTasks(tx, t.id, "work", "hecha", actorId, data.note);
+  if (opts.closeWork !== false) await closeTasks(tx, t.id, WORK_ROLES, "hecha", actorId, data.note);
   await tx.insert(tasks).values({
     title: `Confirmar con el cliente · #${t.number} ${t.title}`,
-    typeId: await typeId(tx, CONFIRM_TYPE),
+    typeId: await typeId(tx, CONFIRM_CALL_TYPE),
     clientId: t.client_id,
     projectId: t.project_id,
     ticketId: t.id,
+    ticketRole: "confirmacion",
     assigneeId: data.confirmerId,
     assignedById: data.confirmerId === actorId ? null : actorId,
     createdById: actorId,
     startsAt: at,
     durationMinutes: 15,
   });
-  if (data.minutes && t.project_id && t.assignee_id) {
-    const [today] = await tx.execute<{ d: string }>(sql`select ${todayAr}::text as d`);
-    await tx.insert(timeEntries).values({
-      userId: t.assignee_id,
-      projectId: t.project_id,
-      ticketId: t.id,
-      workedOn: today?.d ?? new Date().toISOString().slice(0, 10),
-      minutes: data.minutes,
-      note: `Ticket #${t.number}`,
-    });
-  }
+  if (data.minutes && t.assignee_id) await logTicketWork(tx, t, t.assignee_id, null, data.minutes);
   await tx
     .update(tickets)
     .set({ status: "a_confirmar", confirmerId: data.confirmerId, confirmAt: at, updatedAt: new Date() })
     .where(eq(tickets.id, t.id));
-  const how = opts.auto ? " (finalizó su tarea en Mi día)" : "";
-  await event(tx, t.id, actorId, "estado", `${tech} terminó el trabajo${how}${data.note ? `: "${data.note}"` : ""}`);
+  const quote = data.note ? `: "${data.note}"` : "";
+  await event(
+    tx,
+    t.id,
+    actorId,
+    "estado",
+    opts.auto ? `Se finalizaron todas las tareas de trabajo${quote}` : `${tech} terminó el trabajo${quote}`,
+  );
   await event(tx, t.id, opts.auto ? null : actorId, "estado", `Llamada de confirmación agendada para ${confirmerName} (${fmtWhen(at)})`);
 }
 
-/** Ticket abierto de una tarea, si la tarea es el trabajo del técnico (no la llamada de confirmación). */
-export async function ticketOfWorkTask(db: DbOrTx, taskId: string): Promise<TicketRow | null> {
-  const [row] = await db.execute<{ ticket_id: string }>(sql`
-    select t.ticket_id from tasks t join task_types tt on tt.id = t.type_id
-    where t.id = ${taskId} and t.ticket_id is not null and tt.name <> ${CONFIRM_TYPE}`);
+/**
+ * Ticket en curso de una tarea, si la tarea es trabajo del ticket (principal o
+ * adicional; no la llamada de confirmación).
+ */
+export async function ticketOfWorkTask(
+  db: DbOrTx,
+  taskId: string,
+): Promise<{ ticket: TicketRow; role: (typeof WORK_ROLES)[number] } | null> {
+  const [row] = await db.execute<{ ticket_id: string; ticket_role: (typeof WORK_ROLES)[number] }>(sql`
+    select ticket_id, ticket_role from tasks
+    where id = ${taskId} and ticket_id is not null and ${WORK_ROLE}`);
   if (!row) return null;
   const ticket = await repo.findTicket(db, row.ticket_id);
-  return ticket?.status === "en_curso" ? ticket : null;
+  return ticket?.status === "en_curso" ? { ticket, role: row.ticket_role } : null;
+}
+
+/** Tareas de trabajo del ticket que siguen abiertas (de cualquier persona). */
+export async function openWorkTasks(db: DbOrTx, ticketId: string): Promise<number> {
+  const [row] = await db.execute<{ n: number }>(sql`
+    select count(*)::int as n from tasks where ticket_id = ${ticketId} and ${WORK_ROLE} and ${OPEN_TASK}`);
+  return row?.n ?? 0;
+}
+
+/**
+ * En la vuelta de trabajo actual (desde la última llamada de confirmación) hay
+ * alguna tarea de trabajo finalizada: si las demás se cancelaron, igual hay
+ * algo que confirmar con el cliente.
+ */
+export async function roundHasDoneWork(db: DbOrTx, ticketId: string): Promise<boolean> {
+  const [row] = await db.execute(sql`
+    select 1 from tasks w
+    where w.ticket_id = ${ticketId} and w.ticket_role in ('principal', 'adicional') and w.status = 'hecha'
+      and w.created_at > coalesce(
+        (select max(c.created_at) from tasks c where c.ticket_id = ${ticketId} and c.ticket_role = 'confirmacion'),
+        '-infinity')
+    limit 1`);
+  return !!row;
+}
+
+/** Horas de una tarea de trabajo finalizada: se suman al proyecto del ticket, a nombre de quien la hizo. */
+export async function logTicketWork(tx: DbOrTx, t: TicketRow, userId: string, taskId: string | null, minutes: number) {
+  if (!t.project_id || minutes <= 0) return;
+  const [today] = await tx.execute<{ d: string }>(sql`select ${todayAr}::text as d`);
+  await tx.insert(timeEntries).values({
+    userId,
+    projectId: t.project_id,
+    ticketId: t.id,
+    taskId,
+    workedOn: today?.d ?? new Date().toISOString().slice(0, 10),
+    minutes,
+    note: `Ticket #${t.number}`,
+  });
 }
 
 /** Paso 3: lo que dijo el cliente. */
@@ -345,7 +464,7 @@ export async function confirmTicket(db: Db, actorId: string, id: string, input: 
 
   await db.transaction(async (tx) => {
     await lockTicket(tx, id, ["a_confirmar"]);
-    await closeTasks(tx, id, "confirm", "hecha", actorId, data.note);
+    await closeTasks(tx, id, ["confirmacion"], "hecha", actorId, data.note);
     if (data.ok) {
       await tx
         .update(tickets)
@@ -388,17 +507,17 @@ export async function cancelTicket(db: Db, actorId: string, id: string, input: T
   await requireTicket(db, id, ["nuevo", "en_curso", "a_confirmar"]);
   await db.transaction(async (tx) => {
     await lockTicket(tx, id, ["nuevo", "en_curso", "a_confirmar"]);
-    await closeTasks(tx, id, "work", "cancelada", actorId, `Ticket cancelado: ${reason}`);
-    await closeTasks(tx, id, "confirm", "cancelada", actorId, `Ticket cancelado: ${reason}`);
+    await closeTasks(tx, id, ALL_ROLES, "cancelada", actorId, `Ticket cancelado: ${reason}`);
     await tx.update(tickets).set({ status: "cancelado", updatedAt: new Date() }).where(eq(tickets.id, id));
     await event(tx, id, actorId, "estado", `Cancelado: ${reason}`);
   });
 }
 
 /**
- * Cambios hechos desde Mi día sobre la tarea de trabajo de un ticket en curso:
- * pasársela a otro → el ticket queda asignado a esa persona; cancelarla (sin
- * otra tarea de trabajo abierta) → el ticket vuelve a Nuevo para reasignarlo.
+ * Cambios hechos desde Mi día sobre una tarea de trabajo de un ticket en curso:
+ * pasarle la principal a otro → el ticket queda asignado a esa persona; cancelar
+ * la última tarea de trabajo abierta sin que se haya hecho ninguna → el ticket
+ * vuelve a Nuevo para reasignarlo. Las tareas adicionales no cambian el responsable.
  */
 export async function syncTicketFromWorkTask(
   tx: DbOrTx,
@@ -406,19 +525,18 @@ export async function syncTicketFromWorkTask(
   taskId: string,
   change: { assigneeId?: string; assigneeName?: string; startsAt?: Date | null; cancelled?: boolean },
 ) {
-  const ticket = await ticketOfWorkTask(tx, taskId);
-  if (!ticket) return;
+  const ref = await ticketOfWorkTask(tx, taskId);
+  if (!ref) return;
+  const { ticket, role } = ref;
   await lockTicket(tx, ticket.id, ["en_curso"]);
   if (change.cancelled) {
-    const [open] = await tx.execute(sql`
-      select 1 from tasks t join task_types tt on tt.id = t.type_id
-      where t.ticket_id = ${ticket.id} and t.id <> ${taskId} and tt.name <> ${CONFIRM_TYPE}
-        and t.status in ('pendiente', 'en_curso', 'esperando')`);
-    if (open) return;
+    // Quedan otras abiertas, o ya se hizo parte del trabajo (eso lo resuelve la regla de pasar a confirmar).
+    if ((await openWorkTasks(tx, ticket.id)) > 0 || (await roundHasDoneWork(tx, ticket.id))) return;
     await tx.update(tickets).set({ status: "nuevo", assigneeId: null, scheduledAt: null, updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
     await event(tx, ticket.id, actorId, "estado", "Se canceló la tarea de trabajo desde Mi día: el ticket vuelve a Nuevo para asignarlo");
     return;
   }
+  if (role !== "principal") return;
   const patch: Partial<typeof tickets.$inferInsert> = { updatedAt: new Date() };
   if (change.assigneeId && change.assigneeId !== ticket.assignee_id) {
     patch.assigneeId = change.assigneeId;

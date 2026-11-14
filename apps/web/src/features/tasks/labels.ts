@@ -9,8 +9,11 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; tone: Tone }> = {
   cancelada: { label: "Cancelada", tone: "red" },
 };
 
-/** Estados que se eligen a mano (cancelar es otra acción). */
-export const EDITABLE_STATUSES = ["pendiente", "en_curso", "esperando", "hecha"] as const satisfies TaskStatus[];
+/**
+ * Estados que se eligen a mano en el modal de la tarea. "Cancelada" también:
+ * así una cancelada se ve como tal y se puede reactivar volviéndola a Pendiente.
+ */
+export const EDITABLE_STATUSES = ["pendiente", "en_curso", "esperando", "hecha", "cancelada"] as const satisfies TaskStatus[];
 
 /** Colores para tipos nuevos (los mismos tonos que los del sistema). */
 export const TYPE_PALETTE = ["#2563eb", "#0891b2", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#db2777", "#64748b"];
