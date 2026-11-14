@@ -39,7 +39,8 @@ export function StatementTab({ client }: { client: ClientDetail }) {
   const [invoicing, setInvoicing] = useState(false);
   const [plans, setPlans] = useState(false);
   // Lo que debe hoy, sin importar el período filtrado (el saldo del rango no es la deuda).
-  const debt = client.summary.balance;
+  // Deuda real (sin el filtro de período). null si no hay acceso a Finanzas, aunque esta pestaña solo se muestra con acceso.
+  const debt = client.summary.balance ?? 0;
   // Sin "Hasta", el saldo llega hasta el último comprobante (puede haber alguno con fecha futura).
   const lastIssued = st.data?.rows.at(-1)?.issuedOn;
   const until = st.data?.to ?? (lastIssued && lastIssued > today ? lastIssued : today);
