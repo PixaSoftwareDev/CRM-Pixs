@@ -2,15 +2,16 @@
 import { idParams, projectCreate, projectUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
-import { requireUser, sessionOf } from "../auth/guard";
+import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
+  app.addHook("onRequest", requireArea("proyectos"));
 
-  app.get("/api/projects", () => service.listProjects(db));
+  app.get("/api/projects", { config: { access: access(["proyectos", "tickets"], "read") } }, () => service.listProjects(db));
 
-  app.get("/api/projects/:id", { schema: { params: idParams } }, (req) => service.getProject(db, req.params.id));
+  app.get("/api/projects/:id", { config: { access: access(["proyectos", "finanzas"], "read") }, schema: { params: idParams } }, (req) => service.getProject(db, req.params.id));
 
   app.post("/api/projects", { schema: { body: projectCreate } }, async (req, reply) => {
     const project = await service.createProject(db, sessionOf(req).user.id, req.body);

@@ -1,6 +1,6 @@
 import { PROJECT_PHASES, type ProjectDetail } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Check, Copy, Mail, Pencil, Phone, Zap } from "lucide-react";
+import { ArrowLeft, Check, Copy, Mail, Pencil, Phone, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -17,7 +17,7 @@ import { TaskDialog } from "../tasks/TaskDialog";
 import { type TaskDraft, TaskFormDialog } from "../tasks/TaskFormDialog";
 import { nextSlot, todayAr } from "../tasks/time";
 import { useProject, useUpdateProject } from "./api";
-import { InstallmentsCard } from "../finance/InstallmentsCard";
+import { NewTicketDialog } from "../tickets/NewTicketDialog";
 import { TICKET_STATUS, TICKET_TYPE } from "../tickets/labels";
 import { alertsOf, HEALTH, PHASE, STATUS_LABEL } from "./labels";
 import { ProjectFormDialog } from "./ProjectFormDialog";
@@ -40,8 +40,7 @@ export function ProjectDetailPage() {
         <SaleCard project={project.data} />
         <ContactCard project={project.data} />
       </div>
-      <InstallmentsCard project={project.data} onNotice={notice.show} />
-      <TicketsCard project={project.data} />
+      <TicketsCard project={project.data} onNotice={notice.show} />
       <TasksCard project={project.data} onNotice={notice.show} />
       <Notice message={notice.message} />
     </>
@@ -219,17 +218,27 @@ function ContactCard({ project: p }: { project: ProjectDetail }) {
   );
 }
 
-function TicketsCard({ project: p }: { project: ProjectDetail }) {
+function TicketsCard({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m: string) => void }) {
+  const [creating, setCreating] = useState(false);
   return (
     <Card className="flex flex-col gap-3 p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-bold">Tickets del proyecto</h2>
-        <span className="text-sm text-muted">
+        <span className="flex flex-wrap items-center gap-3 text-sm text-muted">
           {p.pendingTickets} pendientes · {p.resolvedTickets} resueltos
+          <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
+            <Plus size={14} aria-hidden /> Cargar ticket
+          </Button>
         </span>
       </div>
+      <NewTicketDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(_id, number) => onNotice(`Ticket #${number} cargado en este proyecto.`)}
+        preset={{ clientId: p.client.id, projectId: p.id }}
+      />
       {p.tickets.length === 0 ? (
-        <p className="text-sm text-muted">Todavía no hay tickets. Se cargan desde Tickets eligiendo este proyecto.</p>
+        <p className="text-sm text-muted">Todavía no hay tickets en este proyecto.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">

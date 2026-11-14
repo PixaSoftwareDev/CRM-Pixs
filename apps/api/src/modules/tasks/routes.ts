@@ -4,13 +4,14 @@
 import { idParams, taskCommentCreate, taskCreate, taskRangeQuery, taskTypeCreate, taskUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
-import { requireAdmin, requireUser, sessionOf } from "../auth/guard";
+import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
+  app.addHook("onRequest", requireArea("tareas"));
 
-  app.get("/api/team", () => service.listTeam(db));
+  app.get("/api/team", { config: { access: "any" } }, () => service.listTeam(db));
 
   // ─── Tareas ──────────────────────────────────────────────────────────────
   app.get("/api/tasks", { schema: { querystring: taskRangeQuery } }, (req) =>
@@ -40,14 +41,14 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   // ─── Tipos ───────────────────────────────────────────────────────────────
-  app.get("/api/task-types", () => service.listTaskTypes(db));
+  app.get("/api/task-types", { config: { access: "any" } }, () => service.listTaskTypes(db));
 
-  app.post("/api/task-types", { onRequest: requireAdmin, schema: { body: taskTypeCreate } }, async (req, reply) => {
+  app.post("/api/task-types", { config: { access: access("tareas", "manage") }, schema: { body: taskTypeCreate } }, async (req, reply) => {
     const type = await service.createTaskType(db, req.body);
     return reply.status(201).send(type);
   });
 
-  app.delete("/api/task-types/:id", { onRequest: requireAdmin, schema: { params: idParams } }, async (req, reply) => {
+  app.delete("/api/task-types/:id", { config: { access: access("tareas", "manage") }, schema: { params: idParams } }, async (req, reply) => {
     await service.deleteTaskType(db, req.params.id);
     return reply.status(204).send();
   });

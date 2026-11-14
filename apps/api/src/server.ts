@@ -20,6 +20,7 @@ import { projectRoutes } from "./modules/projects/routes";
 import { salesRoutes } from "./modules/sales/routes";
 import { taskRoutes } from "./modules/tasks/routes";
 import { ticketRoutes } from "./modules/tickets/routes";
+import { userRoutes } from "./modules/users/routes";
 import { vaultRoutes } from "./modules/vault/routes";
 
 export async function buildServer() {
@@ -86,6 +87,7 @@ export async function buildServer() {
   await app.register(financeRoutes);
   await app.register(vaultRoutes);
   await app.register(automationRoutes);
+  await app.register(userRoutes);
 
   return app;
 }

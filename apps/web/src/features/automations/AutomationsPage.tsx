@@ -7,7 +7,7 @@ import { Card } from "../../components/ui/Card";
 import { cn } from "../../components/ui/cn";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
-import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { useAccess } from "../../hooks/useAccess";
 import { api } from "../../lib/api";
 import { ago, plural } from "../../lib/format";
 
@@ -16,7 +16,7 @@ const KEY = ["automations"] as const;
 export function AutomationsPage() {
   const qc = useQueryClient();
   const notice = useNotice();
-  const isAdmin = useIsAdmin();
+  const isAdmin = useAccess().can("automatizaciones", "manage");
   const rules = useQuery({ queryKey: KEY, queryFn: () => api.get<AutomationRuleDto[]>("/api/automations") });
   // Una corrida puede crear tareas, facturas o cambiar proyectos: se refresca todo.
   const refresh = () => qc.invalidateQueries();
@@ -44,7 +44,7 @@ export function AutomationsPage() {
       />
       <p className="text-sm text-muted">
         Las reglas programadas corren solas una vez por día a partir de las 7. Con «Ejecutar ahora» podés correrlas en el momento; si ya
-        hicieron su trabajo, no duplican nada.{!isAdmin && " Activarlas, pausarlas o ejecutarlas lo hace un administrador."}
+        hicieron su trabajo, no duplican nada.{!isAdmin && " Activarlas, pausarlas o ejecutarlas lo hace quien tenga permiso de administrar este sector."}
       </p>
       {(toggle.error ?? run.error) && (
         <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">

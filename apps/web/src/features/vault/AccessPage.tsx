@@ -14,7 +14,7 @@ import { Field, Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { useDebounced } from "../../hooks/useDebounced";
-import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { useAccess } from "../../hooks/useAccess";
 import { copyText } from "../../lib/clipboard";
 import { downloadCsv } from "../../lib/csv";
 import { ago, initials, plural, when } from "../../lib/format";
@@ -33,7 +33,7 @@ export function AccessPage() {
   const notice = useNotice();
   const [editing, setEditing] = useState<CredentialDto | "new" | null>(null);
   const [history, setHistory] = useState<{ clientId?: string } | null>(null);
-  const isAdmin = useIsAdmin();
+  const isAdmin = useAccess().can("accesos", "manage");
 
   const groups = new Map<string, { client: CredentialDto["client"]; items: CredentialDto[] }>();
   for (const c of creds.data ?? []) {
@@ -159,7 +159,15 @@ function CredentialRow({ cred: c, onEdit, onNotice }: { cred: CredentialDto; onE
 
   const copy = async () => {
     const res = await reveal.mutateAsync({ id: c.id, action: "copiar" });
-    await copyText(res.secret);
+    try {
+      await copyText(res.secret);
+    } catch {
+      // Algunos navegadores no dejan copiar después de ir al servidor: queda a la vista para copiarla a mano.
+      setSecret(res.secret);
+      hideLater();
+      onNotice(`No se pudo copiar sola: la clave de "${c.label}" quedó visible unos segundos para copiarla a mano.`);
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
     onNotice(`Clave de "${c.label}" copiada.`);
@@ -225,7 +233,7 @@ function CredentialDialog({ value, onClose, onDone }: { value: CredentialDto | "
   const form = useForm<FormValues>({ resolver: zodResolver(formSchema) });
   const serverError = useServerErrors(form, mutation.error ?? del.error);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const isAdmin = useIsAdmin();
+  const isAdmin = useAccess().can("accesos", "manage");
   const err = form.formState.errors;
 
   useEffect(() => {

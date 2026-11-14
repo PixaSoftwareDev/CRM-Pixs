@@ -12,7 +12,7 @@ import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { Tabs } from "../../components/ui/Tabs";
 import { useCopy } from "../../hooks/useCopy";
-import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { useAccess } from "../../hooks/useAccess";
 import { downloadCsv } from "../../lib/csv";
 import { day, money, plural } from "../../lib/format";
 import { financeRoute } from "../../router";
@@ -276,7 +276,7 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
   const adjust = useAdjustPrices();
   const accrual = useRunAccrual();
   const update = useUpdateSubscription();
-  const isAdmin = useIsAdmin();
+  const isAdmin = useAccess().can("finanzas", "manage");
   const today = todayAr();
   const months = [today.slice(0, 7), addMonths(today, 1).slice(0, 7)];
   const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);

@@ -41,7 +41,15 @@ const STATUS = {
   cobrada: { label: "Cobrada", tone: "green" },
 } as const;
 
-export function InstallmentsCard({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m: string) => void }) {
+export function InstallmentsCard({
+  project: p,
+  onNotice,
+  title = "Plan de cuotas",
+}: {
+  project: ProjectDetail;
+  onNotice: (m: string) => void;
+  title?: string;
+}) {
   const plans = useInstallmentPlans(p.id);
   const create = useCreatePlan(p.id);
   const [pay, setPay] = useState<PaymentTarget | null>(null);
@@ -61,7 +69,7 @@ export function InstallmentsCard({ project: p, onNotice }: { project: ProjectDet
 
   return (
     <Card className="flex flex-col gap-3 p-5">
-      <h2 className="font-bold">Plan de cuotas</h2>
+      <h2 className="font-bold">{title}</h2>
       {plans.data.length === 0 ? (
         <>
           <p className="text-sm text-muted">Armá las cuotas de la venta: aparecen en Finanzas → Por cobrar y se facturan al cobrarlas.</p>

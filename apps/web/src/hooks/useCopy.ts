@@ -5,7 +5,13 @@ import { copyText } from "../lib/clipboard";
 export function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);
   const copy = useCallback(async (key: string, text: string) => {
-    await copyText(text);
+    try {
+      await copyText(text);
+    } catch {
+      // Último recurso: el navegador muestra el texto seleccionado para copiarlo a mano.
+      window.prompt("No se pudo copiar solo. Copialo desde acá:", text);
+      return;
+    }
     setCopied(key);
     setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500);
   }, []);

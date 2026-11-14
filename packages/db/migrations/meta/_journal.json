@@ -43,6 +43,13 @@
       "when": 1794608430922,
       "tag": "0005_accesos_y_automatizaciones",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794658885372,
+      "tag": "0006_permisos_por_sector",
+      "breakpoints": true
     }
   ]
 }

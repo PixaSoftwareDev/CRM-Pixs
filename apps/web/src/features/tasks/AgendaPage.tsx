@@ -11,7 +11,7 @@ import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { initials } from "../../lib/format";
 import { agendaRoute } from "../../router";
-import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { useAccess } from "../../hooks/useAccess";
 import { useCreateTaskType, useDeleteTaskType, useMyId, useTasksInRange, useTaskTypes, useTeam } from "./api";
 import { TYPE_PALETTE, tint } from "./labels";
 import { layoutLanes } from "./lanes";
@@ -393,7 +393,7 @@ function TypesPanel({
 }) {
   const create = useCreateTaskType();
   const remove = useDeleteTaskType();
-  const isAdmin = useIsAdmin();
+  const isAdmin = useAccess().can("tareas", "manage");
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(TYPE_PALETTE[1] ?? "#0891b2");

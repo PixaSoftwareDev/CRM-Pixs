@@ -27,6 +27,7 @@ const page = {
   AgendaPage: lazyRouteComponent(() => import("./features/tasks/AgendaPage"), "AgendaPage"),
   TicketDetailPage: lazyRouteComponent(() => import("./features/tickets/TicketDetailPage"), "TicketDetailPage"),
   TicketsPage: lazyRouteComponent(() => import("./features/tickets/TicketsPage"), "TicketsPage"),
+  UsersPage: lazyRouteComponent(() => import("./features/users/UsersPage"), "UsersPage"),
   MyDayPage: lazyRouteComponent(() => import("./features/tasks/MyDayPage"), "MyDayPage"),
 };
 
@@ -152,6 +153,7 @@ const financeRoute = createRoute({
 
 const accessRoute = createRoute({ getParentRoute: () => rootRoute, path: "/accesos", component: page.AccessPage });
 const automationsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/automatizaciones", component: page.AutomationsPage });
+const usersRoute = createRoute({ getParentRoute: () => rootRoute, path: "/usuarios", component: page.UsersPage });
 
 const routeTree = rootRoute.addChildren([
   myDayRoute,
@@ -166,6 +168,7 @@ const routeTree = rootRoute.addChildren([
   financeRoute,
   accessRoute,
   automationsRoute,
+  usersRoute,
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent", basepath: BASE || "/" });

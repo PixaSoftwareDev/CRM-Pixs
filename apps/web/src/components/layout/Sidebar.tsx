@@ -9,46 +9,55 @@ import {
   type LucideIcon,
   Sun,
   TrendingUp,
+  UserCog,
   Wallet,
   Workflow,
 } from "lucide-react";
 import { signOut } from "../../features/auth/api";
+import type { Area } from "@crm/shared";
+import { useAccess } from "../../hooks/useAccess";
 import { authClient } from "../../lib/auth-client";
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Sector que hay que poder ver para que aparezca. */
+  area?: Area;
+  /** Solo lo ven los administradores. */
+  adminOnly?: boolean;
 }
 
 const SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { to: "/", label: "Mi día", icon: Sun },
-      { to: "/agenda", label: "Agenda", icon: CalendarDays },
+      { area: "tareas", to: "/", label: "Mi día", icon: Sun },
+      { area: "tareas", to: "/agenda", label: "Agenda", icon: CalendarDays },
     ],
   },
   {
     title: "Clientes",
     items: [
-      { to: "/clientes", label: "Clientes", icon: Building2 },
-      { to: "/embudo", label: "Embudo", icon: TrendingUp },
-      { to: "/tickets", label: "Tickets", icon: LifeBuoy },
-      { to: "/proyectos", label: "Proyectos", icon: FolderKanban },
+      { area: "clientes", to: "/clientes", label: "Clientes", icon: Building2 },
+      { area: "embudo", to: "/embudo", label: "Embudo", icon: TrendingUp },
+      { area: "tickets", to: "/tickets", label: "Tickets", icon: LifeBuoy },
+      { area: "proyectos", to: "/proyectos", label: "Proyectos", icon: FolderKanban },
     ],
   },
   {
     title: "Empresa",
     items: [
-      { to: "/finanzas", label: "Finanzas", icon: Wallet },
-      { to: "/accesos", label: "Accesos", icon: KeyRound },
-      { to: "/automatizaciones", label: "Automatizaciones", icon: Workflow },
+      { area: "finanzas", to: "/finanzas", label: "Finanzas", icon: Wallet },
+      { area: "accesos", to: "/accesos", label: "Accesos", icon: KeyRound },
+      { area: "automatizaciones", to: "/automatizaciones", label: "Automatizaciones", icon: Workflow },
+      { to: "/usuarios", label: "Usuarios", icon: UserCog, adminOnly: true },
     ],
   },
 ];
 
 export function Sidebar() {
   const { data: session } = authClient.useSession();
+  const { isAdmin, can } = useAccess();
 
   return (
     <aside className="flex flex-col gap-4 bg-ink px-3.5 py-5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0">
@@ -58,7 +67,12 @@ export function Sidebar() {
       </div>
 
       <nav aria-label="Principal" className="flex gap-0.5 overflow-x-auto md:flex-1 md:flex-col md:overflow-visible">
-        {SECTIONS.map((section) => (
+        {SECTIONS.map((section) => ({
+          ...section,
+          items: section.items.filter((i) => (!i.adminOnly || isAdmin) && (!i.area || can(i.area, "read"))),
+        }))
+          .filter((section) => section.items.length > 0)
+          .map((section) => (
           <div key={section.title ?? "inicio"} className="contents md:flex md:flex-col md:gap-0.5">
             {section.title && (
               <span className="mx-2.5 mt-3.5 mb-1 hidden text-[11px] font-semibold tracking-[.08em] text-slate-400 uppercase md:block">

@@ -1,5 +1,5 @@
 import type { ClientDetail } from "@crm/shared";
-import { Plus, Printer, Receipt } from "lucide-react";
+import { CalendarRange, Plus, Printer, Receipt } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
@@ -11,7 +11,10 @@ import { day, money, todayIso } from "../../../lib/format";
 import { formatCuit } from "@crm/shared";
 import { Notice, useNotice } from "../../../components/ui/Notice";
 import { InvoiceDialog, type PaymentTarget, PaymentDialog } from "../../finance/dialogs";
-import { useStatement } from "../api";
+import { Dialog } from "../../../components/ui/Dialog";
+import { InstallmentsCard } from "../../finance/InstallmentsCard";
+import { useProject } from "../../projects/api";
+import { useClientProjects, useStatement } from "../api";
 import { DOC_KIND } from "../labels";
 
 function monthsAgo(n: number): string {
@@ -34,6 +37,7 @@ export function StatementTab({ client }: { client: ClientDetail }) {
   const notice = useNotice();
   const [pay, setPay] = useState<PaymentTarget | null>(null);
   const [invoicing, setInvoicing] = useState(false);
+  const [plans, setPlans] = useState(false);
   const balance = st.data?.closingBalance ?? 0;
 
   /** Imprime solo este estado de cuenta (el navegador permite guardarlo como PDF). */
@@ -61,6 +65,9 @@ export function StatementTab({ client }: { client: ClientDetail }) {
         </Button>
         <Button size="sm" variant="secondary" onClick={() => setInvoicing(true)}>
           <Plus size={14} aria-hidden /> Nueva factura
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setPlans(true)}>
+          <CalendarRange size={14} aria-hidden /> Plan de cuotas
         </Button>
         <Button size="sm" variant="secondary" onClick={print} disabled={!st.data}>
           <Printer size={14} aria-hidden /> Imprimir PDF
@@ -180,9 +187,36 @@ export function StatementTab({ client }: { client: ClientDetail }) {
       ) : null}
       <PaymentDialog target={pay} onClose={() => setPay(null)} onDone={notice.show} />
       <InvoiceDialog client={invoicing ? { id: client.id, name: client.name } : null} onClose={() => setInvoicing(false)} onDone={notice.show} />
+      <Dialog open={plans} onClose={() => setPlans(false)} title="Plan de cuotas" description={client.name} size="xl">
+        {plans && <ClientPlans clientId={client.id} onNotice={notice.show} />}
+      </Dialog>
       <Notice message={notice.message} />
     </Card>
   );
+}
+
+/** El plan de cuotas es por proyecto: se muestra el de cada proyecto del cliente. */
+function ClientPlans({ clientId, onNotice }: { clientId: string; onNotice: (m: string) => void }) {
+  const projects = useClientProjects(clientId);
+  if (projects.error) return <ErrorBox error={projects.error} onRetry={() => void projects.refetch()} />;
+  if (projects.isPending) return <Skeleton className="h-32" />;
+  if (projects.data.length === 0) {
+    return <Empty>Este cliente todavía no tiene proyectos: el plan de cuotas se arma sobre un proyecto.</Empty>;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {projects.data.map((p) => (
+        <ProjectPlan key={p.id} projectId={p.id} onNotice={onNotice} />
+      ))}
+    </div>
+  );
+}
+
+function ProjectPlan({ projectId, onNotice }: { projectId: string; onNotice: (m: string) => void }) {
+  const project = useProject(projectId);
+  if (project.error) return <ErrorBox error={project.error} onRetry={() => void project.refetch()} />;
+  if (!project.data) return <Skeleton className="h-32" />;
+  return <InstallmentsCard project={project.data} onNotice={onNotice} title={project.data.name} />;
 }
 
 function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

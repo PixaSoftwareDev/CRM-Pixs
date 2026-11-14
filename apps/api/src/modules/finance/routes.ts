@@ -15,11 +15,12 @@ import {
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { db } from "../../lib/db";
-import { requireAdmin, requireUser, sessionOf } from "../auth/guard";
+import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const financeRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
+  app.addHook("onRequest", requireArea("finanzas"));
   const actor = (req: Parameters<typeof sessionOf>[0]) => sessionOf(req).user.id;
 
   app.get("/api/finance/summary", () => service.getSummary(db));
@@ -54,18 +55,18 @@ export const financeRoutes: FastifyPluginAsyncZod = async (app) => {
 
   // Abonos
   app.get("/api/subscriptions", () => service.listSubscriptions(db));
-  app.post("/api/subscriptions", { onRequest: requireAdmin, schema: { body: subscriptionCreate } }, async (req, reply) =>
+  app.post("/api/subscriptions", { config: { access: access("finanzas", "manage") }, schema: { body: subscriptionCreate } }, async (req, reply) =>
     reply.status(201).send(await service.createSubscription(db, req.body)),
   );
-  app.patch("/api/subscriptions/:id", { onRequest: requireAdmin, schema: { params: idParams, body: subscriptionUpdate } }, async (req, reply) => {
+  app.patch("/api/subscriptions/:id", { config: { access: access("finanzas", "manage") }, schema: { params: idParams, body: subscriptionUpdate } }, async (req, reply) => {
     await service.updateSubscription(db, req.params.id, req.body);
     return reply.status(204).send();
   });
   app.get("/api/price-adjustments", () => service.listAdjustments(db));
-  app.post("/api/price-adjustments", { onRequest: requireAdmin, schema: { body: priceAdjustmentCreate } }, async (req, reply) =>
+  app.post("/api/price-adjustments", { config: { access: access("finanzas", "manage") }, schema: { body: priceAdjustmentCreate } }, async (req, reply) =>
     reply.status(201).send(await service.adjustPrices(db, actor(req), req.body)),
   );
-  app.post("/api/accruals", { onRequest: requireAdmin, schema: { body: accrualRun } }, (req) => service.runAccrual(db, actor(req), req.body));
+  app.post("/api/accruals", { config: { access: access("finanzas", "manage") }, schema: { body: accrualRun } }, (req) => service.runAccrual(db, actor(req), req.body));
 
   // Caja
   app.get("/api/cash", { schema: { querystring: cashListQuery } }, (req) => service.listCash(db, req.query.month));

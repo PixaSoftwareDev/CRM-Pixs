@@ -2,11 +2,12 @@
 import { idParams, opportunityCreate, opportunityLose, opportunityMove, opportunityWin } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
-import { requireUser, sessionOf } from "../auth/guard";
+import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const salesRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
+  app.addHook("onRequest", requireArea("embudo"));
 
   app.get("/api/pipeline", () => service.getPipeline(db));
 

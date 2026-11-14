@@ -1,7 +1,6 @@
-import { authClient } from "../lib/auth-client";
+import { useAccess } from "./useAccess";
 
-/** ¿El usuario logueado es administrador? Las acciones de configuración y de plata son solo para admins. */
+/** ¿El usuario logueado es administrador? Solo ellos manejan los usuarios y sus permisos. */
 export function useIsAdmin(): boolean {
-  const user = authClient.useSession().data?.user as { role?: string } | undefined;
-  return user?.role === "admin";
+  return useAccess().isAdmin;
 }

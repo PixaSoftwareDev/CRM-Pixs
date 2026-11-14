@@ -5,7 +5,7 @@
  *     account: accounts, verification: verifications } })
  * con `advanced.database.generateId: false` para que los ids los genere la base (UUIDv7).
  */
-import { boolean, index, pgEnum, pgTable, text, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgEnum, pgTable, text, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { id, ref, timestamps, tstz } from "./_shared/columns";
 
 export const userRole = pgEnum("user_role", ["admin", "miembro"]);
@@ -22,6 +22,8 @@ export const users = pgTable(
     /** Color del avatar en la UI (hex). */
     color: varchar({ length: 7 }),
     active: boolean().notNull().default(true),
+    /** Nivel por sector ({ clientes: "edit", … }). null = perfil "Editor". No aplica a admins. */
+    permissions: jsonb().$type<Record<string, string>>(),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_uq").on(t.email)],

@@ -18,13 +18,14 @@ import {
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { db } from "../../lib/db";
-import { requireUser, sessionOf } from "../auth/guard";
+import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 const contactParams = idParams.extend({ contactId: z.uuid() });
 
 export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
+  app.addHook("onRequest", requireArea("clientes"));
 
   app.get("/api/clients", { schema: { querystring: clientListQuery } }, (req) =>
     service.listClients(db, req.query),
@@ -32,7 +33,7 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get("/api/clients/summary", () => service.countClients(db));
 
-  app.get("/api/clients/options", () => service.listClientOptions(db));
+  app.get("/api/clients/options", { config: { access: "any" } }, () => service.listClientOptions(db));
 
   app.post("/api/clients", { schema: { body: clientCreate } }, async (req, reply) => {
     const client = await service.createClient(db, sessionOf(req).user.id, req.body);
@@ -111,17 +112,17 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   // Pestañas de lectura
-  app.get("/api/clients/:id/tasks", { schema: { params: idParams } }, (req) =>
+  app.get("/api/clients/:id/tasks", { config: { access: access(["tareas", "clientes"], "read") }, schema: { params: idParams } }, (req) =>
     service.getTasks(db, req.params.id),
   );
 
   app.get(
     "/api/clients/:id/statement",
-    { schema: { params: idParams, querystring: dateRangeQuery } },
+    { config: { access: access("finanzas", "read") }, schema: { params: idParams, querystring: dateRangeQuery } },
     (req) => service.getStatement(db, req.params.id, req.query),
   );
 
-  app.get("/api/clients/:id/projects", { schema: { params: idParams } }, (req) =>
+  app.get("/api/clients/:id/projects", { config: { access: access(["proyectos", "clientes", "finanzas"], "read") }, schema: { params: idParams } }, (req) =>
     service.getProjects(db, req.params.id),
   );
 };

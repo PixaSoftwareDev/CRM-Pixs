@@ -45,10 +45,13 @@ export function NewTicketDialog({
   open,
   onClose,
   onCreated,
+  preset,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (id: string, number: number) => void;
+  /** Cuando se carga desde un proyecto: el cliente y el proyecto ya vienen puestos. */
+  preset?: { clientId: string; projectId: string } | undefined;
 }) {
   const me = useMyId();
   const clients = useClientOptions();
@@ -60,7 +63,7 @@ export function NewTicketDialog({
   const err = form.formState.errors;
   const [clientId, assigneeId, workDate, workTime] = form.watch(["clientId", "assigneeId", "workDate", "workTime"]);
   const clientProjects = (projects.data ?? []).filter(
-    (p) => p.client.id === clientId && p.status !== "entregado" && p.status !== "cancelado",
+    (p) => p.client.id === clientId && (p.id === preset?.projectId || (p.status !== "entregado" && p.status !== "cancelado")),
   );
 
   useEffect(() => {
@@ -68,8 +71,8 @@ export function NewTicketDialog({
     create.reset();
     const now = arParts(new Date().toISOString());
     form.reset({
-      clientId: "",
-      projectId: "",
+      clientId: preset?.clientId ?? "",
+      projectId: preset?.projectId ?? "",
       type: "falla",
       channel: "whatsapp",
       reportedById: me,
@@ -85,10 +88,11 @@ export function NewTicketDialog({
     });
   }, [open]);
 
-  // Si el cliente tiene un solo proyecto activo, se sugiere solo.
+  // Si el cliente tiene un solo proyecto activo, se sugiere solo. Desde un proyecto, queda ese.
   useEffect(() => {
-    form.setValue("projectId", clientProjects.length === 1 ? (clientProjects[0]?.id ?? "") : "");
-  }, [clientId]);
+    const fromPreset = preset && clientId === preset.clientId && clientProjects.some((p) => p.id === preset.projectId);
+    form.setValue("projectId", fromPreset ? preset.projectId : clientProjects.length === 1 ? (clientProjects[0]?.id ?? "") : "");
+  }, [clientId, clientProjects.length]);
 
   const onSubmit = form.handleSubmit(async (v) => {
     const res = await create.mutateAsync({
