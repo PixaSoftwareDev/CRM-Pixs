@@ -16,7 +16,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { id, money, ref, timestamps } from "./_shared/columns";
+import { id, money, ref, timestamps, tstz } from "./_shared/columns";
 import { trgmIndex } from "./_shared/indexes";
 import { clients } from "./clients";
 import { users } from "./identity";
@@ -63,6 +63,8 @@ export const projects = pgTable(
     sellerId: ref().references(() => users.id, { onDelete: "set null" }),
     soldOn: date({ mode: "string" }),
     createdAutomatically: boolean().notNull().default(false),
+    /** Baja lógica: oculto de listados y selectores, sin borrar nada. null = activo. */
+    archivedAt: tstz(),
     ...timestamps,
   },
   (t) => [

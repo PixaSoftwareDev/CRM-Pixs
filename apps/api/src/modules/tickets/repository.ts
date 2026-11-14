@@ -22,6 +22,10 @@ const AR = "America/Argentina/Buenos_Aires";
 /** Día de Argentina de un timestamptz. */
 const arDay = (col: SQL) => sql`(${col} at time zone ${AR})::date`;
 const OPEN = sql`t.status not in ('resuelto', 'cancelado')`;
+/** Su proyecto está dado de baja: el ticket se oculta junto con él. */
+const PROJECT_ARCHIVED = sql`exists (select 1 from projects pa where pa.id = t.project_id and pa.archived_at is not null)`;
+/** Visible en los listados: ni él ni su proyecto están dados de baja. */
+export const LIVE_TICKET = sql`(t.archived_at is null and not ${PROJECT_ARCHIVED})`;
 
 export interface Row extends Record<string, unknown> {
   id: string;
@@ -41,6 +45,8 @@ export interface Row extends Record<string, unknown> {
   assignee_name: string | null;
   resolved_at: Date | null;
   overdue: boolean;
+  archived_at: Date | null;
+  project_archived: boolean;
 }
 
 const SELECT = sql`
@@ -48,7 +54,8 @@ const SELECT = sql`
          c.id as client_id, c.name as client_name, t.received_at,
          r.id as reporter_id, r.name as reporter_name, t.due_at,
          a.id as assignee_id, a.name as assignee_name, t.resolved_at,
-         (${OPEN} and t.due_at < now()) as overdue
+         (${OPEN} and t.due_at < now()) as overdue,
+         t.archived_at, ${PROJECT_ARCHIVED} as project_archived
   from tickets t
   join clients c on c.id = t.client_id
   left join users r on r.id = t.reported_by_id
@@ -72,6 +79,8 @@ function toItem(r: Row): TicketListItem {
     assignee: ref(r.assignee_id, r.assignee_name),
     resolvedAt: r.resolved_at ? toIso(r.resolved_at) : null,
     overdue: r.overdue,
+    archivedAt: r.archived_at ? toIso(r.archived_at) : null,
+    projectArchived: r.project_archived,
   };
 }
 
@@ -86,6 +95,7 @@ export async function listTickets(db: DbOrTx, q: z.output<typeof ticketListQuery
     q.priority ? sql`t.priority = ${q.priority}` : undefined,
     q.status ? sql`t.status = ${q.status}` : undefined,
     q.open ? OPEN : undefined,
+    q.archived ? sql`not ${LIVE_TICKET}` : LIVE_TICKET,
     q.receivedOn ? sql`${arDay(sql`t.received_at`)} = ${q.receivedOn}` : undefined,
     q.dueOn ? sql`${arDay(sql`t.due_at`)} = ${q.dueOn}` : undefined,
     q.resolvedOn ? sql`${arDay(sql`t.resolved_at`)} = ${q.resolvedOn}` : undefined,
@@ -136,7 +146,7 @@ async function suggestAssignee(db: DbOrTx, projectId: string | null) {
       ${projectId}::uuid is null
       or u.id = (select implementer_id from projects where id = ${projectId})
     )
-    order by (select count(*) from tickets t where t.assignee_id = u.id and ${OPEN}), u.name
+    order by (select count(*) from tickets t where t.assignee_id = u.id and ${OPEN} and t.archived_at is null), u.name
     limit 1`);
   return row ?? null;
 }

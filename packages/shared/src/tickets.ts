@@ -28,6 +28,11 @@ export const ticketListQuery = z.object({
   status: z.enum(TICKET_STATUSES).optional(),
   /** "abiertos" = todo lo que no está resuelto ni cancelado. */
   open: z.enum(["1"]).optional(),
+  /**
+   * Por defecto se ocultan los dados de baja (y los de proyectos dados de baja);
+   * "1" trae solo esos.
+   */
+  archived: z.enum(["1"]).optional(),
   receivedOn: isoDate.optional(),
   dueOn: isoDate.optional(),
   resolvedOn: isoDate.optional(),
@@ -65,6 +70,8 @@ export const ticketUpdate = z
     priority: z.enum(TICKET_PRIORITIES),
     projectId: z.uuid().nullable(),
     dueOn: isoDate.nullable(),
+    /** Baja lógica: true lo oculta de los listados; false lo reactiva. */
+    archived: z.boolean(),
   })
   .partial();
 export type TicketUpdate = z.input<typeof ticketUpdate>;

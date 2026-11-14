@@ -136,6 +136,8 @@ export interface ClientProjectDto {
   resolvedTickets: number;
   /** Etapas cumplidas (mismo cálculo que en Proyectos). */
   progress: number;
+  /** Baja lógica (null = activo): la pestaña Proyectos los oculta, el plan de cuotas no. */
+  archivedAt: string | null;
 }
 
 // ─── Tareas / agenda ────────────────────────────────────────────────────────
@@ -258,6 +260,8 @@ export interface ProjectListItem {
   hoursUsed: number;
   estimatedHours: number | null;
   createdAt: string;
+  /** Baja lógica (null = activo). */
+  archivedAt: string | null;
 }
 
 export interface ProjectTicketDto {
@@ -302,6 +306,10 @@ export interface TicketListItem {
   assignee: Ref | null;
   resolvedAt: string | null;
   overdue: boolean;
+  /** Baja lógica del ticket (null = activo). */
+  archivedAt: string | null;
+  /** El proyecto del ticket está dado de baja (el ticket se oculta igual). */
+  projectArchived: boolean;
 }
 
 export interface TicketEventDto {

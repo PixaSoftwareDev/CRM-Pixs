@@ -1,6 +1,6 @@
 import { PROJECT_HEALTHS, type ProjectListItem } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Zap } from "lucide-react";
+import { Archive, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "../../components/layout/AppLayout";
 import { Button } from "../../components/ui/Button";
@@ -19,7 +19,8 @@ import { ProjectFormDialog } from "./ProjectFormDialog";
 export function ProjectsPage() {
   const search = projectsRoute.useSearch();
   const navigate = useNavigate({ from: projectsRoute.fullPath });
-  const projects = useProjects();
+  const archived = !!search.baja;
+  const projects = useProjects({ archived });
   const [creating, setCreating] = useState(false);
 
   const setFilter = (patch: Partial<typeof search>) =>
@@ -37,6 +38,7 @@ export function ProjectsPage() {
   const count = (h: string) => all.filter((p) => p.health === h).length;
   const active = all.filter((p) => p.health !== "terminado" && p.health !== "cancelado").length;
   const filtered = !!(search.cliente || search.impl || search.estado);
+  const kind = archived ? "proyectos dados de baja" : "proyectos";
 
   const clients = unique(all.map((p) => p.client));
   const implementers = unique(all.flatMap((p) => (p.implementer ? [p.implementer] : [])));
@@ -45,7 +47,11 @@ export function ProjectsPage() {
     <>
       <PageHeader
         title="Proyectos"
-        subtitle={`${plural(active, "activo", "activos")} · ${count("en_riesgo")} en riesgo · ${plural(count("nuevo"), "nuevo", "nuevos")} recién salido de ventas`}
+        subtitle={
+          archived
+            ? `${plural(all.length, "dado de baja", "dados de baja")}: no aparecen en listados ni selectores`
+            : `${plural(active, "activo", "activos")} · ${count("en_riesgo")} en riesgo · ${plural(count("nuevo"), "nuevo", "nuevos")} recién salido de ventas`
+        }
         actions={
           <Button variant="secondary" onClick={() => setCreating(true)}>
             <Plus size={16} aria-hidden /> Proyecto manual
@@ -68,7 +74,15 @@ export function ProjectsPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <strong>Filtros</strong>
           <span className="flex items-center gap-3 text-muted">
-            {shown.length} de {all.length} proyectos
+            {shown.length} de {all.length} {kind}
+            <Button
+              size="sm"
+              variant={archived ? "primary" : "secondary"}
+              aria-pressed={archived}
+              onClick={() => setFilter({ baja: archived ? undefined : true })}
+            >
+              <Archive size={13} aria-hidden /> {archived ? "Volver a los activos" : "Ver dados de baja"}
+            </Button>
             {filtered && (
               <Button size="sm" variant="ghost" onClick={() => setFilter({ cliente: undefined, impl: undefined, estado: undefined })}>
                 Quitar filtros
@@ -116,7 +130,13 @@ export function ProjectsPage() {
       {projects.isPending ? (
         <Skeleton className="h-64" />
       ) : shown.length === 0 ? (
-        <Empty>{filtered ? "Ningún proyecto coincide con los filtros." : "Todavía no hay proyectos."}</Empty>
+        <Empty>
+          {filtered
+            ? "Ningún proyecto coincide con los filtros."
+            : archived
+              ? "No hay proyectos dados de baja."
+              : "Todavía no hay proyectos."}
+        </Empty>
       ) : (
         <div className="grid gap-[18px] md:grid-cols-2 xl:grid-cols-3">
           {shown.map((p) => (
@@ -151,7 +171,10 @@ function ProjectCard({ project: p }: { project: ProjectListItem }) {
           <h2 className="truncate font-bold">{p.name}</h2>
           <p className="truncate text-sm text-muted">{p.client.name}</p>
         </div>
-        <Chip tone={h.tone}>{h.label}</Chip>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <Chip tone={h.tone}>{h.label}</Chip>
+          {p.archivedAt && <Chip tone="slate">De baja</Chip>}
+        </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">

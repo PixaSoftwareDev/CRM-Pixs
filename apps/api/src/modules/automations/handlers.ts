@@ -139,7 +139,7 @@ export async function overBudgetProjects(db: Db): Promise<Affected[]> {
     select p.id, p.name, p.client_id, p.implementer_id, p.estimated_hours as est,
            (select coalesce(sum(minutes), 0) from time_entries te where te.project_id = p.id) / 60.0 as used
     from projects p
-    where p.status in ('nuevo', 'en_curso') and p.estimated_hours is not null
+    where p.status in ('nuevo', 'en_curso') and p.archived_at is null and p.estimated_hours is not null
       and (select coalesce(sum(minutes), 0) from time_entries te where te.project_id = p.id) > p.estimated_hours * 60`);
   if (!rows.length) return [];
   const type = await typeId(db, "Implementación");

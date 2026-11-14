@@ -13,6 +13,7 @@ import {
   desc,
   eq,
   exists,
+  ne,
   or,
   type SQL,
   sql,
@@ -41,6 +42,10 @@ import { progressOf } from "../projects/repository";
 
 const CONTACT_KINDS = sql`('llamada', 'reunion', 'whatsapp', 'email')`;
 const OPEN_TICKET = sql`status NOT IN ('resuelto', 'cancelado')`;
+/** Tickets visibles: ni él ni su proyecto están dados de baja (baja lógica). */
+const LIVE_TICKET = sql`(t.archived_at is null and not exists (
+  select 1 from projects pa where pa.id = t.project_id and pa.archived_at is not null
+))`;
 
 /** Saldo de cuenta corriente: debe (facturas, ND) − haber (recibos, NC). */
 const balanceOf = (clientId: SQL | string) => sql`coalesce((
@@ -72,7 +77,8 @@ export async function listClients(db: DbOrTx, query: ClientListQuery) {
   const after = decodeCursor(query.cursor, listCursor);
   const filters: SQL[] = [];
 
-  if (query.status) filters.push(eq(clients.status, query.status));
+  // "Todos" (sin estado) son los vigentes: los de baja solo aparecen con su filtro, también al buscar.
+  filters.push(query.status ? eq(clients.status, query.status) : ne(clients.status, "baja"));
   if (query.priority) filters.push(eq(clients.priority, query.priority));
   if (query.q) {
     const pattern = likePattern(query.q);
@@ -186,9 +192,9 @@ export async function getClientDetail(db: DbOrTx, id: string): Promise<ClientDet
       ${balanceOf(id)} as balance,
       ${overdueOf(id)} as has_overdue_debt,
       coalesce((select sum(s.amount) from subscriptions s where s.client_id = ${id} and s.active), 0) as monthly_subscriptions,
-      (select count(*) from projects p where p.client_id = ${id}
+      (select count(*) from projects p where p.client_id = ${id} and p.archived_at is null
          and p.status in ('nuevo', 'en_curso', 'en_riesgo', 'pausado')) as active_projects,
-      (select count(*) from tickets t where t.client_id = ${id} and t.${OPEN_TICKET}) as open_tickets,
+      (select count(*) from tickets t where t.client_id = ${id} and t.${OPEN_TICKET} and ${LIVE_TICKET}) as open_tickets,
       ${lastContactOf(id)} as last_contact_at`),
   ]);
 
@@ -381,14 +387,15 @@ export async function listClientProjects(db: DbOrTx, clientId: string): Promise<
     open_tickets: string;
     overdue_tickets: string;
     resolved_tickets: string;
+    archived_at: Date | null;
   }>(sql`
-    select p.id, p.name, p.status, p.phase, p.starts_on, p.due_on, p.due_is_estimate,
-      (select count(*) from tickets t where t.project_id = p.id and t.${OPEN_TICKET}) as open_tickets,
-      (select count(*) from tickets t where t.project_id = p.id and t.${OPEN_TICKET} and t.due_at < now()) as overdue_tickets,
-      (select count(*) from tickets t where t.project_id = p.id and t.status = 'resuelto') as resolved_tickets
+    select p.id, p.name, p.status, p.phase, p.starts_on, p.due_on, p.due_is_estimate, p.archived_at,
+      (select count(*) from tickets t where t.project_id = p.id and t.archived_at is null and t.${OPEN_TICKET}) as open_tickets,
+      (select count(*) from tickets t where t.project_id = p.id and t.archived_at is null and t.${OPEN_TICKET} and t.due_at < now()) as overdue_tickets,
+      (select count(*) from tickets t where t.project_id = p.id and t.archived_at is null and t.status = 'resuelto') as resolved_tickets
     from projects p
     where p.client_id = ${clientId}
-    order by (p.status in ('entregado', 'cancelado')), p.created_at desc`);
+    order by (p.archived_at is not null), (p.status in ('entregado', 'cancelado')), p.created_at desc`);
 
   return rows.map((r) => ({
     id: r.id,
@@ -401,6 +408,7 @@ export async function listClientProjects(db: DbOrTx, clientId: string): Promise<
     overdueTickets: toNumber(r.overdue_tickets),
     resolvedTickets: toNumber(r.resolved_tickets),
     progress: progressOf(r.status, r.phase),
+    archivedAt: r.archived_at ? toIso(r.archived_at) : null,
   }));
 }
 

@@ -1,6 +1,6 @@
 import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES, type TicketListItem } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Archive, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../components/layout/AppLayout";
 import { Button } from "../../components/ui/Button";
@@ -54,6 +54,7 @@ export function TicketsPage() {
     resolvedOn: search.resuelto,
     resolvedById: search.resolvio,
     q: search.q,
+    archived: search.baja ? "1" : undefined,
   });
 
   const filtered = Object.values(search).some((v) => v !== undefined);
@@ -88,6 +89,14 @@ export function TicketsPage() {
               onClick={() => set({ abiertos: search.abiertos ? undefined : true, estado: undefined })}
             >
               Solo abiertos
+            </Button>
+            <Button
+              size="sm"
+              variant={search.baja ? "primary" : "secondary"}
+              aria-pressed={!!search.baja}
+              onClick={() => set({ baja: search.baja ? undefined : true })}
+            >
+              <Archive size={13} aria-hidden /> Ver dados de baja
             </Button>
           </span>
           <span className="flex items-center gap-3 text-muted">
@@ -177,7 +186,13 @@ export function TicketsPage() {
       ) : tickets.isPending ? (
         <Skeleton className="h-64" />
       ) : items.length === 0 ? (
-        <Empty>{filtered ? "Ningún ticket coincide con los filtros." : "Todavía no hay tickets."}</Empty>
+        <Empty>
+          {search.baja
+            ? "No hay tickets dados de baja con esos filtros."
+            : filtered
+              ? "Ningún ticket coincide con los filtros."
+              : "Todavía no hay tickets."}
+        </Empty>
       ) : (
         <Card className={cn("overflow-x-auto", tickets.isPlaceholderData && "opacity-60")}>
           <table className="w-full min-w-[960px] border-collapse text-sm">
@@ -248,6 +263,9 @@ function TicketRow({ ticket: t }: { ticket: TicketListItem }) {
       </td>
       <td className={cell}>
         <Chip tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Chip>
+        {(t.archivedAt || t.projectArchived) && (
+          <span className="block pt-1 text-xs text-muted">{t.archivedAt ? "De baja" : "Proyecto de baja"}</span>
+        )}
       </td>
       <td className={cell}>
         {when(t.receivedAt)}

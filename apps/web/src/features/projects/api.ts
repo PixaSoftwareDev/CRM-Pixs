@@ -5,12 +5,16 @@ import { api } from "../../lib/api";
 
 export const projectKeys = {
   all: ["projects"] as const,
-  list: ["projects", "list"] as const,
+  list: (archived = false) => ["projects", "list", { archived }] as const,
   detail: (id: string) => ["projects", id] as const,
 };
 
-export const useProjects = () =>
-  useQuery({ queryKey: projectKeys.list, queryFn: () => api.get<ProjectListItem[]>("/api/projects") });
+/** Por defecto los activos (también para selectores); `archived` trae solo los dados de baja. */
+export const useProjects = ({ archived = false }: { archived?: boolean } = {}) =>
+  useQuery({
+    queryKey: projectKeys.list(archived),
+    queryFn: () => api.get<ProjectListItem[]>("/api/projects", archived ? { archived: "1" } : undefined),
+  });
 
 export const useProject = (id: string) =>
   useQuery({ queryKey: projectKeys.detail(id), queryFn: () => api.get<ProjectDetail>(`/api/projects/${id}`) });

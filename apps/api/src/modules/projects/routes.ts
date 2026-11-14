@@ -1,5 +1,5 @@
 /** Rutas HTTP de Proyectos. Todas exigen sesión. */
-import { idParams, projectCreate, projectUpdate } from "@crm/shared";
+import { idParams, projectCreate, projectListQuery, projectUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
@@ -9,7 +9,9 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
   app.addHook("onRequest", requireArea("proyectos"));
 
-  app.get("/api/projects", { config: { access: access(["proyectos", "tickets"], "read") } }, () => service.listProjects(db));
+  app.get("/api/projects", { config: { access: access(["proyectos", "tickets"], "read") }, schema: { querystring: projectListQuery } }, (req) =>
+    service.listProjects(db, { archived: req.query.archived === "1" }),
+  );
 
   app.get("/api/projects/:id", { config: { access: access(["proyectos", "finanzas"], "read") }, schema: { params: idParams } }, (req) => service.getProject(db, req.params.id));
 

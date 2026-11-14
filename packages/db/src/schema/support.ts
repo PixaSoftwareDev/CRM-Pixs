@@ -66,6 +66,8 @@ export const tickets = pgTable(
     resolvedAt: tstz(),
     resolvedById: ref().references(() => users.id, { onDelete: "set null" }),
     resolutionNote: text(),
+    /** Baja lógica: oculto de listados, sin borrar nada. null = activo. */
+    archivedAt: tstz(),
     ...timestamps,
   },
   (t) => [

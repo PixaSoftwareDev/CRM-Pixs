@@ -104,6 +104,8 @@ const projectsRoute = createRoute({
     cliente: z.uuid().optional().catch(undefined),
     impl: z.uuid().optional().catch(undefined),
     estado: z.enum(PROJECT_HEALTHS).optional().catch(undefined),
+    /** Ver los dados de baja (en vez de los activos). */
+    baja: z.boolean().optional().catch(undefined),
   }),
   component: page.ProjectsPage,
 });
@@ -126,6 +128,8 @@ const ticketsRoute = createRoute({
     urgencia: z.enum(TICKET_PRIORITIES).optional().catch(undefined),
     estado: z.enum(TICKET_STATUSES).optional().catch(undefined),
     abiertos: z.boolean().optional().catch(undefined),
+    /** Ver los dados de baja (en vez de los activos). */
+    baja: z.boolean().optional().catch(undefined),
     carga: day,
     compromiso: day,
     resuelto: day,

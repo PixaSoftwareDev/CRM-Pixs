@@ -50,6 +50,13 @@
       "when": 1794658885372,
       "tag": "0006_permisos_por_sector",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794663440791,
+      "tag": "0007_baja_logica",
+      "breakpoints": true
     }
   ]
 }

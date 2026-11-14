@@ -56,6 +56,7 @@ const uuid = z.uuid();
 
 export const clientListQuery = z.object({
   q: z.string().trim().max(100).optional(),
+  /** Sin estado = todos menos los de baja (esos se ven solo con status=baja). */
   status: z.enum(CLIENT_STATUSES).optional(),
   priority: z.enum(CLIENT_PRIORITIES).optional(),
   /** Cursor opaco devuelto por la página anterior. */

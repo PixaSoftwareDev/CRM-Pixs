@@ -2,6 +2,7 @@ import { PROJECT_PHASES, type ProjectDetail } from "@crm/shared";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Check, Copy, Mail, Pencil, Phone, Plus, Zap } from "lucide-react";
 import { useState } from "react";
+import { ArchiveButton, ArchivedBanner } from "../../components/ui/Archive";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
@@ -58,6 +59,14 @@ function Header({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m
 
   return (
     <Card className="flex flex-col gap-4 p-5">
+      {p.archivedAt && (
+        <ArchivedBanner
+          label="Este proyecto está dado de baja"
+          archivedAt={p.archivedAt}
+          pending={update.isPending}
+          onRestore={() => update.mutate({ archived: false }, { onSuccess: () => onNotice("Proyecto reactivado.") })}
+        />
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold tracking-wide text-muted uppercase">Proyecto</p>
@@ -76,6 +85,14 @@ function Header({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m
           <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
             <Pencil size={13} aria-hidden /> Editar
           </Button>
+          {!p.archivedAt && (
+            <ArchiveButton
+              what="el proyecto"
+              consequences={`"${p.name}" y sus tickets dejan de aparecer en Proyectos, Tickets, la ficha del cliente y los selectores. Las facturas y cobros siguen en la cuenta corriente.`}
+              pending={update.isPending}
+              onConfirm={() => update.mutateAsync({ archived: true }).then(() => onNotice("Proyecto dado de baja."))}
+            />
+          )}
         </div>
       </div>
 
@@ -226,9 +243,12 @@ function TicketsCard({ project: p, onNotice }: { project: ProjectDetail; onNotic
         <h2 className="font-bold">Tickets del proyecto</h2>
         <span className="flex flex-wrap items-center gap-3 text-sm text-muted">
           {p.pendingTickets} pendientes · {p.resolvedTickets} resueltos
-          <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
-            <Plus size={14} aria-hidden /> Cargar ticket
-          </Button>
+          {/* Un proyecto de baja no recibe tickets nuevos (no figura en los selectores). */}
+          {!p.archivedAt && (
+            <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
+              <Plus size={14} aria-hidden /> Cargar ticket
+            </Button>
+          )}
         </span>
       </div>
       <NewTicketDialog

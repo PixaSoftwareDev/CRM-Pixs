@@ -253,6 +253,16 @@ await section("Proyectos", async () => {
   ctx.manualProjectId = manual.data?.id;
   const list = await get("/api/projects");
   check("aparecen en el listado", list.data?.some((x) => x.id === ctx.projectId) && list.data?.some((x) => x.id === ctx.manualProjectId));
+  expectStatus("dar de baja el proyecto manual", await patch(`/api/projects/${ctx.manualProjectId}`, { archived: true }), 204);
+  const active = await get("/api/projects");
+  check("dado de baja: sale del listado", !active.data?.some((x) => x.id === ctx.manualProjectId));
+  const archived = await get("/api/projects?archived=1");
+  check("dado de baja: aparece en Ver dados de baja", archived.data?.some((x) => x.id === ctx.manualProjectId) && !archived.data?.some((x) => x.id === ctx.projectId));
+  const pa = await get(`/api/projects/${ctx.manualProjectId}`);
+  check("dado de baja: el detalle sigue accesible", pa.status === 200 && !!pa.data?.archivedAt, pa.data?.archivedAt);
+  expectStatus("reactivar el proyecto", await patch(`/api/projects/${ctx.manualProjectId}`, { archived: false }), 204);
+  const back = await get("/api/projects");
+  check("reactivado: vuelve al listado", back.data?.some((x) => x.id === ctx.manualProjectId && x.archivedAt === null));
 });
 
 await section("Tickets: flujo completo", async () => {
@@ -284,6 +294,12 @@ await section("Tickets: flujo completo", async () => {
   expectStatus("cargar ya asignado", c, 201);
   expectStatus("cancelar sin motivo → 400", await post(`/api/tickets/${c.data?.id}/cancel`, { reason: "" }), 400);
   expectStatus("cancelar", await post(`/api/tickets/${c.data?.id}/cancel`, { reason: "Duplicado" }), 204);
+  expectStatus("dar de baja el ticket", await patch(`/api/tickets/${c.data?.id}`, { archived: true }), 204);
+  const live = await get("/api/tickets?q=Para%20cancelar");
+  check("dado de baja: sale del buscador", !live.data?.items?.some((x) => x.id === c.data?.id));
+  const gone = await get("/api/tickets?q=Para%20cancelar&archived=1");
+  check("dado de baja: aparece en Ver dados de baja", gone.data?.items?.some((x) => x.id === c.data?.id && !!x.archivedAt));
+  expectStatus("reactivar el ticket", await patch(`/api/tickets/${c.data?.id}`, { archived: false }), 204);
   const pr = await get(`/api/projects/${ctx.projectId}`);
   // 1,5 h del primer "trabajo terminado" + 1 h de la tarea de retrabajo finalizada en Mi día (su duración).
   check("las horas del ticket se sumaron al proyecto", pr.data?.hoursUsed === 2.5, pr.data?.hoursUsed);

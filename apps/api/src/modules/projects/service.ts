@@ -7,13 +7,14 @@ import {
   projectCreate,
   projectUpdate,
 } from "@crm/shared";
+import { archivedChange } from "../../lib/archive";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
 import { isActiveUser } from "../tasks/repository";
 import * as repo from "./repository";
 
 const PHASE_LABEL = ["Kickoff", "Relevamiento", "Desarrollo", "Pruebas", "Entrega"];
 
-export const listProjects = (db: Db) => repo.listProjects(db);
+export const listProjects = (db: Db, opts: { archived?: boolean } = {}) => repo.listProjects(db, opts);
 
 export async function getProject(db: Db, id: string) {
   const p = await repo.getProjectDetail(db, id);
@@ -66,10 +67,14 @@ export async function updateProject(db: Db, actorId: string, id: string, input: 
 
   // Avanzar de etapa saca al proyecto de "nuevo"; llegar a entregado lo deja en la última etapa.
   // Zod deja las claves ausentes como undefined; al UPDATE van solo las presentes.
-  const patch = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) as Partial<
+  const { archived, ...fields } = data;
+  const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) as Partial<
     typeof projects.$inferInsert
   >;
   patch.updatedAt = new Date();
+  // Baja lógica: no se borra nada (tickets, facturas y cobros quedan como estaban).
+  const archiveChange = archivedChange(before.archivedAt, archived);
+  if (archiveChange) patch.archivedAt = archiveChange === "baja" ? new Date() : null;
   if (data.phase && data.phase !== "kickoff" && before.status === "nuevo" && !data.status) patch.status = "en_curso";
   if (data.status === "entregado") patch.phase = "entrega";
 
@@ -78,6 +83,8 @@ export async function updateProject(db: Db, actorId: string, id: string, input: 
     const notes: string[] = [];
     if (patch.phase && patch.phase !== before.phase) notes.push(`Etapa: ${PHASE_LABEL[PROJECT_PHASES.indexOf(patch.phase)]}`);
     if (data.status === "entregado" && before.status !== "entregado") notes.push("Proyecto entregado");
+    if (archiveChange === "baja") notes.push("Proyecto dado de baja");
+    if (archiveChange === "reactivado") notes.push("Proyecto reactivado");
     for (const title of notes) {
       await tx.insert(activities).values({ clientId: before.client.id, actorId, projectId: id, kind: "sistema", title: `${before.name} · ${title}` });
     }

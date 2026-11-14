@@ -233,7 +233,9 @@ function ProjectPlan({ projectId, onNotice }: { projectId: string; onNotice: (m:
   const project = useProject(projectId);
   if (project.error) return <ErrorBox error={project.error} onRetry={() => void project.refetch()} />;
   if (!project.data) return <Skeleton className="h-32" />;
-  return <InstallmentsCard project={project.data} onNotice={onNotice} title={project.data.name} />;
+  // Un proyecto dado de baja sigue acá: sus cuotas siguen contando en la cuenta corriente.
+  const title = project.data.archivedAt ? `${project.data.name} (dado de baja)` : project.data.name;
+  return <InstallmentsCard project={project.data} onNotice={onNotice} title={title} />;
 }
 
 function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

@@ -44,8 +44,14 @@ export const projectUpdate = z
     ...fields,
     status: z.enum(PROJECT_STATUSES),
     phase: z.enum(PROJECT_PHASES),
+    /** Baja lógica: true lo oculta de listados y selectores; false lo reactiva. */
+    archived: z.boolean(),
   })
   .omit({ clientId: true })
   .partial()
   .refine(datesOk, datesMsg);
 export type ProjectUpdate = z.input<typeof projectUpdate>;
+
+/** Listado: por defecto solo los activos; `archived=1` trae solo los dados de baja. */
+export const projectListQuery = z.object({ archived: z.enum(["1"]).optional() });
+export type ProjectListQuery = z.input<typeof projectListQuery>;

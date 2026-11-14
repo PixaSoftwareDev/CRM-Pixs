@@ -41,6 +41,7 @@ import {
 } from "@crm/shared";
 import type { z } from "zod";
 import { endOfDayAr, fmtWhen } from "../../lib/dates";
+import { archivedChange } from "../../lib/archive";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr } from "../../lib/sql";
 import { isActiveUser, listTaskTypes, listTeam } from "../tasks/repository";
@@ -222,6 +223,12 @@ export async function updateTicket(db: Db, actorId: string, id: string, input: T
   if (data.dueOn !== undefined) {
     patch.dueAt = data.dueOn ? endOfDayAr(data.dueOn) : null;
     notes.push(data.dueOn ? `Compromiso: ${data.dueOn.split("-").reverse().join("/")}` : "Sin fecha de compromiso");
+  }
+  // Baja lógica: se oculta de los listados sin borrar nada (tareas, horas y eventos quedan).
+  const archiveChange = archivedChange(before.archived_at, data.archived);
+  if (archiveChange) {
+    patch.archivedAt = archiveChange === "baja" ? new Date() : null;
+    notes.push(archiveChange === "baja" ? "Ticket dado de baja" : "Ticket reactivado");
   }
   await db.transaction(async (tx) => {
     await tx.update(tickets).set(patch).where(eq(tickets.id, id));

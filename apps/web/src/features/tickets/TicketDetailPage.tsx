@@ -2,6 +2,7 @@ import { TICKET_PRIORITIES, type TicketDetail, type TaskDto } from "@crm/shared"
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, CalendarCheck, Check, Phone, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { ArchiveButton, ArchivedBanner } from "../../components/ui/Archive";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
@@ -77,6 +78,19 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
 
   return (
     <Section n={1} title="Datos del cliente y del ticket">
+      {t.archivedAt && (
+        <ArchivedBanner
+          label="Este ticket está dado de baja"
+          archivedAt={t.archivedAt}
+          pending={update.isPending}
+          onRestore={() => update.mutate({ archived: false }, { onSuccess: () => onNotice("Ticket reactivado.") })}
+        />
+      )}
+      {!t.archivedAt && t.projectArchived && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Su proyecto está dado de baja: el ticket no aparece en los listados hasta que se reactive el proyecto.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="flex flex-wrap items-center gap-2">
           <strong className="text-lg">Ticket #{t.number}</strong>
@@ -86,11 +100,21 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
           </Chip>
           <Chip tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Chip>
         </span>
-        {!closed && (
-          <Button size="sm" variant="ghost" onClick={() => setCancelling(true)}>
-            Cancelar ticket
-          </Button>
-        )}
+        <span className="flex flex-wrap items-center gap-2">
+          {!closed && (
+            <Button size="sm" variant="ghost" onClick={() => setCancelling(true)}>
+              Cancelar ticket
+            </Button>
+          )}
+          {!t.archivedAt && (
+            <ArchiveButton
+              what={`el ticket #${t.number}`}
+              consequences="Deja de aparecer en Tickets, en el proyecto y en los contadores del cliente. Sus tareas, horas e historial quedan como están."
+              pending={update.isPending}
+              onConfirm={() => update.mutateAsync({ archived: true }).then(() => onNotice(`Ticket #${t.number} dado de baja.`))}
+            />
+          )}
+        </span>
       </div>
 
       <Link

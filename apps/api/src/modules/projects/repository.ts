@@ -2,7 +2,7 @@
  * Lecturas de Proyectos. Los contadores (tickets, tareas, horas) salen de
  * subconsultas indexadas por project_id; la salud se calcula en `healthOf`.
  */
-import { type DbOrTx, type SQL, sql } from "@crm/db";
+import { type DbOrTx, sql } from "@crm/db";
 import {
   PROJECT_PHASES,
   type ProjectDetail,
@@ -30,6 +30,7 @@ interface Row extends Record<string, unknown> {
   due_is_estimate: boolean;
   estimated_hours: number | null;
   created_at: Date;
+  archived_at: Date | null;
   pending_tickets: string;
   resolved_tickets: string;
   overdue_tickets: string;
@@ -39,15 +40,17 @@ interface Row extends Record<string, unknown> {
 }
 
 const OPEN = sql`status not in ('resuelto', 'cancelado')`;
+/** Los tickets dados de baja no cuentan ni se listan. */
+const LIVE = sql`archived_at is null`;
 
 const SELECT = sql`
   select p.id, p.name, c.id as client_id, c.name as client_name,
          u.id as implementer_id, u.name as implementer_name,
          p.status, p.phase, p.created_automatically, p.starts_on, p.due_on, p.due_is_estimate,
-         p.estimated_hours, p.created_at,
-         (select count(*) from tickets t where t.project_id = p.id and t.${OPEN}) as pending_tickets,
-         (select count(*) from tickets t where t.project_id = p.id and t.status = 'resuelto') as resolved_tickets,
-         (select count(*) from tickets t where t.project_id = p.id and t.${OPEN} and t.due_at < now()) as overdue_tickets,
+         p.estimated_hours, p.created_at, p.archived_at,
+         (select count(*) from tickets t where t.project_id = p.id and t.${LIVE} and t.${OPEN}) as pending_tickets,
+         (select count(*) from tickets t where t.project_id = p.id and t.${LIVE} and t.status = 'resuelto') as resolved_tickets,
+         (select count(*) from tickets t where t.project_id = p.id and t.${LIVE} and t.${OPEN} and t.due_at < now()) as overdue_tickets,
          (select count(*) from tasks t where t.project_id = p.id and t.status not in ('hecha', 'cancelada') and t.archived_at is null) as open_tasks,
          (select coalesce(sum(minutes), 0) from time_entries te where te.project_id = p.id) as minutes_used,
          (p.due_on is not null and p.due_on < ${todayAr}) as overdue_due
@@ -104,14 +107,18 @@ function toItem(r: Row): ProjectListItem {
     resolvedTickets: toNumber(r.resolved_tickets),
     openTasks: toNumber(r.open_tasks),
     createdAt: toIso(r.created_at),
+    archivedAt: r.archived_at ? toIso(r.archived_at) : null,
   };
 }
 
-/** Todos los proyectos (una agencia tiene decenas, no miles): se filtran en el front. */
-export async function listProjects(db: DbOrTx, where: SQL = sql`true`): Promise<ProjectListItem[]> {
+/**
+ * Todos los proyectos (una agencia tiene decenas, no miles): se filtran en el front.
+ * Por defecto solo los activos; con `archived` solo los dados de baja.
+ */
+export async function listProjects(db: DbOrTx, { archived = false }: { archived?: boolean } = {}): Promise<ProjectListItem[]> {
   const rows = await db.execute<Row>(sql`
     ${SELECT}
-    where ${where}
+    where ${archived ? sql`p.archived_at is not null` : sql`p.archived_at is null`}
     order by (p.status in ('entregado', 'cancelado')), p.created_at desc
     limit 1000`);
   return rows.map(toItem);
@@ -157,7 +164,7 @@ export async function getProjectDetail(db: DbOrTx, id: string): Promise<ProjectD
       select t.id, t.number, t.title, t.type, t.status, t.due_at,
              (t.${OPEN} and t.due_at < now()) as overdue, u.name as assignee_name
       from tickets t left join users u on u.id = t.assignee_id
-      where t.project_id = ${id}
+      where t.project_id = ${id} and t.${LIVE}
       order by (t.status in ('resuelto', 'cancelado')), t.due_at nulls last
       limit 200`),
     listTasksOfProject(db, id),
