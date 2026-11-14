@@ -28,11 +28,14 @@ export const clientKeys = {
   all: ["clients"] as const,
   list: (f: ListFilters) => ["clients", "list", f] as const,
   summary: ["clients", "summary"] as const,
+  summaryOf: (f: ListFilters) => ["clients", "summary", f] as const,
   detail: (id: string) => ["clients", id] as const,
   activities: (id: string) => ["clients", id, "activities"] as const,
   tasks: (id: string) => ["clients", id, "tasks"] as const,
   statement: (id: string, from?: string, to?: string) => ["clients", id, "statement", from, to] as const,
   projects: (id: string) => ["clients", id, "projects"] as const,
+  /** Selectores de cliente (tareas, proyectos, tickets): nombre y estado salen de acá. */
+  options: ["clients", "options"] as const,
 };
 
 export function useClients(filters: ListFilters) {
@@ -46,8 +49,13 @@ export function useClients(filters: ListFilters) {
   });
 }
 
-export const useClientSummary = () =>
-  useQuery({ queryKey: clientKeys.summary, queryFn: () => api.get<ClientSummaryCounts>("/api/clients/summary") });
+/** Contador del encabezado, con los mismos filtros que el listado (cuenta lo que se ve). */
+export const useClientSummary = (filters: ListFilters) =>
+  useQuery({
+    queryKey: clientKeys.summaryOf(filters),
+    queryFn: () => api.get<ClientSummaryCounts>("/api/clients/summary", filters),
+    placeholderData: keepPreviousData,
+  });
 
 export const useClient = (id: string) =>
   useQuery({ queryKey: clientKeys.detail(id), queryFn: () => api.get<ClientDetail>(`/api/clients/${id}`) });
@@ -88,7 +96,10 @@ export function useCreateClient() {
   });
 }
 
-/** Invalida la ficha, su timeline (los cambios dejan rastro) y los listados. */
+/**
+ * Invalida la ficha, los listados y los selectores de cliente: un renombre o una
+ * baja tienen que verse enseguida en todos lados (los selectores cachean 5 min).
+ */
 function useClientMutation<V>(id: string, fn: (vars: V) => Promise<unknown>) {
   const qc = useQueryClient();
   return useMutation({
@@ -98,6 +109,7 @@ function useClientMutation<V>(id: string, fn: (vars: V) => Promise<unknown>) {
         qc.invalidateQueries({ queryKey: clientKeys.detail(id) }),
         qc.invalidateQueries({ queryKey: ["clients", "list"] }),
         qc.invalidateQueries({ queryKey: clientKeys.summary }),
+        qc.invalidateQueries({ queryKey: clientKeys.options }),
       ]);
     },
   });
@@ -130,6 +142,8 @@ export function useAddActivity(id: string) {
       Promise.all([
         qc.invalidateQueries({ queryKey: clientKeys.activities(id) }),
         qc.invalidateQueries({ queryKey: clientKeys.detail(id) }),
+        // "Último contacto" del listado sale de las llamadas, reuniones, etc.
+        qc.invalidateQueries({ queryKey: ["clients", "list"] }),
       ]),
   });
 }

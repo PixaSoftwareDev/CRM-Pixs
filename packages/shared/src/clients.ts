@@ -34,6 +34,16 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
+/**
+ * Teléfono: dígitos, espacios, `+ - ( ) . /` y un interno al final
+ * ("+54 11 4567-8910 int. 23"). Nada de letras sueltas ni texto libre.
+ */
+export const PHONE_PATTERN = /^\+?[\d\s().\/-]*\d[\d\s().\/-]*(?:\s*(?:int|ext|interno)\.?\s*\d+)?$/i;
+export const isValidPhone = (v: string) => PHONE_PATTERN.test(v.trim());
+
+export const PHONE_ERROR = "Teléfono inválido: usá números, espacios y + - ( )";
+const phone = optionalText(40).refine((v) => v == null || isValidPhone(v), PHONE_ERROR);
+
 const cuit = z
   .string()
   .trim()
@@ -71,7 +81,7 @@ const clientFields = {
   taxId: cuit,
   taxCondition: z.enum(TAX_CONDITIONS).nullable().optional(),
   address: optionalText(300),
-  phone: optionalText(40),
+  phone,
   email,
   priority: z.enum(CLIENT_PRIORITIES),
   source: z.enum(CLIENT_SOURCES).nullable().optional(),
@@ -105,7 +115,7 @@ export type ClientStatusChange = z.input<typeof clientStatusChange>;
 export const contactInput = z.object({
   name: text(160),
   jobTitle: optionalText(120),
-  phone: optionalText(40),
+  phone,
   email,
   isDecisionMaker: z.boolean().default(false),
   handlesPayments: z.boolean().default(false),

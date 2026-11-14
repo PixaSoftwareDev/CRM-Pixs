@@ -21,3 +21,14 @@ export function formatCuit(value: string): string {
   const d = normalizeCuit(value);
   return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : value;
 }
+
+/**
+ * Si lo que se busca parece un CUIT (o un pedazo), devuelve sus dígitos para
+ * compararlos contra el guardado (solo dígitos): "30-7123 4567" → "3071234567".
+ * Texto con letras no es un CUIT (null): así "Local 2" no trae todo CUIT con un 2.
+ */
+export function cuitSearchDigits(q: string): string | null {
+  if (!/^[\d\s.-]+$/.test(q.trim())) return null;
+  const digits = normalizeCuit(q);
+  return digits.length >= 3 ? digits : null;
+}

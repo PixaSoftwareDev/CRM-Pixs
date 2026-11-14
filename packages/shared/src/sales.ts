@@ -3,6 +3,7 @@
  * las tareas (ver tasks service); acá están las acciones explícitas.
  */
 import { z } from "zod";
+import { isValidPhone, PHONE_ERROR } from "./clients";
 
 export const STAGE_KEYS = [
   "potencial",
@@ -31,7 +32,12 @@ export const opportunityCreate = z
       .object({
         name: name(160, "Poné el nombre del negocio"),
         contactName: z.string().trim().max(160).optional(),
-        phone: z.string().trim().max(40).optional(),
+        phone: z
+          .string()
+          .trim()
+          .max(40)
+          .refine((v) => v === "" || isValidPhone(v), PHONE_ERROR)
+          .optional(),
         email: z.union([z.email({ message: "Email inválido" }), z.literal("")]).optional(),
       })
       .optional(),

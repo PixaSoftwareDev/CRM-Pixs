@@ -15,15 +15,16 @@ import {
   TAX_CONDITIONS,
 } from "@crm/shared";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldValues, type UseFormReturn, useForm } from "react-hook-form";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Chip } from "../../../components/ui/Chip";
 import { Dialog } from "../../../components/ui/Dialog";
 import { Field, Input, Select } from "../../../components/ui/Field";
 import { Empty } from "../../../components/ui/States";
-import { useRemoveContact, useSaveBilling, useSaveContact, useUpdateClient } from "../api";
+import { clientKeys, useRemoveContact, useSaveBilling, useSaveContact, useUpdateClient } from "../api";
 import { PRIORITY, SOURCE, TAX_CONDITION } from "../labels";
 import { useServerErrors } from "../useServerErrors";
 
@@ -62,6 +63,33 @@ function SaveBar({ dirty, saving, saved }: { dirty: boolean; saving: boolean; sa
   );
 }
 
+/**
+ * Mantiene un formulario de la ficha al día con el server sin pisar lo que se está
+ * escribiendo: si la ficha cambia desde otro lado (otra sección guardada, la
+ * prioridad desde el listado) solo se actualizan los campos que no se tocaron.
+ * Devuelve `afterSave`, que tras guardar deja el formulario con lo que quedó en el
+ * server (ya sin cambios pendientes).
+ */
+function useSyncedForm<T extends FieldValues>(
+  form: UseFormReturn<T>,
+  client: ClientDetail,
+  defaults: (c: ClientDetail) => T,
+) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    form.reset(defaults(client), { keepDirtyValues: true });
+  }, [client, form, defaults]);
+
+  return () => {
+    // La mutación ya esperó el refetch de la ficha: lo que hay en caché es lo guardado.
+    const fresh = qc.getQueryData<ClientDetail>(clientKeys.detail(client.id)) ?? client;
+    form.reset(defaults(fresh));
+  };
+}
+
+/** El error ya se muestra en el formulario (useServerErrors): acá solo se evita el rechazo sin manejar. */
+const ignore = () => {};
+
 // ─── Datos de la empresa ────────────────────────────────────────────────────
 
 function clientDefaults(c: ClientDetail): ClientUpdate {
@@ -84,10 +112,9 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
   const { errors, isDirty, isSubmitting } = form.formState;
   const serverError = useServerErrors(form, update.error);
 
-  // Si la ficha cambia desde otro lado (p. ej. prioridad en el listado), se refleja acá.
-  useEffect(() => form.reset(clientDefaults(client)), [client, form]);
+  const afterSave = useSyncedForm(form, client, clientDefaults);
 
-  const onSubmit = form.handleSubmit((values) => update.mutateAsync(values));
+  const onSubmit = form.handleSubmit((values) => update.mutateAsync(values).then(afterSave, ignore));
 
   return (
     <Card className="p-5">
@@ -258,10 +285,9 @@ function ContactDialog({
     );
   }, [contact, isNew, form, save.reset]);
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    await save.mutateAsync(isNew || contact === null ? values : { ...values, contactId: contact.id });
-    onClose();
-  });
+  const onSubmit = form.handleSubmit((values) =>
+    save.mutateAsync(isNew || contact === null ? values : { ...values, contactId: contact.id }).then(onClose, ignore),
+  );
 
   return (
     <Dialog open={contact !== null} onClose={onClose} title={isNew ? "Agregar persona" : "Editar persona"}>
@@ -333,9 +359,9 @@ function BillingForm({ client }: { client: ClientDetail }) {
   const { errors, isDirty, isSubmitting } = form.formState;
   const serverError = useServerErrors(form, save.error);
 
-  useEffect(() => form.reset(billingDefaults(client)), [client, form]);
+  const afterSave = useSyncedForm(form, client, billingDefaults);
 
-  const onSubmit = form.handleSubmit((values) => save.mutateAsync(values));
+  const onSubmit = form.handleSubmit((values) => save.mutateAsync(values).then(afterSave, ignore));
 
   return (
     <Card className="p-5">

@@ -19,6 +19,7 @@ import {
   sql,
   users,
 } from "@crm/db";
+import { cuitSearchDigits } from "@crm/shared";
 import type {
   ActivityDto,
   ClientDetail,
@@ -73,8 +74,8 @@ const cid = sql`${clients.id}`;
 
 const listCursor = z.object({ n: z.string(), i: z.uuid() });
 
-export async function listClients(db: DbOrTx, query: ClientListQuery) {
-  const after = decodeCursor(query.cursor, listCursor);
+/** Filtros del listado (estado, prioridad, búsqueda): los mismos para las filas y para el contador. */
+function listFilters(db: DbOrTx, query: Pick<ClientListQuery, "q" | "status" | "priority">): SQL[] {
   const filters: SQL[] = [];
 
   // "Todos" (sin estado) son los vigentes: los de baja solo aparecen con su filtro, también al buscar.
@@ -86,9 +87,22 @@ export async function listClients(db: DbOrTx, query: ClientListQuery) {
       .select({ one: sql`1` })
       .from(clientContacts)
       .where(and(eq(clientContacts.clientId, clients.id), matches(clientContacts.name, pattern)));
-    const match = or(matches(clients.name, pattern), matches(clients.email, pattern), exists(byContact));
+    // El CUIT se guarda solo con dígitos: "30-71234567" o "30 7123" lo encuentran igual.
+    const cuitDigits = cuitSearchDigits(query.q);
+    const match = or(
+      matches(clients.name, pattern),
+      matches(clients.email, pattern),
+      exists(byContact),
+      cuitDigits ? sql`${clients.taxId} like ${`%${cuitDigits}%`}` : undefined,
+    );
     if (match) filters.push(match);
   }
+  return filters;
+}
+
+export async function listClients(db: DbOrTx, query: ClientListQuery) {
+  const after = decodeCursor(query.cursor, listCursor);
+  const filters = listFilters(db, query);
   if (after) filters.push(sql`(${clients.name}, ${clients.id}) > (${after.n}, ${after.i})`);
 
   const rows = await db
@@ -133,7 +147,11 @@ export async function listClients(db: DbOrTx, query: ClientListQuery) {
   };
 }
 
-export async function countClients(db: DbOrTx): Promise<ClientSummaryCounts> {
+/** Contador del encabezado: cuenta lo mismo que muestra el listado con esos filtros. */
+export async function countClients(
+  db: DbOrTx,
+  query: Pick<ClientListQuery, "q" | "status" | "priority"> = {},
+): Promise<ClientSummaryCounts> {
   const [row] = await db
     .select({
       total: sql<number>`count(*)`.mapWith(toNumber),
@@ -141,7 +159,7 @@ export async function countClients(db: DbOrTx): Promise<ClientSummaryCounts> {
       atRisk: sql<number>`count(*) filter (where ${clients.status} = 'en_riesgo')`.mapWith(toNumber),
     })
     .from(clients)
-    .where(sql`${clients.status} <> 'baja'`);
+    .where(and(...listFilters(db, query)));
   return row ?? { total: 0, highPriority: 0, atRisk: 0 };
 }
 

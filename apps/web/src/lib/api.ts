@@ -11,6 +11,12 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * La ficha pedida no existe: id desconocido (404) o que ni siquiera tiene forma de
+ * id (400, p. ej. `/clientes/abc`). Reintentar no sirve.
+ */
+export const isNotFound = (err: unknown) => err instanceof ApiError && (err.status === 404 || err.status === 400);
+
 type Query = Record<string, string | number | undefined | null>;
 
 function withQuery(path: string, query?: Query): string {

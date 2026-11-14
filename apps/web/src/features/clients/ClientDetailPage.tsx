@@ -8,6 +8,7 @@ import { Chip } from "../../components/ui/Chip";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { Tabs } from "../../components/ui/Tabs";
 import { useCopy } from "../../hooks/useCopy";
+import { isNotFound } from "../../lib/api";
 import { ago, fullDate, initials, money, plural } from "../../lib/format";
 import { clientRoute } from "../../router";
 import { useClient } from "./api";
@@ -27,7 +28,13 @@ export function ClientDetailPage() {
   const navigate = useNavigate({ from: clientRoute.fullPath });
   const client = useClient(clientId);
 
-  if (client.error) return <ErrorBox error={client.error} onRetry={() => void client.refetch()} />;
+  if (client.error) {
+    return isNotFound(client.error) ? (
+      <ErrorBox error={new Error("Este cliente no existe: puede ser un link viejo o mal copiado.")} />
+    ) : (
+      <ErrorBox error={client.error} onRetry={() => void client.refetch()} />
+    );
+  }
   if (!client.data) {
     return (
       <Card className="flex flex-col gap-3 p-6">

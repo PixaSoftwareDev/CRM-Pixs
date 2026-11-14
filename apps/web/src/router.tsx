@@ -48,7 +48,8 @@ const rootRoute = createRootRoute({ component: AppLayout, notFoundComponent: Not
 
 /** Filtros del listado en la URL: se comparten por link y sobreviven a recargar. */
 const clientsSearch = z.object({
-  q: z.string().optional().catch(undefined),
+  // `?q=123` llega como número (el router parsea la URL como JSON): se busca igual, como texto.
+  q: z.union([z.string(), z.number().transform(String)]).optional().catch(undefined),
   status: z.enum(CLIENT_STATUSES).optional().catch(undefined),
   priority: z.enum(CLIENT_PRIORITIES).optional().catch(undefined),
 });

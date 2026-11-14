@@ -1,7 +1,7 @@
 import { CLIENT_PRIORITIES, type ClientListItem, type ClientPriority, type ClientStatus } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "../../components/layout/AppLayout";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -36,8 +36,18 @@ export function ClientsPage() {
     void navigate({ search: (s) => ({ ...s, q: q || undefined }), replace: true });
   }, [q, navigate]);
 
-  const summary = useClientSummary();
-  const list = useClients({ q: search.q, status: search.status, priority: search.priority });
+  // Y al revés: si la URL cambia por fuera (botón Atrás, un link), el buscador la sigue.
+  // Solo cuando difiere de lo último que mandó el propio buscador, para no pisar lo que se tipea.
+  const sentQ = useRef(q);
+  sentQ.current = q;
+  useEffect(() => {
+    const urlQ = search.q ?? "";
+    if (urlQ !== sentQ.current) setText(urlQ);
+  }, [search.q]);
+
+  const filters = { q: search.q, status: search.status, priority: search.priority };
+  const summary = useClientSummary(filters);
+  const list = useClients(filters);
   const rows = list.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
@@ -63,7 +73,7 @@ export function ClientsPage() {
             type="search"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Buscar por nombre, contacto o email"
+            placeholder="Buscar por nombre, contacto, email o CUIT"
             className="pl-9"
           />
         </label>

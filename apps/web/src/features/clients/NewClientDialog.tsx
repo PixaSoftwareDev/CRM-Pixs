@@ -27,9 +27,11 @@ export function NewClientDialog({ open, onClose }: { open: boolean; onClose: () 
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const { id } = await create.mutateAsync(values);
+    // Si falla (p. ej. CUIT repetido) el mensaje ya se muestra en el formulario.
+    const created = await create.mutateAsync(values).catch(() => null);
+    if (!created) return;
     close();
-    void navigate({ to: "/clientes/$clientId", params: { clientId: id }, search: { tab: "datos" } });
+    void navigate({ to: "/clientes/$clientId", params: { clientId: created.id }, search: { tab: "datos" } });
   });
 
   return (

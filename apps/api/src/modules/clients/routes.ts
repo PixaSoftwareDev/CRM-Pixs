@@ -22,6 +22,8 @@ import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 const contactParams = idParams.extend({ contactId: z.uuid() });
+/** El contador del encabezado acepta los mismos filtros que el listado. */
+const clientSummaryQuery = clientListQuery.pick({ q: true, status: true, priority: true });
 
 export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireUser);
@@ -31,7 +33,9 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
     service.listClients(db, req.query),
   );
 
-  app.get("/api/clients/summary", () => service.countClients(db));
+  app.get("/api/clients/summary", { schema: { querystring: clientSummaryQuery } }, (req) =>
+    service.countClients(db, req.query),
+  );
 
   app.get("/api/clients/options", { config: { access: "any" } }, () => service.listClientOptions(db));
 

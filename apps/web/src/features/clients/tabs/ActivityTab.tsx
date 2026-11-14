@@ -1,6 +1,6 @@
 import { type ActivityCreate, MANUAL_ACTIVITY_KINDS } from "@crm/shared";
 import { Bot, CalendarCheck, FileText, LifeBuoy, Mail, MessageCircle, Phone, StickyNote, Wallet } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Input, Select } from "../../../components/ui/Field";
@@ -33,11 +33,22 @@ export function ActivityTab({ clientId }: { clientId: string }) {
   const add = useAddActivity(clientId);
   const [kind, setKind] = useState<ActivityCreate["kind"]>("nota");
   const [body, setBody] = useState("");
+  // Candado sincrónico: un doble clic llega antes de que `isPending` deshabilite el botón.
+  const sending = useRef(false);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!body.trim()) return;
-    add.mutate({ kind, body }, { onSuccess: () => setBody("") });
+    if (!body.trim() || sending.current) return;
+    sending.current = true;
+    add.mutate(
+      { kind, body },
+      {
+        onSuccess: () => setBody(""),
+        onSettled: () => {
+          sending.current = false;
+        },
+      },
+    );
   };
 
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];

@@ -26,14 +26,19 @@ export function StatusDialog({ client, open, onClose }: { client: ClientDetail; 
   const status = form.watch("status");
   const serverError = useServerErrors(form, change.error);
 
+  // Al abrir arranca limpio: con el estado actual y sin el error de un intento anterior.
   useEffect(() => {
-    if (open) form.reset({ status: client.status, reason: client.statusReason ?? "" });
-  }, [open, client.status, client.statusReason, form]);
+    if (!open) return;
+    change.reset();
+    form.reset({ status: client.status, reason: client.statusReason ?? "" });
+  }, [open, client.status, client.statusReason, form, change.reset]);
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    await change.mutateAsync({ ...values, reason: needsReason(values.status) ? values.reason : null });
-    onClose();
-  });
+  const onSubmit = form.handleSubmit((values) =>
+    change
+      .mutateAsync({ ...values, reason: needsReason(values.status) ? values.reason : null })
+      // Si falla, el mensaje queda a la vista en el diálogo.
+      .then(onClose, () => {}),
+  );
 
   return (
     <Dialog open={open} onClose={onClose} title="Cambiar estado" description="El cambio queda registrado en la actividad del cliente.">
