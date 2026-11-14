@@ -16,6 +16,15 @@ const IN_STAGE = sql`(
   or (s.closes_as = 'ganada' and o.status = 'ganada' and o.closed_at >= ${MONTH_START})
 )`;
 
+/**
+ * Tareas de la oportunidad `o`: las suyas y las del cliente sin oportunidad.
+ * Una tarea de otra oportunidad del mismo cliente no es de esta. Mismo criterio
+ * para la tarea que muestra la tarjeta y para el contador de la etapa.
+ */
+const TASK_OF_OPP = sql`(t.opportunity_id = o.id or (t.opportunity_id is null and t.client_id = o.client_id))`;
+/** Tarea abierta (lo que cuenta el resumen por etapa). */
+const OPEN_TASK = sql`(t.status not in ('hecha', 'cancelada') and t.archived_at is null)`;
+
 export async function getPipeline(db: DbOrTx): Promise<PipelineDto> {
   const [stages, moves] = await Promise.all([
     db.execute<{
@@ -30,11 +39,11 @@ export async function getPipeline(db: DbOrTx): Promise<PipelineDto> {
     }>(sql`
       select s.id, s.key, s.name, s.description, s.color,
              count(o.id) as n, coalesce(sum(o.amount), 0) as total,
+             -- Cada tarea una sola vez, aunque sea del cliente y este tenga varias oportunidades en la etapa.
              (select count(*) from tasks t
-               join opportunities o2
-                 on o2.id = t.opportunity_id or (t.opportunity_id is null and t.client_id = o2.client_id)
-               where o2.stage_id = s.id and o2.status = 'abierta'
-                 and t.status not in ('hecha', 'cancelada') and t.archived_at is null) as open_tasks
+               where ${OPEN_TASK}
+                 and exists (select 1 from opportunities o where o.stage_id = s.id and ${IN_STAGE} and ${TASK_OF_OPP})
+             ) as open_tasks
       from pipeline_stages s
       left join opportunities o on o.stage_id = s.id and ${IN_STAGE}
       group by s.id
@@ -134,8 +143,7 @@ export async function listStageOpportunities(db: DbOrTx, stageId: string): Promi
       from tasks t
       join task_types tt on tt.id = t.type_id
       join users a on a.id = t.assignee_id
-      where (t.opportunity_id = o.id or t.client_id = o.client_id)
-        and t.archived_at is null and t.status <> 'cancelada'
+      where ${TASK_OF_OPP} and t.archived_at is null and t.status <> 'cancelada'
       order by (t.status = 'hecha'), case when t.status = 'hecha' then null else t.starts_at end nulls last,
                t.completed_at desc nulls last
       limit 1

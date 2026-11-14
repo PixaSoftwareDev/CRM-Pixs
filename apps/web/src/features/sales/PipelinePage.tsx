@@ -175,7 +175,8 @@ function StageDialog({
   const [winning, setWinning] = useState<OpportunityCardDto | null>(null);
   const [losing, setLosing] = useState<OpportunityCardDto | null>(null);
   const closed = stage?.key === "implementacion";
-  const movable = stages.filter((s) => s.key !== "implementacion");
+  // A dónde se puede mover a mano: ni a implementación (eso es «Ganada») ni a la etapa en la que ya está.
+  const movable = stages.filter((s) => s.key !== "implementacion" && s.id !== stage?.id);
 
   return (
     <>
