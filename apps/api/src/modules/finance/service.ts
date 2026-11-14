@@ -3,6 +3,9 @@
  * su rastro: el cobro genera recibo + imputación + ingreso en caja + actividad.
  * La numeración de comprobantes es correlativa por tipo/letra/punto de venta y
  * se toma con un lock transaccional (dos cobros a la vez no repiten número).
+ * Todo lo que imputa (cobros, facturas, cuotas, devengamiento) bloquea antes la
+ * fila del cliente: dos operaciones sobre el mismo cliente nunca leen el mismo
+ * saldo pendiente a la vez. Orden de locks: cliente(s) → talonario.
  */
 import {
   activities,
@@ -33,6 +36,7 @@ import {
   invoiceCreate,
   type PaymentCreate,
   type PaymentMethod,
+  type PaymentResult,
   type PriceAdjustmentCreate,
   paymentCreate,
   priceAdjustmentCreate,
@@ -69,8 +73,55 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
   cheque: "cheque",
   otro: "otro medio",
 };
+/** "$ 4.445" o, si hay centavos, "$ 4.444,50" (no se redondean para que los saldos cierren). */
 const pesos = (cents: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(cents / 100);
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
+
+/**
+ * Serializa todo lo que mueve la cuenta corriente de un cliente hasta el fin de
+ * la transacción. FOR NO KEY UPDATE no choca con los FK que apuntan al cliente
+ * (tareas, actividades) pero sí con otro cobro/factura del mismo cliente.
+ * Varios clientes se bloquean siempre en el mismo orden (por id) para no trabarse.
+ */
+async function lockClients(tx: DbOrTx, clientIds: string[]) {
+  const ids = [...new Set(clientIds)].sort();
+  if (!ids.length) return;
+  const rows = await tx.execute<{ id: string }>(sql`select id from clients where id in ${ids} order by id for no key update`);
+  if (rows.length < ids.length) throw new NotFoundError("Cliente");
+}
+
+/** Comprobantes que imputó cada transacción (para el control del final). */
+const touchedByTx = new WeakMap<DbOrTx, Set<string>>();
+
+/** Toda imputación pasa por acá: queda anotada para assertAllocations. */
+async function allocate(tx: DbOrTx, sourceId: string, targetId: string, amount: number) {
+  await tx.insert(documentAllocations).values({ sourceId, targetId, amount });
+  const touched = touchedByTx.get(tx) ?? new Set<string>();
+  touched.add(sourceId).add(targetId);
+  touchedByTx.set(tx, touched);
+}
+
+/**
+ * Red de seguridad: lo que imputó esta transacción no deja ninguna factura con
+ * más imputado que su total, ni un recibo / nota de crédito imputando más de lo
+ * que vale. Solo mira lo tocado ahora: datos viejos no bloquean cobros nuevos.
+ */
+async function assertAllocations(tx: DbOrTx) {
+  const ids = [...(touchedByTx.get(tx) ?? [])];
+  if (!ids.length) return;
+  const [bad] = await tx.execute(sql`
+    select 1 from documents d
+    where d.id in ${ids}
+      and (d.amount < coalesce((select sum(a.amount) from document_allocations a where a.target_id = d.id), 0)
+        or d.amount < coalesce((select sum(a.amount) from document_allocations a where a.source_id = d.id), 0))
+    limit 1`);
+  if (bad) throw new ConflictError("Otro cobro de este cliente se registró al mismo tiempo. Probá de nuevo.");
+}
 
 /** Próximo número del talonario. El lock se libera solo al terminar la transacción. */
 async function nextNumber(tx: DbOrTx, kind: string, letter: string | null) {
@@ -136,8 +187,12 @@ async function insertInvoice(
  * cada vez que aparece una factura nueva o un cobro deja resto.
  */
 async function applyCredit(tx: DbOrTx, clientId: string) {
-  // Mismo lock que el talonario de recibos por cliente: dos imputaciones a la vez no se pisan.
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`credit:${clientId}`}))`);
+  return allocateCredit(tx, clientId, await repo.pendingInvoices(tx, clientId));
+}
+
+/** Imputa saldo a favor (lo más viejo primero) a las facturas dadas, hasta `pending` de cada una. */
+async function allocateCredit(tx: DbOrTx, clientId: string, targets: { id: string; pending: number }[]) {
+  await lockClients(tx, [clientId]);
   const sources = await tx.execute<{ id: string; free: string }>(sql`
     select d.id, d.amount - coalesce((select sum(a.amount) from document_allocations a where a.source_id = d.id), 0) as free
     from documents d
@@ -145,7 +200,6 @@ async function applyCredit(tx: DbOrTx, clientId: string) {
     order by d.issued_on, d.number`);
   const credits = sources.map((r) => ({ id: r.id, free: Number(r.free) })).filter((r) => r.free > 0);
   if (!credits.length) return 0;
-  const targets = await repo.pendingInvoices(tx, clientId);
   let applied = 0;
   for (const t of targets) {
     let pending = t.pending;
@@ -153,7 +207,7 @@ async function applyCredit(tx: DbOrTx, clientId: string) {
       if (pending <= 0) break;
       if (c.free <= 0) continue;
       const amount = Math.min(pending, c.free);
-      await tx.insert(documentAllocations).values({ sourceId: c.id, targetId: t.id, amount });
+      await allocate(tx, c.id, t.id, amount);
       c.free -= amount;
       pending -= amount;
       applied += amount;
@@ -174,6 +228,8 @@ async function applyCredit(tx: DbOrTx, clientId: string) {
 
 /** Recibo + imputación + caja + actividad. Lo que sobra queda a favor del cliente. */
 async function registerPaymentTx(tx: DbOrTx, actorId: string, clientId: string, data: ReturnType<typeof paymentCreate.parse>) {
+  // Primero el lock: el pendiente de las facturas se lee recién cuando nadie más puede imputarlas.
+  await lockClients(tx, [clientId]);
   const { name } = await billingOf(tx, clientId);
   if (data.invoiceIds?.length) {
     const found = await tx.execute<{ client_id: string }>(sql`select client_id from documents where id in ${data.invoiceIds} and kind in ('factura', 'nota_debito')`);
@@ -204,7 +260,7 @@ async function registerPaymentTx(tx: DbOrTx, actorId: string, clientId: string, 
   for (const t of targets) {
     if (left <= 0) break;
     const amount = Math.min(left, t.pending);
-    await tx.insert(documentAllocations).values({ sourceId: receipt.id, targetId: t.id, amount });
+    await allocate(tx, receipt.id, t.id, amount);
     left -= amount;
   }
 
@@ -228,7 +284,14 @@ async function registerPaymentTx(tx: DbOrTx, actorId: string, clientId: string, 
   });
   // Si sobró y hay otras facturas con saldo, el resto se imputa ahí.
   const reapplied = left > 0 ? await applyCredit(tx, clientId) : 0;
-  return { receiptId: receipt.id, number: receipt.number, allocated: data.amount - left + reapplied, credit: left - reapplied };
+  await assertAllocations(tx);
+  return {
+    receiptId: receipt.id,
+    number: receipt.number,
+    allocated: data.amount - left + reapplied,
+    credit: left - reapplied,
+    fromCredit: 0,
+  } satisfies PaymentResult;
 }
 
 export async function registerPayment(db: Db, actorId: string, clientId: string, input: PaymentCreate) {
@@ -244,6 +307,7 @@ export async function createInvoice(db: Db, actorId: string, clientId: string, i
     if (!p) throw new BadRequestError("El proyecto no es de ese cliente");
   }
   return db.transaction(async (tx) => {
+    await lockClients(tx, [clientId]);
     const { termDays } = await billingOf(tx, clientId);
     const id = await insertInvoice(tx, actorId, clientId, {
       ...data,
@@ -251,6 +315,7 @@ export async function createInvoice(db: Db, actorId: string, clientId: string, i
     });
     await tx.insert(activities).values({ clientId, actorId, documentId: id, kind: "factura", title: "Factura emitida", body: `${data.concept} · ${pesos(data.amount)}` });
     await applyCredit(tx, clientId);
+    await assertAllocations(tx);
     return { id };
   });
 }
@@ -300,15 +365,28 @@ async function findInstallment(db: DbOrTx, id: string) {
   return { ...row, amount: Number(row.amount) };
 }
 
-/** "Cobrada" sobre una cuota sin facturar: se factura y se cobra en una sola transacción. */
-export async function payInstallment(db: Db, actorId: string, id: string, input: InstallmentPay) {
+/**
+ * "Cobrada" sobre una cuota: si no está facturada se factura, se le aplica el
+ * saldo a favor que Por cobrar ya le descontaba y se cobra solo lo que falta
+ * (lo mismo que se mostraba). Si el saldo a favor la cubre entera, no hay recibo
+ * ni ingreso nuevo: esa plata ya entró con el cobro anterior.
+ */
+export async function payInstallment(db: Db, actorId: string, id: string, input: InstallmentPay): Promise<PaymentResult> {
   const data = installmentPay.parse(input);
   return db.transaction(async (tx) => {
+    const [owner] = await tx.execute<{ client_id: string }>(sql`
+      select pl.client_id from installments i join installment_plans pl on pl.id = i.plan_id where i.id = ${id}`);
+    if (!owner) throw new NotFoundError("Cuota");
+    await lockClients(tx, [owner.client_id]);
     // Bloquea la cuota: dos "Cobrada" a la vez no la facturan dos veces.
     await tx.execute(sql`select 1 from installments where id = ${id} for update`);
     const inst = await findInstallment(tx, id);
     let invoiceId = inst.invoice_id;
+    let fromCredit = 0;
     if (!invoiceId) {
+      // Lo que Por cobrar muestra para esta cuota (con el saldo a favor descontado).
+      const shown = (await repo.netReceivables(tx, inst.client_id)).find((r) => r.kind === "installment" && r.id === id);
+      const toCollect = shown?.amount ?? 0;
       invoiceId = await insertInvoice(tx, actorId, inst.client_id, {
         concept: inst.label,
         amount: inst.amount,
@@ -317,17 +395,30 @@ export async function payInstallment(db: Db, actorId: string, id: string, input:
         projectId: inst.project_id,
       });
       await tx.update(installments).set({ invoiceId, updatedAt: new Date() }).where(eq(installments.id, id));
+      if (inst.amount > toCollect) {
+        fromCredit = await allocateCredit(tx, inst.client_id, [{ id: invoiceId, pending: inst.amount - toCollect }]);
+      }
+    } else {
+      // Ya facturada: si quedó saldo a favor suelto, se usa antes de cobrar.
+      fromCredit = await allocateCredit(tx, inst.client_id, await repo.pendingInvoices(tx, inst.client_id, [invoiceId]));
     }
     const pending = await repo.pendingInvoices(tx, inst.client_id, [invoiceId]);
     const amount = pending[0]?.pending ?? 0;
-    if (amount <= 0) throw new ConflictError("Esa cuota ya está cobrada");
-    return registerPaymentTx(tx, actorId, inst.client_id, {
+    if (amount <= 0) {
+      if (fromCredit > 0) {
+        await assertAllocations(tx);
+        return { receiptId: null, number: null, allocated: 0, credit: 0, fromCredit };
+      }
+      throw new ConflictError("Esa cuota ya está cobrada");
+    }
+    const res = await registerPaymentTx(tx, actorId, inst.client_id, {
       amount,
       method: data.method,
       receivedOn: data.receivedOn,
       note: inst.label,
       invoiceIds: [invoiceId],
     });
+    return { ...res, fromCredit };
   });
 }
 
@@ -420,6 +511,8 @@ export async function runAccrual(db: Db, actorId: string | null, input: AccrualR
         and (s.ends_on is null or s.ends_on >= ${period}::date)
       order by c.name, s.name`);
 
+    // Todos los clientes a facturar se bloquean juntos y antes de numerar (mismo orden que un cobro).
+    await lockClients(tx, due.filter((s) => !s.billed).map((s) => s.client_id));
     const created: AccrualResult["created"] = [];
     for (const s of due) {
       if (s.billed) continue;
@@ -444,6 +537,7 @@ export async function runAccrual(db: Db, actorId: string | null, input: AccrualR
       created.push({ client: s.client_name, concept, amount });
       await applyCredit(tx, s.client_id);
     }
+    await assertAllocations(tx);
     return { created, skipped: due.length - created.length };
   });
 }

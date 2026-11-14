@@ -12,9 +12,12 @@ const cents = z.number().int().positive({ message: "El importe tiene que ser may
 const isoDate = z.iso.date({ message: "Fecha inválida" });
 /** Hoy + n días como "YYYY-MM-DD" (con margen por husos horarios). */
 const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
-/** Algo que ya pasó (un cobro, un gasto): hasta hoy, nunca en el futuro ni antes de 2000. */
+/** Hoy en Argentina como "YYYY-MM-DD" (la zona del negocio, sea donde sea que corra el código). */
+export const todayInArgentina = (now = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(now);
+/** Algo que ya pasó (un cobro, un gasto): hasta hoy en Argentina, nunca en el futuro ni antes de 2000. */
 const pastDate = isoDate
-  .refine((d) => d <= daysFromNow(1), { message: "La fecha no puede ser futura" })
+  .refine((d) => d <= todayInArgentina(), { message: "La fecha no puede ser futura" })
   .refine((d) => d >= "2000-01-01", { message: "Fecha inválida" });
 /** Fecha de un comprobante o vencimiento: dentro de un rango razonable (2000 → dentro de 5 años). */
 const docDate = isoDate.refine((d) => d >= "2000-01-01" && d <= daysFromNow(5 * 366), { message: "Fecha fuera de rango" });
@@ -48,17 +51,44 @@ export const installmentPay = z.object({
 });
 export type InstallmentPay = z.input<typeof installmentPay>;
 
+/**
+ * Plan de cuotas. `total` y `advancePercent` son lo que se pidió en pantalla:
+ * si vienen, las cuotas tienen que sumar el total y el anticipo (cuota 0)
+ * corresponder al porcentaje, así un plan mal armado no se guarda a medias.
+ */
 export const installmentPlanCreate = z
   .object({
     description: text(200, "Describí el plan"),
+    total: cents.optional(),
+    advancePercent: z
+      .number()
+      .min(0, { message: "El anticipo va de 0 a 100%" })
+      .max(100, { message: "El anticipo va de 0 a 100%" })
+      .optional(),
     items: z
       .array(z.object({ number: z.number().int().min(0).max(120), amount: cents, dueOn: docDate }))
       .min(1, { message: "Agregá al menos una cuota" })
       .max(120),
   })
-  .refine((v) => new Set(v.items.map((i) => i.number)).size === v.items.length, {
-    message: "Hay cuotas con el mismo número",
-    path: ["items"],
+  .superRefine((v, ctx) => {
+    if (new Set(v.items.map((i) => i.number)).size !== v.items.length) {
+      ctx.addIssue({ code: "custom", message: "Hay cuotas con el mismo número", path: ["items"] });
+    }
+    const sum = v.items.reduce((a, i) => a + i.amount, 0);
+    if (v.total !== undefined && sum !== v.total) {
+      ctx.addIssue({ code: "custom", message: "Las cuotas no suman el total del plan", path: ["items"] });
+    }
+    if (v.advancePercent !== undefined) {
+      if (v.total === undefined) {
+        ctx.addIssue({ code: "custom", message: "Falta el total del plan", path: ["total"] });
+        return;
+      }
+      const advance = v.items.find((i) => i.number === 0)?.amount ?? 0;
+      // El anticipo se redondea al peso: se tolera esa diferencia.
+      if (Math.abs(advance - (v.total * v.advancePercent) / 100) > 100) {
+        ctx.addIssue({ code: "custom", message: "El anticipo no coincide con el porcentaje", path: ["advancePercent"] });
+      }
+    }
   });
 export type InstallmentPlanCreate = z.input<typeof installmentPlanCreate>;
 

@@ -35,46 +35,47 @@ const INSTALLMENT_LABEL = sql`
    end) || ' · ' || coalesce(p.name, pl.description)`;
 
 export async function getSummary(db: DbOrTx): Promise<FinanceSummary> {
-  const [row] = await db.execute<{
-    collected: string;
-    receivable: string;
-    receivable_count: string;
-    overdue: string;
-    mrr: string;
-  }>(sql`
-    with pend as (
-      select d.client_id, ${PENDING} as amount, d.due_on from documents d where ${DEBIT}
-      union all
-      select pl.client_id, i.amount, i.due_on from installments i
-      join installment_plans pl on pl.id = i.plan_id where i.invoice_id is null
-    ),
-    -- Lo que cada cliente tiene a favor se descuenta de lo que debe (nunca por debajo de cero).
-    per_client as (
-      select p.client_id,
-             sum(p.amount) filter (where p.amount > 0) as owed,
-             sum(p.amount) filter (where p.amount > 0 and p.due_on < ${todayAr}) as late,
-             count(*) filter (where p.amount > 0) as n,
-             coalesce(cr.credit, 0) as credit
-      from pend p left join ${CLIENT_CREDIT} cr on cr.client_id = p.client_id
-      group by p.client_id, cr.credit
-    )
+  const [row] = await db.execute<{ collected: string; mrr: string }>(sql`
     select
       (select coalesce(sum(amount), 0) from documents
         where kind = 'recibo' and status = 'emitido' and issued_on >= ${MONTH_START}) as collected,
-      (select coalesce(sum(greatest(coalesce(owed, 0) - credit, 0)), 0) from per_client) as receivable,
-      (select coalesce(sum(n), 0) from per_client where coalesce(owed, 0) > credit) as receivable_count,
-      (select coalesce(sum(greatest(coalesce(late, 0) - credit, 0)), 0) from per_client) as overdue,
       (select coalesce(sum(amount), 0) from subscriptions where active) as mrr`);
+  // Lo pendiente sale de la misma cuenta que la pestaña Por cobrar: el KPI y la lista siempre coinciden.
+  const items = await netReceivables(db);
   return {
     collectedThisMonth: toNumber(row?.collected),
-    receivable: toNumber(row?.receivable),
-    receivableCount: toNumber(row?.receivable_count),
-    overdue: toNumber(row?.overdue),
+    receivable: items.reduce((a, r) => a + r.amount, 0),
+    receivableCount: items.length,
+    overdue: items.filter((r) => r.daysToDue !== null && r.daysToDue < 0).reduce((a, r) => a + r.amount, 0),
     monthlyRecurring: toNumber(row?.mrr),
   };
 }
 
-export async function listReceivables(db: DbOrTx): Promise<ReceivableDto[]> {
+/** Un ítem por cobrar con el saldo a favor del cliente ya descontado. */
+export interface NetReceivable {
+  kind: "invoice" | "installment";
+  id: string;
+  clientId: string;
+  clientName: string;
+  concept: string;
+  /** Lo que falta cobrar (centavos), ya descontado el saldo a favor. */
+  amount: number;
+  /** Cuánto de este ítem cubre el saldo a favor del cliente. */
+  coveredByCredit: number;
+  dueOn: string | null;
+  daysToDue: number | null;
+  autoReminder: boolean | null;
+}
+
+/**
+ * Lo que falta cobrar (facturas con saldo y cuotas sin facturar), con el saldo
+ * a favor de cada cliente descontado de lo que vence primero. Es la única
+ * cuenta de "pendiente": la usan Por cobrar, los KPI y "Cobrada" de una cuota
+ * (que cobra exactamente lo que acá se muestra). Los ítems que el saldo a favor
+ * cubre del todo no aparecen.
+ */
+export async function netReceivables(db: DbOrTx, clientId?: string): Promise<NetReceivable[]> {
+  const byClient = clientId ? sql`and c.id = ${clientId}` : sql``;
   const rows = await db.execute<{
     kind: "invoice" | "installment";
     id: string;
@@ -88,43 +89,65 @@ export async function listReceivables(db: DbOrTx): Promise<ReceivableDto[]> {
   }>(sql`
     select * from (
       select 'invoice' as kind, d.id, c.id as client_id, c.name as client_name, d.concept,
-             ${PENDING} as amount, d.due_on, (d.due_on - ${todayAr}) as days, null::boolean as auto_reminder
+             ${PENDING} as amount, d.due_on, (d.due_on - ${todayAr}) as days, null::boolean as auto_reminder,
+             0 as kind_rank, d.issued_on, d.number as num
       from documents d join clients c on c.id = d.client_id
-      where ${DEBIT}
+      where ${DEBIT} ${byClient}
       union all
-      select 'installment', i.id, c.id, c.name, ${INSTALLMENT_LABEL}, i.amount, i.due_on, (i.due_on - ${todayAr}), i.auto_reminder
+      select 'installment', i.id, c.id, c.name, ${INSTALLMENT_LABEL}, i.amount, i.due_on, (i.due_on - ${todayAr}), i.auto_reminder,
+             1, null::date, i.number
       from installments i
       join installment_plans pl on pl.id = i.plan_id
       join clients c on c.id = pl.client_id
       left join projects p on p.id = pl.project_id
-      where i.invoice_id is null
+      where i.invoice_id is null ${byClient}
     ) r
     where r.amount > 0
-    order by r.due_on nulls last, r.client_name
-    limit 500`);
+    -- Orden estable: el saldo a favor se descuenta siempre de los mismos ítems
+    -- (y en el mismo orden en que applyCredit imputa las facturas).
+    order by r.due_on nulls last, r.client_name, r.client_id, r.kind_rank, r.issued_on, r.num, r.id`);
   // El saldo a favor de cada cliente se descuenta de lo que vence primero.
   const credits = new Map(
-    (await db.execute<{ client_id: string; credit: string }>(sql`select * from ${CLIENT_CREDIT} cr where cr.credit > 0`)).map((c) => [
-      c.client_id,
-      toNumber(c.credit),
-    ]),
+    (
+      await db.execute<{ client_id: string; credit: string }>(
+        sql`select * from ${CLIENT_CREDIT} cr where cr.credit > 0 ${clientId ? sql`and cr.client_id = ${clientId}` : sql``}`,
+      )
+    ).map((c) => [c.client_id, toNumber(c.credit)]),
   );
-  const net = rows.flatMap((r) => {
+  return rows.flatMap((r): NetReceivable[] => {
     const credit = credits.get(r.client_id) ?? 0;
     const amount = toNumber(r.amount);
     const used = Math.min(credit, amount);
     if (used > 0) credits.set(r.client_id, credit - used);
-    return amount - used > 0 ? [{ ...r, amount: amount - used, discounted: used > 0 }] : [];
+    if (amount - used <= 0) return [];
+    return [
+      {
+        kind: r.kind,
+        id: r.id,
+        clientId: r.client_id,
+        clientName: r.client_name,
+        concept: r.concept,
+        amount: amount - used,
+        coveredByCredit: used,
+        dueOn: r.due_on,
+        daysToDue: r.days === null ? null : toNumber(r.days),
+        autoReminder: r.auto_reminder,
+      },
+    ];
   });
-  return net.map((r) => ({
+}
+
+export async function listReceivables(db: DbOrTx): Promise<ReceivableDto[]> {
+  const items = await netReceivables(db);
+  return items.slice(0, 500).map((r) => ({
     kind: r.kind,
     id: r.id,
-    client: { id: r.client_id, name: r.client_name },
-    concept: r.discounted ? `${r.concept} (descontado el saldo a favor)` : r.concept,
+    client: { id: r.clientId, name: r.clientName },
+    concept: r.coveredByCredit > 0 ? `${r.concept} (descontado el saldo a favor)` : r.concept,
     amount: r.amount,
-    dueOn: r.due_on,
-    daysToDue: r.days === null ? null : toNumber(r.days),
-    autoReminder: r.auto_reminder,
+    dueOn: r.dueOn,
+    daysToDue: r.daysToDue,
+    autoReminder: r.autoReminder,
   }));
 }
 
@@ -257,6 +280,11 @@ export async function getProjectPlans(db: DbOrTx, projectId: string): Promise<In
     where pl.project_id = ${projectId}
     order by pl.created_at, i.number`);
 
+  // Lo que "Cobrada" va a cobrar de cada cuota: lo mismo que muestra Por cobrar.
+  const [owner] = await db.execute<{ client_id: string }>(sql`select client_id from projects where id = ${projectId}`);
+  const net = owner ? await netReceivables(db, owner.client_id) : [];
+  const toCollect = new Map(net.map((r) => [`${r.kind}:${r.id}`, r.amount]));
+
   const plans = new Map<string, InstallmentPlanDto>();
   for (const r of rows) {
     const plan = plans.get(r.plan_id) ?? {
@@ -269,10 +297,19 @@ export async function getProjectPlans(db: DbOrTx, projectId: string): Promise<In
     const amount = toNumber(r.amount);
     const pending = r.invoice_id ? toNumber(r.pending) : amount;
     const status = !r.invoice_id ? "pendiente" : pending > 0 ? "facturada" : "cobrada";
+    const key = r.invoice_id ? `invoice:${r.invoice_id}` : `installment:${r.id}`;
     plan.collected += amount - pending;
-    plan.installments.push({ id: r.id, number: r.number, amount, dueOn: r.due_on, status, pending, autoReminder: r.auto_reminder });
+    plan.installments.push({
+      id: r.id,
+      number: r.number,
+      amount,
+      dueOn: r.due_on,
+      status,
+      pending,
+      toCollect: pending > 0 ? (toCollect.get(key) ?? 0) : 0,
+      autoReminder: r.auto_reminder,
+    });
     plans.set(r.plan_id, plan);
   }
   return [...plans.values()];
 }
-

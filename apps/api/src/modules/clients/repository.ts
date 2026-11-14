@@ -54,14 +54,32 @@ const balanceOf = (clientId: SQL | string) => sql`coalesce((
   from documents d where d.client_id = ${clientId} and d.status = 'emitido'
 ), 0)`;
 
-/** ¿Tiene alguna factura vencida con saldo pendiente? */
-const overdueOf = (clientId: SQL | string) => sql`exists (
-  select 1 from documents f
-  where f.client_id = ${clientId}
-    and f.kind in ('factura', 'nota_debito') and f.status = 'emitido'
-    and f.due_on < ${todayAr}
-    and f.amount > coalesce((select sum(a.amount) from document_allocations a where a.target_id = f.id), 0)
-)`;
+/**
+ * Deuda vencida: saldo de facturas vencidas + cuotas vencidas sin facturar,
+ * menos el saldo a favor (nunca negativa). Misma cuenta que "Vencido" en Finanzas.
+ */
+const overdueAmountOf = (clientId: SQL | string) => sql`greatest(
+  coalesce((
+    select sum(f.amount - coalesce((select sum(a.amount) from document_allocations a where a.target_id = f.id), 0))
+    from documents f
+    where f.client_id = ${clientId}
+      and f.kind in ('factura', 'nota_debito') and f.status = 'emitido'
+      and f.due_on < ${todayAr}
+      and f.amount > coalesce((select sum(a.amount) from document_allocations a where a.target_id = f.id), 0)
+  ), 0)
+  + coalesce((
+    select sum(i.amount) from installments i join installment_plans pl on pl.id = i.plan_id
+    where pl.client_id = ${clientId} and i.invoice_id is null and i.due_on < ${todayAr}
+  ), 0)
+  - coalesce((
+    select sum(r.amount - coalesce((select sum(a.amount) from document_allocations a where a.source_id = r.id), 0))
+    from documents r
+    where r.client_id = ${clientId} and r.kind in ('recibo', 'nota_credito') and r.status = 'emitido'
+  ), 0),
+  0)`;
+
+/** ¿Debe algo vencido (facturas o cuotas sin facturar), descontado el saldo a favor? */
+const overdueOf = (clientId: SQL | string) => sql`(${overdueAmountOf(clientId)} > 0)`;
 
 const lastContactOf = (clientId: SQL | string) => sql`(
   select max(a.occurred_at) from activities a
@@ -202,6 +220,7 @@ export async function getClientDetail(db: DbOrTx, id: string): Promise<ClientDet
     db.execute<{
       balance: string;
       has_overdue_debt: boolean;
+      overdue_amount: string;
       monthly_subscriptions: string;
       active_projects: string;
       open_tickets: string;
@@ -209,6 +228,7 @@ export async function getClientDetail(db: DbOrTx, id: string): Promise<ClientDet
     }>(sql`select
       ${balanceOf(id)} as balance,
       ${overdueOf(id)} as has_overdue_debt,
+      ${overdueAmountOf(id)} as overdue_amount,
       coalesce((select sum(s.amount) from subscriptions s where s.client_id = ${id} and s.active), 0) as monthly_subscriptions,
       (select count(*) from projects p where p.client_id = ${id} and p.archived_at is null
          and p.status in ('nuevo', 'en_curso', 'en_riesgo', 'pausado')) as active_projects,
@@ -235,6 +255,7 @@ export async function getClientDetail(db: DbOrTx, id: string): Promise<ClientDet
     summary: {
       balance: toNumber(summary?.balance),
       hasOverdueDebt: summary?.has_overdue_debt ?? false,
+      overdueAmount: toNumber(summary?.overdue_amount),
       monthlySubscriptions: toNumber(summary?.monthly_subscriptions),
       activeProjects: toNumber(summary?.active_projects),
       openTickets: toNumber(summary?.open_tickets),

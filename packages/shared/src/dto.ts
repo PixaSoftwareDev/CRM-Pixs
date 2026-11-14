@@ -75,6 +75,8 @@ export interface ClientDetail {
   summary: {
     balance: number;
     hasOverdueDebt: boolean;
+    /** Lo vencido (facturas y cuotas sin facturar), descontado el saldo a favor; igual que "Vencido" de Finanzas. */
+    overdueAmount: number;
     monthlySubscriptions: number;
     activeProjects: number;
     openTickets: number;
@@ -350,6 +352,18 @@ export interface FinanceSummary {
   monthlyRecurring: number;
 }
 
+/** Resultado de un cobro (o del "Cobrada" de una cuota). */
+export interface PaymentResult {
+  /** null si la cuota la cubrió entera el saldo a favor: no hubo recibo nuevo. */
+  receiptId: string | null;
+  number: number | null;
+  /** Del recibo nuevo: lo imputado a facturas y lo que quedó a favor. */
+  allocated: number;
+  credit: number;
+  /** Saldo a favor que ya tenía el cliente y se aplicó a la cuota. */
+  fromCredit: number;
+}
+
 /** Algo que hay que cobrar: una factura con saldo o una cuota que todavía no se facturó. */
 export interface ReceivableDto {
   kind: "invoice" | "installment";
@@ -413,6 +427,11 @@ export interface InstallmentDto {
   status: "pendiente" | "facturada" | "cobrada";
   /** Lo que falta cobrar de la factura (si se facturó). */
   pending: number;
+  /**
+   * Lo que se cobra al marcarla "Cobrada": lo pendiente menos el saldo a favor
+   * del cliente que le corresponde (igual que en Por cobrar).
+   */
+  toCollect: number;
   autoReminder: boolean;
 }
 
