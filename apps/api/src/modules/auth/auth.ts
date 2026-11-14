@@ -20,7 +20,7 @@ export const auth = betterAuth({
     enabled: true,
     // CRM interno: no hay registro público; los usuarios los crea un admin.
     disableSignUp: true,
-    minPasswordLength: 12,
+    minPasswordLength: 8,
   },
   user: {
     additionalFields: {

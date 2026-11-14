@@ -38,9 +38,9 @@ async function askHidden(question: string): Promise<string> {
   return typeof value === "string" ? value : "";
 }
 
-const password = await askHidden(`Contraseña para ${email} (mínimo 12 caracteres): `);
-if (password.length < 12) {
-  console.error("La contraseña tiene que tener al menos 12 caracteres.");
+const password = await askHidden(`Contraseña para ${email} (mínimo 8 caracteres): `);
+if (password.length < 8) {
+  console.error("La contraseña tiene que tener al menos 8 caracteres.");
   process.exit(1);
 }
 if ((await askHidden("Repetila: ")) !== password) {

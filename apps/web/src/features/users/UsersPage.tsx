@@ -217,7 +217,7 @@ function NewUserDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
             ))}
           </Select>
         </Field>
-        <Field label="Contraseña" error={err.password?.message} hint="Mínimo 12 caracteres.">
+        <Field label="Contraseña" error={err.password?.message} hint="Mínimo 8 caracteres.">
           <Input type="text" autoComplete="off" spellCheck={false} className="font-mono" {...form.register("password")} />
         </Field>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
@@ -258,7 +258,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: UserDto | null; onClo
           save.mutate({ id: user.id, password }, { onSuccess: () => (onDone(`Contraseña de ${user.name} cambiada.`), onClose()) });
         }}
       >
-        <Field label="Nueva contraseña" hint="Mínimo 12 caracteres.">
+        <Field label="Nueva contraseña" hint="Mínimo 8 caracteres.">
           <Input
             autoFocus
             type="text"
@@ -274,7 +274,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: UserDto | null; onClo
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={password.length < 12 || save.isPending}>
+          <Button type="submit" disabled={password.length < 8 || save.isPending}>
             Guardar contraseña
           </Button>
         </div>

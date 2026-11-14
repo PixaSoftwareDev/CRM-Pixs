@@ -8,7 +8,7 @@ export type UserRole = (typeof USER_ROLES)[number];
 /** Mismo mínimo que exige el inicio de sesión. */
 const password = z
   .string()
-  .min(12, { message: "Mínimo 12 caracteres" })
+  .min(8, { message: "Mínimo 8 caracteres" })
   .max(128, { message: "Máximo 128 caracteres" });
 
 const name = z.string().trim().min(1, { message: "Poné el nombre" }).max(80);
