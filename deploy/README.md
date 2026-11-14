@@ -69,6 +69,17 @@ a `/backups/satelites/crm/`, con 7 días de retención.
 
 Restaurar: `gunzip -c pg_crm_<fecha>.sql.gz | docker exec -i crm-db psql -U crm -d crm`.
 
+### Archivos subidos
+
+Viven en el volumen `crm-files` (`/data/files` dentro de `crm-api`; en el host,
+`/var/lib/docker/volumes/crm-files/_data`). La base guarda solo la metadata
+(tabla `attachments`). El mismo script los copia con `rsync` a
+`/backups/satelites/crm-files/actual/`; lo que se borra o se reemplaza queda
+7 días en `/backups/satelites/crm-files/borrados/<fecha>/`.
+
+Restaurar: `rsync -a /backups/satelites/crm-files/actual/ /var/lib/docker/volumes/crm-files/_data/`
+(junto con el dump de la base del mismo día, para que coincidan).
+
 ## Probar un deploy sin tocar la base real
 
 Corre la prueba de punta a punta contra la imagen recién construida, con una

@@ -32,6 +32,10 @@ services:
       HOST: 0.0.0.0
       PORT: "3005"
       DATABASE_URL: postgres://crm:${POSTGRES_PASSWORD}@crm-db:5432/crm
+      FILES_DIR: /data/files
+    volumes:
+      # Archivos subidos (contenedor de archivos de clientes, proyectos y tickets).
+      - files:/data/files
     depends_on:
       db: { condition: service_healthy }
     networks:
@@ -58,6 +62,8 @@ services:
 volumes:
   pgdata:
     name: crm-pgdata
+  files:
+    name: crm-files
 
 networks:
   internal: {}

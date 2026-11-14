@@ -42,6 +42,8 @@ COPY tsconfig.base.json ./
 COPY packages packages
 COPY apps/api apps/api
 WORKDIR /repo/apps/api
+# Archivos subidos (volumen crm-files): la carpeta tiene que ser del usuario node.
+RUN mkdir -p /data/files && chown node:node /data/files
 USER node
 EXPOSE 3005
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD wget -qO- http://127.0.0.1:3005/api/health || exit 1

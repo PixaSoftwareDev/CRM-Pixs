@@ -16,13 +16,14 @@ import { clientRoute } from "../../router";
 import { useClient } from "./api";
 import { STATUS } from "./labels";
 import { StatusDialog } from "./StatusDialog";
+import { FilesCard } from "../files/FilesCard";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { DataTab } from "./tabs/DataTab";
 import { ProjectsTab } from "./tabs/ProjectsTab";
 import { StatementTab } from "./tabs/StatementTab";
 import { TasksTab } from "./tabs/TasksTab";
 
-type TabKey = "actividad" | "tareas" | "cuenta" | "proyectos" | "datos";
+type TabKey = "actividad" | "tareas" | "cuenta" | "proyectos" | "archivos" | "datos";
 
 export function ClientDetailPage() {
   const { clientId } = clientRoute.useParams();
@@ -71,6 +72,7 @@ export function ClientDetailPage() {
             { key: "tareas", label: "Tareas" },
             ...(showMoney ? [{ key: "cuenta" as const, label: "Cuenta corriente" }] : []),
             { key: "proyectos", label: "Proyectos", badge: c.summary.activeProjects },
+            { key: "archivos", label: "Archivos" },
             { key: "datos", label: "Datos" },
           ]}
         />
@@ -78,6 +80,7 @@ export function ClientDetailPage() {
         {current === "tareas" && <TasksTab clientId={c.id} />}
         {current === "cuenta" && <StatementTab client={c} />}
         {current === "proyectos" && <ProjectsTab clientId={c.id} />}
+        {current === "archivos" && <FilesCard owner={{ clientId: c.id }} area="clientes" />}
         {current === "datos" && <DataTab client={c} />}
       </section>
     </>

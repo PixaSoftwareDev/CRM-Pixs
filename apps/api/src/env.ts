@@ -34,6 +34,11 @@ const schema = z.object({
     .refine((v) => Buffer.from(v, "base64").length === 32, { message: "Tiene que ser de 32 bytes en base64" }),
   /** Versión de VAULT_KEY (para rotarla sin descifrar todo de golpe). */
   VAULT_KEY_VERSION: z.coerce.number().int().min(1).max(32767).default(1),
+  /**
+   * Carpeta donde se guardan los archivos subidos (en el VPS, un volumen de Docker).
+   * Por defecto, `storage/files` dentro de la carpeta desde donde corre la API.
+   */
+  FILES_DIR: z.string().default("storage/files"),
   /** Corre las automatizaciones programadas en este proceso (apagarlo en réplicas extra). */
   SCHEDULER_ENABLED: z
     .enum(["true", "false"])

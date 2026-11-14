@@ -20,6 +20,7 @@ import { TaskDialog } from "../tasks/TaskDialog";
 import { type TaskDraft, TaskFormDialog } from "../tasks/TaskFormDialog";
 import { nextSlot, todayAr } from "../tasks/time";
 import { useProject, useUpdateProject } from "./api";
+import { FilesCard } from "../files/FilesCard";
 import { NewTicketDialog } from "../tickets/NewTicketDialog";
 import { TICKET_STATUS, TICKET_TYPE } from "../tickets/labels";
 import { alertsOf, HEALTH, PHASE, STATUS_LABEL } from "./labels";
@@ -51,6 +52,7 @@ export function ProjectDetailPage() {
       </div>
       <TicketsCard project={project.data} onNotice={notice.show} />
       <TasksCard project={project.data} onNotice={notice.show} />
+      <FilesCard owner={{ projectId: project.data.id }} area="proyectos" />
       <Notice message={notice.message} />
     </>
   );

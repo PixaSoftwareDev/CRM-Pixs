@@ -1,6 +1,7 @@
 export * from "./automations";
 export * from "./clients";
 export * from "./cuit";
+export * from "./files";
 export type * from "./dto";
 export * from "./finance";
 export * from "./permissions";

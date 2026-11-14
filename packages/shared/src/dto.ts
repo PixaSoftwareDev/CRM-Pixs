@@ -501,3 +501,16 @@ export interface RuleRunResult {
   affected: number;
   detail: string;
 }
+
+/** Un archivo del contenedor. `owner` dice de qué es (en la ficha del cliente se ven también los de sus proyectos y tickets). */
+export interface FileDto {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  uploadedBy: Ref | null;
+  owner: { kind: "client" | "project" | "ticket"; id: string; name: string };
+  /** Lo puede borrar quien lo subió o un administrador. */
+  canDelete: boolean;
+}

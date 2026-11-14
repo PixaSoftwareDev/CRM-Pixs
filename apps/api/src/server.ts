@@ -14,6 +14,7 @@ import { meRoutes } from "./modules/auth/me.routes";
 import { automationRoutes } from "./modules/automations/routes";
 import { clientRoutes } from "./modules/clients/routes";
 import { authRoutes } from "./modules/auth/routes";
+import { fileRoutes } from "./modules/files/routes";
 import { financeRoutes } from "./modules/finance/routes";
 import { healthRoutes } from "./modules/health/routes";
 import { projectRoutes } from "./modules/projects/routes";
@@ -95,6 +96,7 @@ export async function buildServer() {
   await app.register(projectRoutes);
   await app.register(ticketRoutes);
   await app.register(financeRoutes);
+  await app.register(fileRoutes);
   await app.register(vaultRoutes);
   await app.register(automationRoutes);
   await app.register(userRoutes);

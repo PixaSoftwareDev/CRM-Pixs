@@ -55,7 +55,7 @@ const clientsSearch = z.object({
 });
 
 const clientTabs = z.object({
-  tab: z.enum(["actividad", "tareas", "cuenta", "proyectos", "datos"]).optional().catch(undefined),
+  tab: z.enum(["actividad", "tareas", "cuenta", "proyectos", "archivos", "datos"]).optional().catch(undefined),
 });
 
 /** Día que se mira y de quién es la agenda (sin parámetros: hoy, la propia). */

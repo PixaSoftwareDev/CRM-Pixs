@@ -14,6 +14,7 @@ import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { ApiError } from "../../lib/api";
 import { ago, initials, when } from "../../lib/format";
 import { ticketRoute } from "../../router";
+import { FilesCard } from "../files/FilesCard";
 import { useMyId, useTeam } from "../tasks/api";
 import { TASK_STATUS, tint } from "../tasks/labels";
 import { TaskDialog } from "../tasks/TaskDialog";
@@ -47,10 +48,11 @@ export function TicketDetailPage() {
       <Link to="/tickets" className="inline-flex w-fit items-center gap-1.5 text-sm text-muted hover:text-ink">
         <ArrowLeft size={14} aria-hidden /> Volver al buscador
       </Link>
-      <div className="grid gap-[18px] xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+      <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <div className="flex min-w-0 flex-col gap-[18px]">
           <ClientSection ticket={t} onNotice={notice.show} />
           <DetailSection ticket={t} />
+          <FilesCard owner={{ ticketId: t.id }} area="tickets" />
         </div>
         <TasksSection ticket={t} onNotice={notice.show} />
       </div>
