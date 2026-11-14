@@ -142,7 +142,12 @@ export async function updateTask(db: Db, actorId: string, id: string, input: Tas
     patch.assignedById = actorId === data.assigneeId ? null : actorId;
     const team = await repo.listTeam(db);
     assigneeName = team.find((u) => u.id === data.assigneeId)?.name ?? "otra persona";
-    log.push(`Se la pasó a ${assigneeName}.`);
+    // El comentario lo firma quien hizo el cambio; queda también de quién era.
+    log.push(
+      actorId === data.assigneeId
+        ? `Se la quedó (la tenía ${before.assignee.name}).`
+        : `Se la pasó a ${assigneeName} (la tenía ${before.assignee.name}).`,
+    );
   }
 
   const finished = data.status === "hecha" && before.status !== "hecha";

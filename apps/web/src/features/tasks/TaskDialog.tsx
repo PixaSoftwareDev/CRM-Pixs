@@ -1,4 +1,4 @@
-import { type TaskDetailDto, type TaskStatus, type TaskUpdate, taskTitle } from "@crm/shared";
+import { type TaskDetailDto, type TaskDto, type TaskStatus, type TaskUpdate, taskTitle } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Receipt, Users } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
@@ -191,7 +191,7 @@ function TaskBody({
   };
 
   const resp = t.assignee.id === me ? "vos" : t.assignee.name;
-  const passedBy = t.assignedBy && t.assignedBy.id !== t.assignee.id ? ` · te la pasó ${t.assignedBy.name}` : "";
+  const passedBy = originOf(t, me);
   const when = t.startsAt ? `${shortDay(arParts(t.startsAt).date)} ${arParts(t.startsAt).time}` : "Sin fecha";
 
   return (
@@ -500,4 +500,14 @@ function ClientTasks({ clientId, currentId, onPick }: { clientId: string; curren
       </div>
     </aside>
   );
+}
+
+/** De dónde viene la tarea: quién se la pasó al responsable y, si fue otro, quién la cargó. */
+function originOf(t: TaskDto, me: string | undefined): string {
+  const parts: string[] = [];
+  const by = t.assignedBy && t.assignedBy.id !== t.assignee.id ? t.assignedBy : null;
+  if (by) parts.push(`${t.assignee.id === me ? "te" : "se"} la pasó ${by.id === me ? "vos" : by.name}`);
+  const created = t.createdBy;
+  if (created && created.id !== t.assignee.id && created.id !== by?.id) parts.push(`la cargó ${created.id === me ? "vos" : created.name}`);
+  return parts.map((p) => ` · ${p}`).join("");
 }

@@ -24,6 +24,8 @@ interface TaskRow extends Record<string, unknown> {
   assignee_name: string;
   assigned_by_id: string | null;
   assigned_by_name: string | null;
+  created_by_id: string | null;
+  created_by_name: string | null;
   ticket_role: TicketTaskRole | null;
 }
 
@@ -33,11 +35,13 @@ const TASK_SELECT = sql`
          c.id as client_id, c.name as client_name,
          a.id as assignee_id, a.name as assignee_name,
          b.id as assigned_by_id, b.name as assigned_by_name,
+         cb.id as created_by_id, cb.name as created_by_name,
          case when t.ticket_id is null then null else t.ticket_role end as ticket_role
   from tasks t
   join task_types tt on tt.id = t.type_id
   join users a on a.id = t.assignee_id
   left join users b on b.id = t.assigned_by_id
+  left join users cb on cb.id = t.created_by_id
   left join clients c on c.id = t.client_id`;
 
 function toDto(r: TaskRow): TaskDto {
@@ -52,6 +56,7 @@ function toDto(r: TaskRow): TaskDto {
     client: r.client_id && r.client_name ? { id: r.client_id, name: r.client_name } : null,
     assignee: { id: r.assignee_id, name: r.assignee_name },
     assignedBy: r.assigned_by_id && r.assigned_by_name ? { id: r.assigned_by_id, name: r.assigned_by_name } : null,
+    createdBy: r.created_by_id && r.created_by_name ? { id: r.created_by_id, name: r.created_by_name } : null,
     ticketRole: r.ticket_role,
   };
 }

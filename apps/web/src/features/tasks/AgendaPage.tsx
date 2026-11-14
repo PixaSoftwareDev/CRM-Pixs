@@ -314,6 +314,7 @@ function DayList({ date, items, onOpen }: { date: string; items: Placed[]; onOpe
                 </span>
                 <span className="block text-xs text-muted">
                   {t.type.name} · {t.assignee.name}
+                  {t.assignedBy && t.assignedBy.id !== t.assignee.id && ` (se la pasó ${t.assignedBy.name})`}
                 </span>
               </button>
               {t.client && (

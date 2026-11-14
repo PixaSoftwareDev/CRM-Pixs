@@ -174,6 +174,8 @@ export interface TaskDto {
   assignee: Ref;
   /** Quién se la pasó, si la reasignó un compañero. */
   assignedBy: Ref | null;
+  /** Quién la cargó (null si la creó una automatización). */
+  createdBy: Ref | null;
   /** Papel dentro de su ticket (null si no cuelga de un ticket). */
   ticketRole: TicketTaskRole | null;
 }

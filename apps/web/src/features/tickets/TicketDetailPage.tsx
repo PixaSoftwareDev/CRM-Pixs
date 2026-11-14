@@ -393,7 +393,8 @@ function TaskRow({ task: x, onOpen }: { task: TaskDto; onOpen: () => void }) {
       <span className="min-w-0 flex-1">
         <span className={cn("block truncate text-sm font-semibold", closed && "line-through")}>{x.title}</span>
         <span className="block text-xs text-slate-600">
-          {x.assignee.name} · {x.type.name} · {when(x.startsAt)}
+          {x.assignee.name}
+          {x.assignedBy && x.assignedBy.id !== x.assignee.id && ` (se la pasó ${x.assignedBy.name})`} · {x.type.name} · {when(x.startsAt)}
           {role && <strong className="ml-1.5 font-semibold text-slate-700">· {role}</strong>}
         </span>
       </span>
