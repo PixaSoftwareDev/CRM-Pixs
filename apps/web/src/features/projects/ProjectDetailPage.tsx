@@ -11,6 +11,7 @@ import { Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { useCopy } from "../../hooks/useCopy";
+import { isNotFound } from "../../lib/api";
 import { day, initials, money, when } from "../../lib/format";
 import { projectRoute } from "../../router";
 import { TASK_STATUS, tint } from "../tasks/labels";
@@ -28,7 +29,13 @@ export function ProjectDetailPage() {
   const project = useProject(projectId);
   const notice = useNotice();
 
-  if (project.error) return <ErrorBox error={project.error} onRetry={() => void project.refetch()} />;
+  if (project.error) {
+    return isNotFound(project.error) ? (
+      <ErrorBox error={new Error("Este proyecto no existe: puede ser un link viejo o mal copiado.")} />
+    ) : (
+      <ErrorBox error={project.error} onRetry={() => void project.refetch()} />
+    );
+  }
   if (!project.data) return <Skeleton className="h-[400px]" />;
 
   return (

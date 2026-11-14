@@ -107,12 +107,12 @@ export function ProjectFormDialog({
           <Field label="Cliente" error={err.clientId?.message}>
             <Select disabled={!!project} aria-invalid={!!err.clientId} {...form.register("clientId")}>
               <option value="">Elegí…</option>
-              {clients.data?.map((c) => (
+              {/* Al editar el cliente no se cambia: se muestra solo el suyo (sin repetirlo en la lista). */}
+              {(project ? [project.client] : (clients.data ?? [])).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-              {project && <option value={project.client.id}>{project.client.name}</option>}
             </Select>
           </Field>
         </div>
