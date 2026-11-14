@@ -13,7 +13,7 @@ const EXPIRED_NOTICE =
  * (así no se disparan más pedidos), limpia la caché y cierra la sesión local.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, error, refetch } = authClient.useSession();
   const queryClient = useQueryClient();
   const [expired, setExpired] = useState(false);
   // Varios 401 llegan casi juntos: se atiende el primero.
@@ -42,6 +42,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <div className="flex min-h-dvh items-center justify-center text-sm text-muted">Cargando…</div>;
   }
   if (session && !expired) return children;
+  // Si no se pudo consultar la sesión (sin red, 429, server reiniciando) no es "sin sesión":
+  // mandar al login a alguien logueado lo obligaba a volver a entrar sin motivo.
+  if (error && !expired) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 text-sm text-muted">
+        <p>No se pudo verificar la sesión. Reintentá en unos segundos.</p>
+        <button type="button" onClick={() => void refetch()} className="rounded-[10px] border border-line bg-white px-3 py-1.5 font-semibold text-ink hover:bg-slate-50">
+          Reintentar
+        </button>
+      </div>
+    );
+  }
   return (
     <LoginPage
       notice={expired ? EXPIRED_NOTICE : null}

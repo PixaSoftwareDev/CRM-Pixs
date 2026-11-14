@@ -56,7 +56,12 @@ export const auth = betterAuth({
     enabled: true,
     window: 60,
     max: 100,
-    customRules: { "/sign-in/email": { window: 60, max: 5 } },
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      // Se consulta en cada carga de la app y la cuenta es por IP: varios usuarios detrás
+      // de la misma IP (una oficina) agotaban el general y la app los mandaba al login.
+      "/get-session": { window: 60, max: 1000 },
+    },
   },
   advanced: {
     // Cookies "Secure" solo si la app se sirve por HTTPS (si no, el navegador no las manda).
