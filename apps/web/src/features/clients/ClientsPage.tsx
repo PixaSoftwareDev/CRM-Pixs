@@ -7,7 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { cn } from "../../components/ui/cn";
-import { Input } from "../../components/ui/Field";
+import { Input, selectArrow } from "../../components/ui/Field";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { useDebounced } from "../../hooks/useDebounced";
 import { ago, initials, money, when } from "../../lib/format";
@@ -170,7 +170,8 @@ function ClientRow({ client: c }: { client: ClientListItem }) {
           disabled={update.isPending}
           onChange={(e) => update.mutate({ priority: e.target.value as ClientPriority })}
           className={cn(
-            "h-7 rounded-full border-0 px-2.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-brand/30",
+            selectArrow,
+            "h-7 rounded-full border-0 pr-7 pl-2.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-brand/30 bg-[length:12px] bg-[position:right_0.5rem_center]",
             PRIORITY[c.priority].tone === "red" && "bg-red-100 text-red-800",
             PRIORITY[c.priority].tone === "amber" && "bg-amber-100 text-amber-800",
             PRIORITY[c.priority].tone === "slate" && "bg-slate-100 text-slate-700",
