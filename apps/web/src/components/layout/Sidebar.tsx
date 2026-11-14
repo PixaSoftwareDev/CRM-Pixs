@@ -55,24 +55,36 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
   },
 ];
 
+type Can = (area: Area, level: "read") => boolean;
+
+/** Las secciones del menú con lo que el usuario puede abrir (sin las que quedan vacías). */
+export function allowedSections(can: Can, isAdmin: boolean) {
+  return SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((i) => (!i.adminOnly || isAdmin) && (!i.area || can(i.area, "read"))),
+  })).filter((section) => section.items.length > 0);
+}
+
 export function Sidebar() {
   const { data: session } = authClient.useSession();
   const { isAdmin, can } = useAccess();
+  const name = session?.user.name ?? "";
 
   return (
-    <aside className="flex flex-col gap-4 bg-ink px-3.5 py-5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0">
+    <aside className="flex min-w-0 flex-col gap-4 bg-ink px-3.5 py-5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0">
       <div className="flex items-center gap-2.5 px-2">
         <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-soft font-bold text-white">C</span>
         <span className="text-[17px] font-bold tracking-tight text-white">CRM</span>
+        {/* En el celular el menú es una barra arriba: el usuario y "Cerrar sesión" van en esta fila. */}
+        <div className="ml-auto flex min-w-0 items-center gap-2 md:hidden">
+          <Avatar name={name} />
+          <span className="max-w-[140px] truncate text-sm">{name}</span>
+          <LogoutButton withLabel />
+        </div>
       </div>
 
       <nav aria-label="Principal" className="flex gap-0.5 overflow-x-auto md:flex-1 md:flex-col md:overflow-visible">
-        {SECTIONS.map((section) => ({
-          ...section,
-          items: section.items.filter((i) => (!i.adminOnly || isAdmin) && (!i.area || can(i.area, "read"))),
-        }))
-          .filter((section) => section.items.length > 0)
-          .map((section) => (
+        {allowedSections(can, isAdmin).map((section) => (
           <div key={section.title ?? "inicio"} className="contents md:flex md:flex-col md:gap-0.5">
             {section.title && (
               <span className="mx-2.5 mt-3.5 mb-1 hidden text-[11px] font-semibold tracking-[.08em] text-slate-400 uppercase md:block">
@@ -95,20 +107,33 @@ export function Sidebar() {
       </nav>
 
       <div className="hidden items-center gap-2.5 border-t border-slate-800 px-2 pt-4 md:flex">
-        <span className="flex size-8 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-white">
-          {session?.user.name.slice(0, 2).toUpperCase()}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm">{session?.user.name}</span>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          aria-label="Cerrar sesión"
-          title="Cerrar sesión"
-          className="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
-        >
-          <LogOut size={16} aria-hidden />
-        </button>
+        <Avatar name={name} />
+        <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+        <LogoutButton />
       </div>
     </aside>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-white">
+      {name.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+function LogoutButton({ withLabel = false }: { withLabel?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => void signOut()}
+      aria-label="Cerrar sesión"
+      title="Cerrar sesión"
+      className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+    >
+      <LogOut size={16} aria-hidden />
+      {withLabel && "Salir"}
+    </button>
   );
 }

@@ -138,7 +138,7 @@ export function ProjectsPage() {
               : "Todavía no hay proyectos."}
         </Empty>
       ) : (
-        <div className="grid gap-[18px] md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-3">
           {shown.map((p) => (
             <ProjectCard key={p.id} project={p} />
           ))}
@@ -162,7 +162,7 @@ function ProjectCard({ project: p }: { project: ProjectListItem }) {
       to="/proyectos/$projectId"
       params={{ projectId: p.id }}
       className={cn(
-        "flex flex-col gap-3.5 rounded-[14px] border bg-white p-5 transition hover:shadow-md",
+        "flex min-w-0 flex-col gap-3.5 rounded-[14px] border bg-white p-5 transition hover:shadow-md",
         p.health === "nuevo" ? "border-purple-300 ring-3 ring-purple-100" : "border-line",
       )}
     >

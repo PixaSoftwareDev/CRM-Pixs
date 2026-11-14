@@ -174,12 +174,21 @@ export function FinancePage() {
 
 function Kpi({ label, value, hint, tone }: { label: string; value: string | undefined; hint?: string | undefined; tone?: "green" | "red" | undefined }) {
   return (
-    <Card className="flex flex-col gap-1 p-4">
+    // El monto se achica con el ancho de la tarjeta (en el celular entran dos por fila) y, si aun así no entra, baja de renglón.
+    <Card className="@container flex min-w-0 flex-col gap-1 p-4">
       <span className="text-xs text-muted">{label}</span>
       {value === undefined ? (
         <Skeleton className="h-7 w-2/3" />
       ) : (
-        <strong className={cn("text-2xl tracking-tight", tone === "green" && "text-green-700", tone === "red" && "text-red-700")}>{value}</strong>
+        <strong
+          className={cn(
+            "text-[clamp(0.95rem,10.5cqi,1.5rem)] leading-tight tracking-tight tabular-nums [overflow-wrap:anywhere]",
+            tone === "green" && "text-green-700",
+            tone === "red" && "text-red-700",
+          )}
+        >
+          {value}
+        </strong>
       )}
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </Card>
