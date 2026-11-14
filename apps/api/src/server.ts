@@ -8,7 +8,7 @@ import {
   validatorCompiler,
 } from "fastify-type-provider-zod";
 import { ZodError } from "zod";
-import { env, isProd } from "./env";
+import { env, isProd, trustProxy } from "./env";
 import { AppError, isForeignKeyViolation } from "./lib/errors";
 import { meRoutes } from "./modules/auth/me.routes";
 import { automationRoutes } from "./modules/automations/routes";
@@ -32,8 +32,9 @@ export async function buildServer() {
       redact: ["req.headers.cookie", "req.headers.authorization", 'res.headers["set-cookie"]', "req.body.secret", "secret"],
       ...(isProd ? {} : { transport: { target: "pino-pretty", options: { singleLine: true } } }),
     },
-    // Detrás de nginx: la IP real viene en X-Forwarded-For.
-    trustProxy: isProd,
+    // Detrás de nginx la IP real viene en X-Forwarded-For, pero solo se le cree a los
+    // proxies de TRUST_PROXY (ver env.ts): si no, cualquiera se inventa una IP y esquiva los límites.
+    trustProxy,
     bodyLimit: 1_048_576,
   });
 
@@ -68,12 +69,21 @@ export async function buildServer() {
 
   await app.register(sensible);
   await app.register(helmet, { contentSecurityPolicy: false });
-  // El límite se cuenta por sesión (no por IP): una oficina entera sale por la misma IP.
-  // Sin sesión (login, health) se cuenta por IP.
+  // Dos límites. Por IP (confiable, ver trustProxy), antes que nada: frena a quien manda
+  // sesiones inventadas o martilla sin sesión. Es amplio porque una oficina entera sale por la misma IP.
+  // Y por usuario: en las rutas protegidas el límite corre después de `requireUser`, así que una
+  // sesión válida se cuenta por su usuario; lo demás (login, health) por IP.
   await app.register(rateLimit, {
     max: 600,
     timeWindow: "1 minute",
-    keyGenerator: (req) => /session_token=([^;.]+)/.exec(req.headers.cookie ?? "")?.[1] ?? req.ip,
+    keyGenerator: (req) => (req.session ? `user:${req.session.user.id}` : `ip:${req.ip}`),
+  });
+  const perIp = app.createRateLimit({ max: 2400, timeWindow: "1 minute", keyGenerator: (req) => `ip:${req.ip}` });
+  app.addHook("onRequest", async (request, reply) => {
+    const limit = await perIp(request);
+    if (!limit.isAllowed && limit.isExceeded) {
+      return reply.code(429).header("retry-after", limit.ttlInSeconds).send({ error: "Demasiados pedidos. Esperá un minuto." });
+    }
   });
 
   await app.register(healthRoutes);

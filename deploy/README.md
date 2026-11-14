@@ -12,6 +12,32 @@ Esa configuración vive en el repo de Mutualyf (`nginx/nginx.prod.conf`): por es
 la URL pública es `/crmpixs` y los contenedores llevan esos alias. No cambiar
 puertos ni alias sin cambiar también ese nginx.
 
+## IP del cliente y nginx
+
+La API limita los intentos de login (5 por minuto por IP) y los pedidos en
+general (por IP y por usuario). Para eso necesita la IP real del navegador,
+que llega en `X-Forwarded-For` a través del nginx compartido. Como cualquiera
+puede mandar ese header, la API solo se lo cree a los proxies de `TRUST_PROXY`
+(por defecto en producción: `loopback,uniquelocal`, o sea la red interna de
+Docker) y toma la última IP que agregó un proxy confiable; lo que mande el
+navegador en `X-Forwarded-For`, `X-Real-IP` o `Forwarded` no llega a Better Auth.
+
+Lo que la API espera del nginx en `location /crmpixs/api/` (es lo que tiene hoy):
+
+```nginx
+proxy_set_header X-Real-IP       $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;  # agrega $remote_addr al final
+```
+
+- El puerto de la API (3005) no se publica en el host: solo se llega por la red
+  `edge`. Si alguna vez se publica o se pone otro proxy/CDN adelante, revisar
+  `TRUST_PROXY` (con un CDN hay que confiar en sus rangos, o la IP de todos los
+  usuarios va a ser la del CDN).
+- Si el nginx dejara de mandar `X-Forwarded-For`, todos los pedidos se verían con
+  la IP del nginx y el límite de login sería compartido por todos.
+- Para comprobarlo después de un deploy: `docker logs crm-api` muestra `remoteAddress`
+  de cada request; tiene que ser la IP pública del navegador, no una `172.x`.
+
 ## Primera vez
 
 ```bash

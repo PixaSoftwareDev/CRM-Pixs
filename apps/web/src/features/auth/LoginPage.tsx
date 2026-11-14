@@ -8,7 +8,7 @@ import { type LoginInput, loginSchema } from "./login-schema";
 const inputClass =
   "h-11 rounded-[10px] border border-line bg-white px-3.5 text-[15px] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 aria-invalid:border-red-500";
 
-export function LoginPage() {
+export function LoginPage({ notice = null, onSignedIn }: { notice?: string | null; onSignedIn?: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -21,6 +21,7 @@ export function LoginPage() {
     setServerError(null);
     try {
       await signIn(data);
+      onSignedIn?.();
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     }
@@ -83,6 +84,12 @@ export function LoginPage() {
               <span className="text-xs text-red-600">{errors.password.message}</span>
             )}
           </label>
+
+          {notice && !serverError && (
+            <p role="status" className="rounded-[10px] bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {notice}
+            </p>
+          )}
 
           {serverError && (
             <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">

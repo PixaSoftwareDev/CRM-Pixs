@@ -55,16 +55,11 @@ async function loadAccess(userId: string): Promise<Access | null> {
 }
 
 /**
- * Hook onRequest (antes de validar el body, así sin sesión siempre es 401) para rutas protegidas: valida la sesión y la deja en `request.session`.
- * Usuarios desactivados se rechazan aunque tengan una sesión vigente.
+ * Hook onRequest (antes de validar el body, así sin sesión siempre es 401) para rutas protegidas: valida la sesión
+ * contra la base y la deja en `request.session`. Usuarios desactivados se rechazan aunque tengan una sesión vigente.
  */
 export async function requireUser(request: FastifyRequest, reply: FastifyReply) {
-  const headers = toFetchHeaders(request.headers);
-  let session = await auth.api.getSession({ headers });
-  // Si a ese usuario le acaban de cambiar el acceso, la copia de la cookie no sirve: se lee de la base.
-  if (session && isStale(session.user.id)) {
-    session = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
-  }
+  const session = await auth.api.getSession({ headers: toFetchHeaders(request.headers, request.ip) });
   if (!session || session.user.active === false) {
     return reply.unauthorized("Sesión inválida o vencida");
   }
@@ -93,26 +88,6 @@ export function requireArea(area: Area) {
       `No tenés permiso para esto (hace falta «${LEVEL_LABEL[rule.level]}» en ${first ? AREA_INFO[first].label : "este sector"}). Pedíselo a un administrador.`,
     );
   };
-}
-
-/**
- * La sesión se valida desde una cookie firmada durante 5 minutos (ver `cookieCache`).
- * Cuando a alguien lo dan de baja o le cambian el rol o la contraseña, durante ese
- * rato sus requests se validan contra la base para que el cambio rija al instante.
- */
-const STALE_MS = 6 * 60_000;
-const stale = new Map<string, number>();
-
-export function markSessionsStale(userId: string) {
-  stale.set(userId, Date.now() + STALE_MS);
-}
-
-function isStale(userId: string): boolean {
-  const until = stale.get(userId);
-  if (until === undefined) return false;
-  if (until > Date.now()) return true;
-  stale.delete(userId);
-  return false;
 }
 
 /** Sesión garantizada dentro de un handler que pasó por `requireUser`. */

@@ -4,10 +4,13 @@
  */
 import { accounts, and, type Db, eq, sessions, sql, users } from "@crm/db";
 import { effectivePermissions, type UserCreate, type UserDto, type UserUpdate, userCreate, userUpdate } from "@crm/shared";
-import { BadRequestError, ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
+import { AppError, BadRequestError, ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
 import { toIso } from "../../lib/sql";
 import { auth } from "../auth/auth";
-import { forgetAccess, markSessionsStale } from "../auth/guard";
+import { forgetAccess } from "../auth/guard";
+
+/** Clave del advisory lock que serializa los cambios de usuarios (cualquier número fijo sirve). */
+const ADMIN_CHANGE_LOCK = 7_310_001;
 
 const hashPassword = async (password: string) => (await auth.$context).password.hash(password);
 
@@ -42,8 +45,18 @@ export async function updateUser(db: Db, actorId: string, id: string, input: Use
   const data = userUpdate.parse(input);
   const hash = data.password ? await hashPassword(data.password) : null;
 
-  const revoked = await db.transaction(async (tx) => {
-    const [before] = await tx.select({ role: users.role, active: users.active }).from(users).where(eq(users.id, id)).for("update");
+  await db.transaction(async (tx) => {
+    // Cambios de rol o de baja, de a uno: si no, dos administradores que se quitan el
+    // rol a la vez ven cada uno al otro como "el que queda" y el sistema queda sin admins.
+    await tx.execute(sql`select pg_advisory_xact_lock(${ADMIN_CHANGE_LOCK})`);
+    // Mientras esperaba el lock, a quien hace el cambio le pudieron sacar el rol.
+    const [actor] = await tx.select({ role: users.role, active: users.active }).from(users).where(eq(users.id, actorId));
+    if (actor?.role !== "admin" || !actor.active) throw new AppError(403, "Solo un administrador puede hacer esto");
+    const [before] = await tx
+      .select({ role: users.role, active: users.active, permissions: users.permissions })
+      .from(users)
+      .where(eq(users.id, id))
+      .for("update");
     if (!before) throw new NotFoundError("Usuario");
 
     const role = data.role ?? before.role;
@@ -75,12 +88,14 @@ export async function updateUser(db: Db, actorId: string, id: string, input: Use
       }
     }
 
-    // Baja, cambio de rol o de contraseña: se cierran sus sesiones y tiene que volver a entrar.
-    const revoke = !!hash || active !== before.active || role !== before.role;
-    if (revoke) await tx.delete(sessions).where(eq(sessions.userId, id));
-    return revoke;
+    // Baja, cambio de rol, de permisos o de contraseña: se cierran sus sesiones y tiene que volver a entrar.
+    const permissionsChanged =
+      data.permissions !== undefined &&
+      JSON.stringify(effectivePermissions(role, data.permissions)) !== JSON.stringify(effectivePermissions(before.role, before.permissions));
+    if (hash || active !== before.active || role !== before.role || permissionsChanged) {
+      await tx.delete(sessions).where(eq(sessions.userId, id));
+    }
   });
-  if (revoked) markSessionsStale(id);
-  // Los permisos nuevos rigen desde el próximo request (sin cerrarle la sesión).
+  // Los permisos nuevos rigen desde el próximo request.
   forgetAccess(id);
 }

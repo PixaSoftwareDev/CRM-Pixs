@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseTrustProxy } from "./lib/http";
 
 /**
  * Variables de entorno validadas al arrancar: si falta o está mal una, la API
@@ -17,6 +18,13 @@ const schema = z.object({
   BETTER_AUTH_URL: z.url(),
   /** Origen del front, para CSRF/orígenes confiables. */
   WEB_ORIGIN: z.url(),
+  /**
+   * Proxies de los que se acepta X-Forwarded-For (IPs, CIDR o "loopback",
+   * "uniquelocal"… separados por coma; "false" = ninguno). La IP del cliente
+   * sale de acá y la usan los rate limits. Por defecto: en producción la red
+   * interna de Docker (el nginx compartido), en desarrollo ninguno.
+   */
+  TRUST_PROXY: z.string().optional(),
   /**
    * Clave maestra de Accesos (AES-256-GCM): 32 bytes en base64. Generar con:
    * openssl rand -base64 32. Perderla = perder las claves guardadas: guardarla aparte.
@@ -41,3 +49,4 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === "production";
+export const trustProxy = parseTrustProxy(env.TRUST_PROXY ?? (isProd ? "loopback,uniquelocal" : "false"));
