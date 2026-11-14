@@ -21,25 +21,22 @@ body {
   @apply bg-surface font-sans text-ink antialiased;
 }
 
-/* Impresión de una sola pieza (p. ej. el estado de cuenta): se oculta todo lo demás. */
+/*
+ * Impresión de una sola pieza (p. ej. el estado de cuenta): se imprime una copia
+ * colgada de <body> (#print-root) y se oculta todo lo demás, modales incluidos.
+ */
+@media screen {
+  #print-root {
+    display: none;
+  }
+}
 @media print {
-  body[data-print] * {
-    visibility: hidden;
+  body[data-print] > :not(#print-root) {
+    display: none !important;
   }
-  body[data-print="statement"] #statement-print,
-  body[data-print="statement"] #statement-print * {
-    visibility: visible;
-  }
-  body[data-print="statement"] #statement-print {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
+  #print-root {
     border: 0;
     box-shadow: none;
-  }
-  /* Los modales no se imprimen, salvo el que contiene el estado de cuenta. */
-  body[data-print] dialog:not(:has(#statement-print)) {
-    display: none;
   }
 }
 

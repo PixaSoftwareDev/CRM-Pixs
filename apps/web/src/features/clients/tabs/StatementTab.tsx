@@ -1,6 +1,6 @@
 import type { ClientDetail } from "@crm/shared";
 import { CalendarRange, Plus, Printer, Receipt } from "lucide-react";
-import { useState } from "react";
+import { type MouseEvent, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Chip } from "../../../components/ui/Chip";
@@ -40,10 +40,27 @@ export function StatementTab({ client }: { client: ClientDetail }) {
   const [plans, setPlans] = useState(false);
   const balance = st.data?.closingBalance ?? 0;
 
-  /** Imprime solo este estado de cuenta (el navegador permite guardarlo como PDF). */
-  const print = () => {
+  /**
+   * Imprime solo este estado de cuenta (el navegador permite guardarlo como PDF).
+   * Se imprime una copia colgada directo de <body>: dentro de un modal (p. ej. la
+   * cta. cte. abierta desde una tarea) el alto y el scroll del modal la recortaban
+   * y la hoja salía en blanco.
+   */
+  const print = (e: MouseEvent<HTMLElement>) => {
+    const source = e.currentTarget.closest<HTMLElement>("#statement-print");
+    if (!source) return;
+    const copy = source.cloneNode(true) as HTMLElement;
+    copy.id = "print-root";
+    document.body.append(copy);
     document.body.dataset.print = "statement";
-    window.addEventListener("afterprint", () => delete document.body.dataset.print, { once: true });
+    window.addEventListener(
+      "afterprint",
+      () => {
+        copy.remove();
+        delete document.body.dataset.print;
+      },
+      { once: true },
+    );
     window.print();
   };
 
