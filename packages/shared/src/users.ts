@@ -9,13 +9,15 @@ export type UserRole = (typeof USER_ROLES)[number];
 const password = z
   .string()
   .min(8, { message: "Mínimo 8 caracteres" })
-  .max(128, { message: "Máximo 128 caracteres" });
+  .max(128, { message: "Máximo 128 caracteres" })
+  .refine((v) => v.trim().length > 0, { message: "La contraseña no puede ser solo espacios" });
 
 const name = z.string().trim().min(1, { message: "Poné el nombre" }).max(80);
 
 export const userCreate = z.object({
   name,
-  email: z.email({ message: "Email inválido" }).trim().toLowerCase().max(200),
+  // Primero se limpian espacios y mayúsculas, después se valida (si no, " a@b.com" da "Email inválido").
+  email: z.string().trim().toLowerCase().max(200).pipe(z.email({ message: "Email inválido" })),
   role: z.enum(USER_ROLES),
   password,
   /** Permisos por sector (no aplican a un administrador). Sin esto queda como "Editor". */
