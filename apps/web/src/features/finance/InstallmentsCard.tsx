@@ -35,6 +35,17 @@ export function buildInstallments(totalCents: number, advancePct: number, count:
   return items;
 }
 
+/** Qué impide crear el plan (o null si está bien armado). */
+export function planProblem(totalCents: number, advancePct: number, count: number, items: Item[]): string | null {
+  if (totalCents <= 0) return "Indicá el total del plan.";
+  if (!Number.isFinite(advancePct) || advancePct < 0 || advancePct > 100) return "El anticipo va de 0 a 100%.";
+  if (advancePct < 100 && count <= 0) return "Indicá en cuántas cuotas se paga el resto.";
+  if (items.length === 0) return "El plan no tiene cuotas.";
+  if (items.reduce((a, i) => a + i.amount, 0) !== totalCents) return "Las cuotas no suman el total.";
+  if (items.some((i) => i.amount <= 0)) return "El total es muy chico para tantas cuotas.";
+  return null;
+}
+
 const STATUS = {
   pendiente: { label: "Sin facturar", tone: "slate" },
   facturada: { label: "Facturada", tone: "amber" },
@@ -64,8 +75,11 @@ export function InstallmentsCard({
   if (plans.isPending) return <Skeleton className="h-32" />;
 
   const totalCents = parsePesos(total) ?? 0;
-  const preview = buildInstallments(totalCents, Number(advance) || 0, Number(count) || 0, firstDue, today);
-  const canCreate = totalCents > 0 && preview.length > 0 && desc.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(firstDue);
+  const advancePct = Number(advance) || 0;
+  const countN = Number(count) || 0;
+  const preview = advancePct <= 100 ? buildInstallments(totalCents, advancePct, countN, firstDue, today) : [];
+  const problem = total.trim() || advance !== "0" ? planProblem(totalCents, advancePct, countN, preview) : null;
+  const canCreate = !planProblem(totalCents, advancePct, countN, preview) && desc.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(firstDue);
 
   return (
     <Card className="flex flex-col gap-3 p-5">
@@ -80,10 +94,10 @@ export function InstallmentsCard({
             <Field label="Total ($)">
               <Input inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} />
             </Field>
-            <Field label="Anticipo (%)">
+            <Field label="Anticipo (%)" error={advancePct > 100 ? "Máximo 100%" : undefined}>
               <Input inputMode="numeric" value={advance} onChange={(e) => setAdvance(e.target.value.replace(/\D/g, "").slice(0, 3))} />
             </Field>
-            <Field label="Cuotas">
+            <Field label="Cuotas" hint={advancePct === 100 ? "Con 100% de anticipo no hay cuotas" : undefined}>
               <Input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, "").slice(0, 2))} />
             </Field>
             <Field label="Primer vencimiento">
@@ -99,11 +113,17 @@ export function InstallmentsCard({
               ))}
             </ul>
           )}
+          {problem && <p className="text-sm text-amber-700">{problem}</p>}
           {create.error && <p role="alert" className="text-sm text-red-700">{create.error.message}</p>}
           <Button
             className="self-start"
             disabled={!canCreate || create.isPending}
-            onClick={() => create.mutate({ description: desc.trim(), items: preview }, { onSuccess: () => onNotice("Plan de cuotas creado.") })}
+            onClick={() =>
+              create.mutate(
+                { description: desc.trim(), total: totalCents, advancePercent: advancePct, items: preview },
+                { onSuccess: () => onNotice("Plan de cuotas creado.") },
+              )
+            }
           >
             Crear plan de cuotas
           </Button>
@@ -141,7 +161,7 @@ export function InstallmentsCard({
                               clientId: p.client.id,
                               clientName: p.client.name,
                               concept: i.number === 0 ? "Anticipo" : `Cuota ${i.number}`,
-                              amount: i.pending,
+                              amount: i.toCollect,
                               installmentId: i.id,
                             })
                           }

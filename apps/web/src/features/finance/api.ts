@@ -9,6 +9,7 @@ import type {
   InstallmentPlanDto,
   InvoiceCreate,
   PaymentCreate,
+  PaymentResult,
   PriceAdjustmentCreate,
   PriceAdjustmentDto,
   ReceivableDto,
@@ -55,7 +56,7 @@ function useWrite<B, R = void>(fn: (body: B) => Promise<R>) {
   return useMutation({ mutationFn: fn, onSuccess: invalidate });
 }
 
-export type PaymentResult = { receiptId: string; number: number; allocated: number; credit: number };
+export type { PaymentResult };
 
 export const useRegisterPayment = () =>
   useWrite(({ clientId, ...body }: PaymentCreate & { clientId: string }) =>

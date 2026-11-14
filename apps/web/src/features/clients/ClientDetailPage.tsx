@@ -122,7 +122,7 @@ function ClientHeader({ client: c }: { client: ClientDetail }) {
       )}
 
       <dl className="grid grid-cols-2 gap-3 border-t border-line pt-4 sm:grid-cols-4">
-        <Kpi label="Saldo" value={money(c.summary.balance)} danger={c.summary.hasOverdueDebt} hint={c.summary.hasOverdueDebt ? "con deuda vencida" : undefined} />
+        <Kpi label="Saldo" value={money(c.summary.balance)} danger={c.summary.hasOverdueDebt} hint={c.summary.hasOverdueDebt ? `${money(c.summary.overdueAmount)} vencido` : undefined} />
         <Kpi label="Abono" value={c.summary.monthlySubscriptions ? `${money(c.summary.monthlySubscriptions)}/mes` : "—"} />
         <Kpi label="Proyectos" value={`${plural(c.summary.activeProjects, "activo", "activos")} · ${plural(c.summary.openTickets, "ticket", "tickets")}`} />
         <Kpi label="Último contacto" value={ago(c.summary.lastContactAt)} />

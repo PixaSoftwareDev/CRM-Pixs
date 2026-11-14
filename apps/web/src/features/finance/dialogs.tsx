@@ -6,11 +6,11 @@ import { z } from "zod";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
-import { money, parsePesos } from "../../lib/format";
+import { centsToInput, money, parsePesos } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useClientOptions, useTeam } from "../tasks/api";
 import { todayAr } from "../tasks/time";
-import { useCreateCash, useCreateInvoice, useCreateSubscription, usePayInstallment, useRegisterPayment } from "./api";
+import { type PaymentResult, useCreateCash, useCreateInvoice, useCreateSubscription, usePayInstallment, useRegisterPayment } from "./api";
 
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
   transferencia: "Transferencia",
@@ -23,8 +23,27 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
 
 const pesosField = (msg = "Importe inválido") =>
   z.string().refine((v) => (parsePesos(v) ?? 0) > 0, { message: msg });
-/** Centavos → "150000,5" para precargar un input. */
-const toInput = (cents: number) => String(cents / 100).replace(".", ",");
+/** Algo que ya pasó (cobro, gasto): hasta hoy en Argentina, como valida el server. */
+const pastDateField = z.iso.date({ message: "Fecha inválida" }).refine((d) => d <= todayAr(), { message: "La fecha no puede ser futura" });
+/**
+ * El error ya quedó en `mutation.error` y se muestra en el formulario: acá solo
+ * se evita el rechazo sin manejar (y que el diálogo se cierre como si nada).
+ */
+async function settled<R>(p: Promise<R>): Promise<{ value: R } | null> {
+  try {
+    return { value: await p };
+  } catch {
+    return null;
+  }
+}
+
+/** "Cobro de $ X registrado (recibo N)…" o, si la cuota la cubrió el saldo a favor, eso. */
+export function paymentMessage(res: PaymentResult): string {
+  const credit = res.fromCredit ? `${money(res.fromCredit)} se cubrieron con el saldo a favor del cliente` : "";
+  if (res.number === null) return `Cuota cubierta: ${credit}. No hubo cobro nuevo.`;
+  const extra = [credit, res.credit ? `${money(res.credit)} quedan a favor del cliente` : ""].filter(Boolean).join("; ");
+  return `Cobro de ${money(res.allocated + res.credit)} registrado (recibo ${String(res.number).padStart(8, "0")})${extra ? `: ${extra}` : ""}.`;
+}
 const errorBox = (msg: string | null) =>
   msg && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{msg}</p>;
 
@@ -55,7 +74,7 @@ export interface PaymentTarget {
   concept?: string;
 }
 
-const paySchema = z.object({ amount: z.string(), method: z.enum(PAYMENT_METHODS), receivedOn: z.iso.date(), note: z.string().max(200) });
+const paySchema = z.object({ amount: z.string(), method: z.enum(PAYMENT_METHODS), receivedOn: pastDateField, note: z.string().max(200) });
 
 /** Registrar un cobro: del cliente (se imputa a lo más viejo), de una factura o de una cuota. */
 export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarget | null; onClose: () => void; onDone: (m: string) => void }) {
@@ -63,33 +82,35 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
   const payInst = usePayInstallment();
   const mutation = target?.installmentId ? payInst : pay;
   const form = useForm<z.infer<typeof paySchema>>({ resolver: zodResolver(paySchema) });
-  const serverError = useServerErrors(form, mutation.error);
   const fixed = !!target?.installmentId;
+  const serverError = useServerErrors(form, mutation.error, fixed ? ["receivedOn", "method"] : ["amount", "receivedOn", "method", "note"]);
+  const err = form.formState.errors;
 
   useEffect(() => {
     if (!target) return;
     pay.reset();
     payInst.reset();
-    form.reset({ amount: target.amount ? toInput(target.amount) : "", method: "transferencia", receivedOn: todayAr(), note: "" });
+    form.reset({ amount: target.amount !== undefined ? centsToInput(target.amount) : "", method: "transferencia", receivedOn: todayAr(), note: "" });
   }, [target]);
 
   const onSubmit = form.handleSubmit(async (v) => {
     if (!target) return;
     const cents = parsePesos(v.amount) ?? 0;
     if (!fixed && cents <= 0) return form.setError("amount", { message: "Importe inválido" });
-    const res = target.installmentId
-      ? await payInst.mutateAsync({ id: target.installmentId, method: v.method, receivedOn: v.receivedOn })
-      : await pay.mutateAsync({
-          clientId: target.clientId,
-          amount: cents,
-          method: v.method,
-          receivedOn: v.receivedOn,
-          ...(v.note.trim() && { note: v.note.trim() }),
-          ...(target.invoiceId && { invoiceIds: [target.invoiceId] }),
-        });
-    onDone(
-      `Cobro de ${money(res.allocated + res.credit)} registrado (recibo ${String(res.number).padStart(8, "0")})${res.credit ? `: ${money(res.credit)} quedan a favor del cliente` : ""}.`,
+    const res = await settled(
+      target.installmentId
+        ? payInst.mutateAsync({ id: target.installmentId, method: v.method, receivedOn: v.receivedOn })
+        : pay.mutateAsync({
+            clientId: target.clientId,
+            amount: cents,
+            method: v.method,
+            receivedOn: v.receivedOn,
+            ...(v.note.trim() && { note: v.note.trim() }),
+            ...(target.invoiceId && { invoiceIds: [target.invoiceId] }),
+          }),
     );
+    if (!res) return;
+    onDone(paymentMessage(res.value));
     onClose();
   });
 
@@ -97,10 +118,10 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
     <Dialog open={!!target} onClose={onClose} title="Registrar cobro" description={target ? [target.clientName, target.concept].filter(Boolean).join(" · ") : undefined}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Importe ($)" error={form.formState.errors.amount?.message} className="sm:col-span-1">
+          <Field label="Importe ($)" error={err.amount?.message} className="sm:col-span-1">
             <Input inputMode="decimal" autoFocus={!fixed} disabled={fixed} {...form.register("amount")} />
           </Field>
-          <Field label="Medio">
+          <Field label="Medio" error={err.method?.message}>
             <Select {...form.register("method")}>
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
@@ -109,20 +130,23 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
               ))}
             </Select>
           </Field>
-          <Field label="Fecha">
+          <Field label="Fecha" error={err.receivedOn?.message}>
             <Input type="date" max={todayAr()} {...form.register("receivedOn")} />
           </Field>
         </div>
         {!fixed && (
-          <Field label="Nota (opcional)">
+          <Field label="Nota (opcional)" error={err.note?.message}>
             <Input placeholder="Ej: transferencia del Banco Galicia" {...form.register("note")} />
           </Field>
         )}
         <p className="text-xs text-muted">
-          {target?.invoiceId || fixed
-            ? "Se emite el recibo y se imputa a esta factura."
-            : "Se emite el recibo y se imputa a las facturas más viejas primero; lo que sobre queda a favor del cliente."}{" "}
-          Entra también como ingreso en la caja.
+          {fixed && target?.amount === 0
+            ? "El saldo a favor del cliente ya cubre esta cuota: se factura y se imputa, sin recibo ni ingreso nuevo."
+            : `${
+                target?.invoiceId || fixed
+                  ? "Se emite el recibo y se imputa a esta factura."
+                  : "Se emite el recibo y se imputa a las facturas más viejas primero; lo que sobre queda a favor del cliente."
+              } Entra también como ingreso en la caja.`}
         </p>
         {errorBox(serverError)}
         <Actions onClose={onClose} label="Registrar cobro" busy={form.formState.isSubmitting} />
@@ -148,7 +172,7 @@ export function InvoiceDialog({
 }) {
   const create = useCreateInvoice();
   const form = useForm<z.infer<typeof invoiceSchema>>({ resolver: zodResolver(invoiceSchema) });
-  const serverError = useServerErrors(form, create.error);
+  const serverError = useServerErrors(form, create.error, ["concept", "amount", "issuedOn", "dueOn"]);
   const err = form.formState.errors;
 
   useEffect(() => {
@@ -160,7 +184,10 @@ export function InvoiceDialog({
   const onSubmit = form.handleSubmit(async (v) => {
     if (!client) return;
     // Sin vencimiento, el server usa el plazo de pago del perfil de facturación.
-    await create.mutateAsync({ clientId: client.id, concept: v.concept, amount: parsePesos(v.amount) ?? 0, issuedOn: v.issuedOn, ...(v.dueOn && { dueOn: v.dueOn }) });
+    const res = await settled(
+      create.mutateAsync({ clientId: client.id, concept: v.concept, amount: parsePesos(v.amount) ?? 0, issuedOn: v.issuedOn, ...(v.dueOn && { dueOn: v.dueOn }) }),
+    );
+    if (!res) return;
     onDone(`Factura emitida: ${v.concept}.`);
     onClose();
   });
@@ -175,7 +202,7 @@ export function InvoiceDialog({
           <Field label="Importe ($)" error={err.amount?.message}>
             <Input inputMode="decimal" {...form.register("amount")} />
           </Field>
-          <Field label="Emisión">
+          <Field label="Emisión" error={err.issuedOn?.message}>
             <Input type="date" {...form.register("issuedOn")} />
           </Field>
           <Field label="Vence" error={err.dueOn?.message} hint="Vacío: según el plazo del cliente">
@@ -202,7 +229,7 @@ const cashSchema = z
     direction: z.enum(["ingreso", "egreso"]),
     amount: pesosField(),
     concept: z.string().trim().min(1, { message: "Indicá el concepto" }).max(200),
-    occurredOn: z.iso.date(),
+    occurredOn: pastDateField,
     category: z.string().max(60),
     paidById: z.string(),
     reimbursable: z.boolean(),
@@ -213,7 +240,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
   const team = useTeam();
   const create = useCreateCash();
   const form = useForm<z.infer<typeof cashSchema>>({ resolver: zodResolver(cashSchema) });
-  const serverError = useServerErrors(form, create.error);
+  const serverError = useServerErrors(form, create.error, ["direction", "amount", "concept", "occurredOn", "category", "paidById"]);
   const [direction, reimbursable] = form.watch(["direction", "reimbursable"]);
   const err = form.formState.errors;
 
@@ -222,7 +249,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
     create.reset();
     form.reset({
       direction: draft.direction,
-      amount: draft.amount ? toInput(draft.amount) : "",
+      amount: draft.amount ? centsToInput(draft.amount) : "",
       concept: draft.concept,
       occurredOn: todayAr(),
       category: "",
@@ -232,15 +259,18 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
   }, [draft]);
 
   const onSubmit = form.handleSubmit(async (v) => {
-    await create.mutateAsync({
-      direction: v.direction,
-      amount: parsePesos(v.amount) ?? 0,
-      concept: v.concept,
-      occurredOn: v.occurredOn,
-      ...(v.category.trim() && { category: v.category.trim() }),
-      paidById: v.paidById || null,
-      reimbursable: v.reimbursable,
-    });
+    const res = await settled(
+      create.mutateAsync({
+        direction: v.direction,
+        amount: parsePesos(v.amount) ?? 0,
+        concept: v.concept,
+        occurredOn: v.occurredOn,
+        ...(v.category.trim() && { category: v.category.trim() }),
+        paidById: v.paidById || null,
+        reimbursable: v.reimbursable,
+      }),
+    );
+    if (!res) return;
     onDone(`${v.direction === "ingreso" ? "Ingreso" : "Gasto"} cargado: ${v.concept}.`);
     onClose();
   });
@@ -249,7 +279,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
     <Dialog open={!!draft} onClose={onClose} title="Movimiento de caja">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Tipo">
+          <Field label="Tipo" error={err.direction?.message}>
             <Select {...form.register("direction")}>
               <option value="egreso">Gasto</option>
               <option value="ingreso">Ingreso</option>
@@ -258,7 +288,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
           <Field label="Importe ($)" error={err.amount?.message}>
             <Input inputMode="decimal" autoFocus {...form.register("amount")} />
           </Field>
-          <Field label="Fecha">
+          <Field label="Fecha" error={err.occurredOn?.message}>
             <Input type="date" max={todayAr()} {...form.register("occurredOn")} />
           </Field>
         </div>
@@ -266,7 +296,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
           <Field label="Concepto" error={err.concept?.message}>
             <Input {...form.register("concept")} />
           </Field>
-          <Field label="Categoría (opcional)">
+          <Field label="Categoría (opcional)" error={err.category?.message}>
             <Input placeholder="Software, Infraestructura…" {...form.register("category")} />
           </Field>
         </div>
@@ -310,7 +340,7 @@ export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; o
   const clients = useClientOptions();
   const create = useCreateSubscription();
   const form = useForm<z.input<typeof subSchema>, unknown, z.output<typeof subSchema>>({ resolver: zodResolver(subSchema) });
-  const serverError = useServerErrors(form, create.error);
+  const serverError = useServerErrors(form, create.error, ["clientId", "name", "amount", "billingDay", "startsOn"]);
   const err = form.formState.errors;
 
   useEffect(() => {
@@ -320,7 +350,8 @@ export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; o
   }, [open]);
 
   const onSubmit = form.handleSubmit(async (v) => {
-    await create.mutateAsync({ ...v, amount: parsePesos(v.amount) ?? 0 });
+    const res = await settled(create.mutateAsync({ ...v, amount: parsePesos(v.amount) ?? 0 }));
+    if (!res) return;
     onDone(`Abono "${v.name}" creado.`);
     onClose();
   });
@@ -350,7 +381,7 @@ export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; o
           <Field label="Se factura el día" error={err.billingDay?.message}>
             <Input type="number" min={1} max={28} {...form.register("billingDay")} />
           </Field>
-          <Field label="Desde">
+          <Field label="Desde" error={err.startsOn?.message}>
             <Input type="date" {...form.register("startsOn")} />
           </Field>
         </div>

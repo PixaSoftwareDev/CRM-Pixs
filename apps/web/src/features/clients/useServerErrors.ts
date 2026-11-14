@@ -2,29 +2,37 @@ import { useEffect } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import { ApiError } from "../../lib/api";
 
+const fieldOf = (path: string) => path.replace(/^\//, "").replaceAll("/", ".");
+
 /**
  * Lleva los errores de validación del server a cada campo del formulario
- * ("/taxId" → error en taxId) y devuelve el mensaje general si no es de un campo.
+ * ("/taxId" → error en taxId) y devuelve el mensaje general para lo que no se
+ * puede mostrar en un campo.
+ *
+ * `shown` son los campos que muestran su error en pantalla: el error de
+ * cualquier otro campo cae al mensaje general (si no, el botón "no hace nada").
+ * Sin `shown`, cae al general lo que no es un campo del formulario.
  */
-export function useServerErrors<T extends FieldValues>(form: UseFormReturn<T>, error: Error | null): string | null {
-  // Solo se marcan en el campo los errores de campos que el formulario tiene; los
-  // demás (p. ej. "durationMinutes", que se calcula de Desde/Hasta) van al mensaje
-  // general: si no, el error no se veía en ningún lado.
+export function useServerErrors<T extends FieldValues>(
+  form: UseFormReturn<T>,
+  error: Error | null,
+  shown?: readonly Path<T>[],
+): string | null {
   const values = form.getValues() as Record<string, unknown>;
-  const isField = (name: string) => !!name && (name.split(".")[0] ?? "") in values;
-  const issues =
-    error instanceof ApiError && error.issues
-      ? error.issues.map((i) => ({ name: i.path.replace(/^\//, "").replaceAll("/", "."), message: i.message }))
-      : [];
+  const isShown = (name: string) =>
+    !!name && (shown ? (shown as readonly string[]).includes(name) : (name.split(".")[0] ?? "") in values);
 
   useEffect(() => {
-    for (const issue of issues) {
-      if (isField(issue.name)) form.setError(issue.name as Path<T>, { message: issue.message });
+    if (!(error instanceof ApiError) || !error.issues) return;
+    for (const issue of error.issues) {
+      const name = fieldOf(issue.path);
+      if (isShown(name)) form.setError(name as Path<T>, { message: issue.message });
     }
   }, [error, form]);
 
   if (!error) return null;
+  const issues = error instanceof ApiError ? (error.issues ?? []) : [];
   if (!issues.length) return error.message;
-  const general = issues.filter((i) => !isField(i.name)).map((i) => i.message);
-  return general.length ? general.join(" · ") : null;
+  const loose = issues.filter((i) => !isShown(fieldOf(i.path))).map((i) => i.message);
+  return loose.length ? [...new Set(loose)].join(" · ") : null;
 }

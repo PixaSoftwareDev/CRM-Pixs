@@ -79,10 +79,32 @@ export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 
  */
 export const centsToInput = (cents: number) => String(cents / 100).replace(".", ",");
 
-/** "150.000,50" o "150000" (pesos escritos a mano) → centavos. null si no es un número. */
+/**
+ * Un número escrito a mano, en pesos → número (sin redondear). null si no se entiende.
+ * - Con coma: la coma es decimal y los puntos, de miles ("1.500,50", "1500,5").
+ * - Sin coma, un único punto con 1 o 2 dígitos al final: punto decimal ("1500.50", "1.5").
+ * - Puntos en grupos de 3: miles ("150.000", "1.500.000").
+ */
+export function parseDecimal(input: string): number | null {
+  const s = input.replace(/[$\s]/g, "");
+  let plain: string;
+  if (s.includes(",")) {
+    if (!/^(\d{1,3}(\.\d{3})+|\d+)?,\d*$/.test(s) || s === ",") return null;
+    plain = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d+\.\d{1,2}$/.test(s)) {
+    plain = s;
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s) || /^\d+$/.test(s)) {
+    plain = s.replace(/\./g, "");
+  } else {
+    return null;
+  }
+  const n = Number(plain);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** "150.000,50", "1500.50" o "150000" (pesos escritos a mano) → centavos. 0 si está vacío, null si no es un número. */
 export function parsePesos(input: string): number | null {
-  const clean = input.replace(/[$\s]/g, "").replace(/\./g, "").replace(",", ".");
-  if (clean === "") return 0;
-  const n = Number(clean);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+  if (input.replace(/[$\s]/g, "") === "") return 0;
+  const n = parseDecimal(input);
+  return n === null ? null : Math.round(n * 100);
 }

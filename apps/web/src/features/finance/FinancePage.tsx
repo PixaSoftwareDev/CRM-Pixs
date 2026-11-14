@@ -1,4 +1,4 @@
-import type { ReceivableDto, SubscriptionDto } from "@crm/shared";
+import type { CashMovementDto, ReceivableDto, SubscriptionDto } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, Plus, Wallet } from "lucide-react";
 import { useState } from "react";
@@ -34,6 +34,9 @@ import { type CashDraft, CashDialog, type PaymentTarget, PaymentDialog, Subscrip
 import { parseMovement } from "./quick-movement";
 
 type Tab = "cobrar" | "abonos" | "movimientos";
+
+/** Los movimientos del mes (la API trae además los "a devolver" pendientes de otros meses). */
+const cashInMonth = (list: CashMovementDto[], month: string) => list.filter((m) => m.occurredOn.startsWith(month));
 
 export function FinancePage() {
   const search = financeRoute.useSearch();
@@ -83,7 +86,8 @@ export function FinancePage() {
       downloadCsv(
         `movimientos-${month}.csv`,
         ["Fecha", "Tipo", "Concepto", "Categoría", "Cliente", "Lo pagó", "A devolver", "Importe"],
-        (cash.data ?? []).map((m) => [
+        // Lo mismo que la lista y los totales del mes (no los "a devolver" de otros meses).
+        cashInMonth(cash.data ?? [], month).map((m) => [
           day(m.occurredOn),
           m.direction === "ingreso" ? "Ingreso" : "Gasto",
           m.concept,
@@ -489,7 +493,7 @@ function MovementsTab({
 }) {
   const cash = useCash(month);
   const reimburse = useReimburse();
-  const inMonth = (cash.data ?? []).filter((m) => m.occurredOn.startsWith(month));
+  const inMonth = cashInMonth(cash.data ?? [], month);
   const pendingRefunds = (cash.data ?? []).filter((m) => m.reimbursable && !m.reimbursedAt);
   const income = inMonth.filter((m) => m.direction === "ingreso").reduce((a, m) => a + m.amount, 0);
   const expense = inMonth.filter((m) => m.direction === "egreso").reduce((a, m) => a + m.amount, 0);
