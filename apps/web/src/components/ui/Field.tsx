@@ -10,7 +10,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 Input.displayName = "Input";
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, ...props }, ref) => <select ref={ref} className={cn(control, "pr-8", className)} {...props} />,
+  ({ className, ...props }, ref) => <select ref={ref} className={cn(control, "pr-2", className)} {...props} />,
 );
 Select.displayName = "Select";
 

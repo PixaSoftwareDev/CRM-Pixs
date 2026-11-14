@@ -12,6 +12,7 @@ import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { Tabs } from "../../components/ui/Tabs";
 import { useCopy } from "../../hooks/useCopy";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
 import { downloadCsv } from "../../lib/csv";
 import { day, money, plural } from "../../lib/format";
 import { financeRoute } from "../../router";
@@ -275,6 +276,7 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
   const adjust = useAdjustPrices();
   const accrual = useRunAccrual();
   const update = useUpdateSubscription();
+  const isAdmin = useIsAdmin();
   const today = todayAr();
   const months = [today.slice(0, 7), addMonths(today, 1).slice(0, 7)];
   const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);
@@ -302,6 +304,12 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
 
   return (
     <div className="flex flex-col gap-[18px]">
+      {!isAdmin && (
+        <p className="rounded-[10px] bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          Los aumentos, el devengamiento y el alta o baja de abonos los hace un administrador.
+        </p>
+      )}
+      {isAdmin && (
       <div className="grid gap-[18px] lg:grid-cols-2">
         <Card className="flex flex-col gap-3 p-5">
           <div>
@@ -405,29 +413,32 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
           )}
         </Card>
       </div>
+      )}
 
       <Card className="overflow-x-auto">
         <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <label className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted uppercase">
             <input
               type="checkbox"
-              className="size-4 accent-brand"
+              className={cn("size-4 accent-brand", !isAdmin && "hidden")}
               checked={active.length > 0 && chosen.length === active.length}
               onChange={() => setSelected(chosen.length === active.length ? new Set() : new Set(active.map((s) => s.id)))}
               aria-label="Seleccionar todos"
             />
             Cliente / plan
           </label>
-          <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
-            <Plus size={14} aria-hidden /> Nuevo abono
-          </Button>
+          {isAdmin && (
+            <Button size="sm" variant="secondary" onClick={() => setCreating(true)}>
+              <Plus size={14} aria-hidden /> Nuevo abono
+            </Button>
+          )}
         </div>
         {subs.data.length === 0 && <p className="p-4 text-sm text-muted">Todavía no hay abonos.</p>}
         <ul className="divide-y divide-slate-100">
           {subs.data.map((s) => (
             <li key={s.id} className={cn("flex flex-wrap items-center justify-between gap-3 px-4 py-3", !s.active && "opacity-60")}>
               <label className="flex min-w-0 items-center gap-3">
-                <input type="checkbox" className="size-4 accent-brand" disabled={!s.active} checked={s.active && sel.has(s.id)} onChange={() => toggle(s.id)} />
+                <input type="checkbox" className={cn("size-4 accent-brand", !isAdmin && "hidden")} disabled={!s.active} checked={s.active && sel.has(s.id)} onChange={() => toggle(s.id)} />
                 <span className="min-w-0">
                   <strong className="block truncate">{s.client.name}</strong>
                   <span className="block text-xs text-muted">
@@ -443,6 +454,7 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
                 <Button
                   size="sm"
                   variant="ghost"
+                  className={cn(!isAdmin && "hidden")}
                   onClick={() =>
                     update.mutate(
                       { id: s.id, active: !s.active },

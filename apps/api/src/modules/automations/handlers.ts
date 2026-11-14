@@ -6,6 +6,7 @@
 import { activities, type Db, eq, inArray, installments, projects, sql, taskComments, tasks } from "@crm/db";
 import { nextWorkdayAt, todayArIso } from "../../lib/dates";
 import { todayAr } from "../../lib/sql";
+import { CLIENT_CREDIT } from "../finance/repository";
 import { runAccrual } from "../finance/service";
 import { listTaskTypes } from "../tasks/repository";
 
@@ -42,7 +43,7 @@ export async function accrueSubscriptions(db: Db): Promise<Affected[]> {
  * cobranza por cliente, si no tiene ya una abierta.
  */
 export async function collectionTasks(db: Db): Promise<Affected[]> {
-  const due = await db.execute<{ client_id: string; client_name: string; owner_id: string | null; items: string; total: string; installment_ids: string[] }>(sql`
+  const due = await db.execute<{ client_id: string; client_name: string; owner_id: string | null; items: string; total: string; installment_ids: string[]; credit: string }>(sql`
     with pend as (
       select d.client_id, d.concept, d.due_on,
              d.amount - coalesce((select sum(a.amount) from document_allocations a where a.target_id = d.id), 0) as amount,
@@ -57,14 +58,18 @@ export async function collectionTasks(db: Db): Promise<Affected[]> {
     select c.id as client_id, c.name as client_name, c.owner_id,
            string_agg(p.concept || ' (' || to_char(p.due_on, 'DD/MM') || ')', ', ' order by p.due_on) as items,
            sum(p.amount) as total,
-           array_remove(array_agg(p.installment_id), null) as installment_ids
+           array_remove(array_agg(p.installment_id), null) as installment_ids,
+           coalesce(cr.credit, 0) as credit
     from pend p join clients c on c.id = p.client_id
+    left join ${CLIENT_CREDIT} cr on cr.client_id = c.id
     where p.amount > 0 and p.due_on <= ${todayAr} + 3
       and not exists (
         select 1 from tasks t join task_types tt on tt.id = t.type_id
         where t.client_id = c.id and tt.name = 'Cobranza' and t.status not in ('hecha', 'cancelada')
       )
-    group by c.id`);
+    group by c.id, cr.credit
+    -- Si el saldo a favor cubre lo que vence, no hay nada que cobrar.
+    having sum(p.amount) > coalesce(cr.credit, 0)`);
   if (!due.length) return [];
 
   const type = await typeId(db, "Cobranza");
@@ -76,7 +81,7 @@ export async function collectionTasks(db: Db): Promise<Affected[]> {
       const [task] = await tx
         .insert(tasks)
         .values({
-          title: `Cobrar a ${d.client_name}: ${pesos(Number(d.total))}`,
+          title: `Cobrar a ${d.client_name}: ${pesos(Number(d.total) - Number(d.credit ?? 0))}`,
           typeId: type,
           clientId: d.client_id,
           assigneeId: d.owner_id ?? fallback,

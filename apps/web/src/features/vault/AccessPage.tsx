@@ -14,6 +14,8 @@ import { Field, Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { useDebounced } from "../../hooks/useDebounced";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { copyText } from "../../lib/clipboard";
 import { downloadCsv } from "../../lib/csv";
 import { ago, initials, plural, when } from "../../lib/format";
 import { useClientOptions, useTeam } from "../tasks/api";
@@ -31,6 +33,7 @@ export function AccessPage() {
   const notice = useNotice();
   const [editing, setEditing] = useState<CredentialDto | "new" | null>(null);
   const [history, setHistory] = useState<{ clientId?: string } | null>(null);
+  const isAdmin = useIsAdmin();
 
   const groups = new Map<string, { client: CredentialDto["client"]; items: CredentialDto[] }>();
   for (const c of creds.data ?? []) {
@@ -46,9 +49,11 @@ export function AccessPage() {
         subtitle="Usuarios y contraseñas de cada cliente, guardados cifrados."
         actions={
           <>
-            <Button variant="secondary" onClick={() => setHistory({})}>
-              <History size={16} aria-hidden /> Historial de accesos
-            </Button>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setHistory({})}>
+                <History size={16} aria-hidden /> Historial de accesos
+              </Button>
+            )}
             <Button onClick={() => setEditing("new")}>
               <Plus size={16} aria-hidden /> Acceso
             </Button>
@@ -96,9 +101,11 @@ export function AccessPage() {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => setHistory({ clientId: g.client.id })}>
-                  Ver historial
-                </Button>
+                {isAdmin && (
+                  <Button size="sm" variant="ghost" onClick={() => setHistory({ clientId: g.client.id })}>
+                    Ver historial
+                  </Button>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[820px] table-fixed text-sm">
@@ -152,7 +159,7 @@ function CredentialRow({ cred: c, onEdit, onNotice }: { cred: CredentialDto; onE
 
   const copy = async () => {
     const res = await reveal.mutateAsync({ id: c.id, action: "copiar" });
-    await navigator.clipboard.writeText(res.secret);
+    await copyText(res.secret);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
     onNotice(`Clave de "${c.label}" copiada.`);
@@ -218,6 +225,7 @@ function CredentialDialog({ value, onClose, onDone }: { value: CredentialDto | "
   const form = useForm<FormValues>({ resolver: zodResolver(formSchema) });
   const serverError = useServerErrors(form, mutation.error ?? del.error);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const isAdmin = useIsAdmin();
   const err = form.formState.errors;
 
   useEffect(() => {
@@ -294,7 +302,7 @@ function CredentialDialog({ value, onClose, onDone }: { value: CredentialDto | "
         </Field>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          {editing ? (
+          {editing && isAdmin ? (
             confirmDelete ? (
               <span className="flex items-center gap-2 text-sm">
                 ¿Borrar este acceso?

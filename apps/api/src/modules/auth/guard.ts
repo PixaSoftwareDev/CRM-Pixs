@@ -9,7 +9,7 @@ declare module "fastify" {
 }
 
 /**
- * preHandler para rutas protegidas: valida la sesión y la deja en `request.session`.
+ * Hook onRequest (antes de validar el body, así sin sesión siempre es 401) para rutas protegidas: valida la sesión y la deja en `request.session`.
  * Usuarios desactivados se rechazan aunque tengan una sesión vigente.
  */
 export async function requireUser(request: FastifyRequest, reply: FastifyReply) {
@@ -24,4 +24,15 @@ export async function requireUser(request: FastifyRequest, reply: FastifyReply) 
 export function sessionOf(request: FastifyRequest): Session {
   if (!request.session) throw new Error("requireUser no se ejecutó en esta ruta");
   return request.session;
+}
+
+/**
+ * Hook onRequest para acciones solo de administradores (aumentos, abonos,
+ * devengamiento, automatizaciones, tipos de tarea, borrar claves y ver su
+ * registro). Va a nivel de ruta: corre después de `requireUser`.
+ */
+export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  if (request.session?.user.role !== "admin") {
+    return reply.forbidden("Solo un administrador puede hacer esto");
+  }
 }

@@ -115,8 +115,8 @@ export function NewOpportunityDialog({
             <Input inputMode="decimal" placeholder="380.000" {...form.register("amount")} />
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Responsable">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Responsable" className="sm:col-span-2">
             <Select {...form.register("ownerId")}>
               {team.data?.map((u) => (
                 <option key={u.id} value={u.id}>

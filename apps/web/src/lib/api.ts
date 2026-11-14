@@ -39,7 +39,9 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
     if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
     throw new ApiError(res.status, data?.error ?? "Algo salió mal. Probá de nuevo.", data?.issues);
   }
-  return (res.status === 204 ? undefined : await res.json()) as T;
+  // Un 201/204 puede venir sin cuerpo: no es un error.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {

@@ -11,7 +11,7 @@ import { Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { myDayRoute } from "../../router";
-import { useClientOptions, useMyId, useTasksInRange, useTeam } from "./api";
+import { useClientOptions, useMyId, useTasksInRange, useTeam, useUnscheduledTasks } from "./api";
 import { TASK_STATUS, tint } from "./labels";
 import { parseQuickTask } from "./quick-parse";
 import { TaskDialog } from "./TaskDialog";
@@ -40,6 +40,7 @@ export function MyDayPage() {
   const userId = search.user ?? me;
 
   const tasks = useTasksInRange(date, date);
+  const unscheduled = useUnscheduledTasks();
   const team = useTeam();
   const clients = useClientOptions();
   const notice = useNotice();
@@ -71,6 +72,7 @@ export function MyDayPage() {
   }
 
   const isToday = date === todayAr();
+  const undated = (unscheduled.data ?? []).filter((t) => t.assignee.id === userId);
   const nowHour = isToday ? Math.floor(nowMinutesAr() / 60) : -1;
   const viewingOther = userId !== me;
 
@@ -220,6 +222,17 @@ export function MyDayPage() {
                   : "No hay nada agendado este día."}
             </p>
           )}
+        </Card>
+      )}
+
+      {isToday && undated.length > 0 && (
+        <Card className="flex flex-col gap-1.5 p-3 sm:p-4">
+          <h2 className="text-sm font-bold">
+            Sin fecha <span className="font-normal text-muted">· {undated.length} por agendar</span>
+          </h2>
+          {undated.map((t) => (
+            <TaskRow key={t.id} task={t} viewerId={userId} onOpen={() => setOpenId(t.id)} />
+          ))}
         </Card>
       )}
 

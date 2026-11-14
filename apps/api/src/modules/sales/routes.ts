@@ -6,7 +6,7 @@ import { requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const salesRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.addHook("preHandler", requireUser);
+  app.addHook("onRequest", requireUser);
 
   app.get("/api/pipeline", () => service.getPipeline(db));
 

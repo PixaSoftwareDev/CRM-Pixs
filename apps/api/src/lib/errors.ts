@@ -34,3 +34,11 @@ export function isUniqueViolation(err: unknown, constraint?: string): boolean {
   if (e.code === "23505") return !constraint || e.constraint_name === constraint;
   return e.cause !== undefined && isUniqueViolation(e.cause, constraint);
 }
+
+/** Violación de clave foránea de Postgres: se eligió algo (cliente, proyecto, usuario…) que no existe. */
+export function isForeignKeyViolation(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { code?: string; cause?: unknown };
+  if (e.code === "23503") return true;
+  return e.cause !== undefined && isForeignKeyViolation(e.cause);
+}

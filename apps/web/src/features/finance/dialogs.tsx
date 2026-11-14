@@ -110,7 +110,7 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
             </Select>
           </Field>
           <Field label="Fecha">
-            <Input type="date" {...form.register("receivedOn")} />
+            <Input type="date" max={todayAr()} {...form.register("receivedOn")} />
           </Field>
         </div>
         {!fixed && (
@@ -259,7 +259,7 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
             <Input inputMode="decimal" autoFocus {...form.register("amount")} />
           </Field>
           <Field label="Fecha">
-            <Input type="date" {...form.register("occurredOn")} />
+            <Input type="date" max={todayAr()} {...form.register("occurredOn")} />
           </Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">

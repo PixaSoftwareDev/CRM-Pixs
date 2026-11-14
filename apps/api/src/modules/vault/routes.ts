@@ -7,7 +7,7 @@ import type { FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { db } from "../../lib/db";
-import { requireUser, sessionOf } from "../auth/guard";
+import { requireAdmin, requireUser, sessionOf } from "../auth/guard";
 import { type Audit, createCredential, deleteCredential, listAccessLogs, listCredentials, revealCredential, updateCredential } from "./service";
 
 const audit = (req: FastifyRequest): Audit => ({
@@ -17,13 +17,13 @@ const audit = (req: FastifyRequest): Audit => ({
 });
 
 export const vaultRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.addHook("preHandler", requireUser);
+  app.addHook("onRequest", requireUser);
 
   app.get("/api/credentials", { schema: { querystring: z.object({ q: z.string().trim().max(100).optional() }) } }, (req) =>
     listCredentials(db, req.query.q),
   );
 
-  app.get("/api/credentials/logs", { schema: { querystring: accessLogQuery } }, (req) => listAccessLogs(db, req.query));
+  app.get("/api/credentials/logs", { onRequest: requireAdmin, schema: { querystring: accessLogQuery } }, (req) => listAccessLogs(db, req.query));
 
   app.post("/api/credentials", { schema: { body: credentialCreate } }, async (req, reply) =>
     reply.status(201).send(await createCredential(db, audit(req), req.body)),
@@ -34,7 +34,7 @@ export const vaultRoutes: FastifyPluginAsyncZod = async (app) => {
     return reply.status(204).send();
   });
 
-  app.delete("/api/credentials/:id", { schema: { params: idParams } }, async (req, reply) => {
+  app.delete("/api/credentials/:id", { onRequest: requireAdmin, schema: { params: idParams } }, async (req, reply) => {
     await deleteCredential(db, audit(req), req.params.id);
     return reply.status(204).send();
   });

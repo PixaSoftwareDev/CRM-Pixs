@@ -1,3 +1,4 @@
+import { type SQL, sql } from "@crm/db";
 import type { z } from "zod";
 import { BadRequestError } from "./errors";
 
@@ -28,5 +29,15 @@ export function toPage<T, C>(rows: T[], limit: number, cursorOf: (last: T) => C)
 
 /** Escapa comodines de LIKE para que el texto del usuario se busque literal. */
 export function likePattern(q: string): string {
-  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  // Sin acentos ni mayúsculas: "nandu" encuentra "Ñandú" (ver `matches`).
+  const folded = q.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  return `%${folded.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+const ACCENTED = "áàäâãéèëêíìïîóòöôõúùüûñç";
+const PLAIN = "aaaaaeeeeiiiiooooouuuunc";
+
+/** `columna` contiene el patrón de `likePattern`, ignorando acentos y mayúsculas. */
+export function matches(col: unknown, pattern: string): SQL {
+  return sql`translate(lower(${col}::text), ${ACCENTED}, ${PLAIN}) like ${pattern}`;
 }

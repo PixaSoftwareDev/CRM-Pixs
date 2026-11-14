@@ -19,6 +19,7 @@ import { authClient } from "../../lib/auth-client";
 export const taskKeys = {
   all: ["tasks"] as const,
   range: (from: string, to: string) => ["tasks", "range", from, to] as const,
+  unscheduled: ["tasks", "unscheduled"] as const,
   detail: (id: string) => ["tasks", "detail", id] as const,
   types: ["task-types"] as const,
   team: ["team"] as const,
@@ -34,6 +35,9 @@ export const useTasksInRange = (from: string, to: string) =>
     queryFn: () => api.get<TaskDto[]>("/api/tasks", { from, to }),
     placeholderData: keepPreviousData,
   });
+
+export const useUnscheduledTasks = () =>
+  useQuery({ queryKey: taskKeys.unscheduled, queryFn: () => api.get<TaskDto[]>("/api/tasks/unscheduled") });
 
 export const useTask = (id: string | null) =>
   useQuery({

@@ -17,6 +17,13 @@ describe("reglas del embudo", () => {
     expect(ruleFor("done", "Ventas", "aceptaron, firman el lunes")?.to).toBe("cierre");
   });
 
+  it("una negación no cuenta como aceptación", () => {
+    expect(ruleFor("done", "Ventas", "El cliente NO aceptó la propuesta")?.to).toBe("propuesta");
+    expect(ruleFor("done", "Ventas", "todavía no la aceptaron")?.to).toBe("propuesta");
+    expect(ruleFor("done", "Ventas", "nunca lo aceptó")?.to).toBe("propuesta");
+    expect(ruleFor("done", "Ventas", "dudaba pero al final aceptó")?.to).toBe("cierre");
+  });
+
   it("cualquier tarea en curso solo pasa a seguimiento desde propuesta", () => {
     expect(ruleFor("in_progress", "Llamada", undefined)).toEqual(
       expect.objectContaining({ to: "seguimiento", onlyFrom: "propuesta" }),

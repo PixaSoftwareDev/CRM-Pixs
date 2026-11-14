@@ -24,7 +24,7 @@ import * as service from "./service";
 const contactParams = idParams.extend({ contactId: z.uuid() });
 
 export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.addHook("preHandler", requireUser);
+  app.addHook("onRequest", requireUser);
 
   app.get("/api/clients", { schema: { querystring: clientListQuery } }, (req) =>
     service.listClients(db, req.query),

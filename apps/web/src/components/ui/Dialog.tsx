@@ -21,8 +21,8 @@ export function Dialog({
   description?: string | undefined;
   children: ReactNode;
   className?: string;
-  /** md: formularios; xl: vistas de detalle con columnas. */
-  size?: "md" | "xl";
+  /** md: formularios; xl: vistas de detalle con columnas; full: ocupa toda la pantalla, siempre del mismo tamaño. */
+  size?: "md" | "xl" | "full";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -45,12 +45,16 @@ export function Dialog({
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
         "m-auto w-[calc(100%-32px)] rounded-[14px] border border-line p-0 shadow-2xl backdrop:bg-slate-900/45",
-        size === "xl" ? "max-w-5xl" : "max-w-lg",
+        size === "full"
+          ? "h-[calc(100dvh-32px)] max-h-none max-w-none"
+          : size === "xl"
+            ? "max-w-5xl"
+            : "max-w-lg",
         className,
       )}
     >
       {open && (
-        <div className="flex flex-col">
+        <div className={cn("flex flex-col", size === "full" && "h-full")}>
           <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
             <div>
               <h2 className="text-lg font-bold">{title}</h2>
@@ -65,7 +69,7 @@ export function Dialog({
               <X size={16} aria-hidden />
             </button>
           </header>
-          <div className="p-5">{children}</div>
+          <div className={cn("p-5", size === "full" && "min-h-0 flex-1 overflow-y-auto")}>{children}</div>
         </div>
       )}
     </dialog>

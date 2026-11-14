@@ -45,8 +45,13 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors"
 import { todayAr } from "../../lib/sql";
 import * as repo from "./repository";
 
+export async function getProjectPlans(db: Db, projectId: string) {
+  const [project] = await db.execute(sql`select 1 from projects where id = ${projectId}`);
+  if (!project) throw new NotFoundError("Proyecto");
+  return repo.getProjectPlans(db, projectId);
+}
+
 export {
-  getProjectPlans,
   getSummary,
   listAdjustments,
   listCash,
@@ -125,11 +130,56 @@ async function insertInvoice(
   return doc.id;
 }
 
+/**
+ * Imputa el saldo a favor del cliente (recibos y notas de crédito con resto
+ * libre) a sus facturas pendientes, de la más vieja a la más nueva. Se llama
+ * cada vez que aparece una factura nueva o un cobro deja resto.
+ */
+async function applyCredit(tx: DbOrTx, clientId: string) {
+  // Mismo lock que el talonario de recibos por cliente: dos imputaciones a la vez no se pisan.
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`credit:${clientId}`}))`);
+  const sources = await tx.execute<{ id: string; free: string }>(sql`
+    select d.id, d.amount - coalesce((select sum(a.amount) from document_allocations a where a.source_id = d.id), 0) as free
+    from documents d
+    where d.client_id = ${clientId} and d.kind in ('recibo', 'nota_credito') and d.status = 'emitido'
+    order by d.issued_on, d.number`);
+  const credits = sources.map((r) => ({ id: r.id, free: Number(r.free) })).filter((r) => r.free > 0);
+  if (!credits.length) return 0;
+  const targets = await repo.pendingInvoices(tx, clientId);
+  let applied = 0;
+  for (const t of targets) {
+    let pending = t.pending;
+    for (const c of credits) {
+      if (pending <= 0) break;
+      if (c.free <= 0) continue;
+      const amount = Math.min(pending, c.free);
+      await tx.insert(documentAllocations).values({ sourceId: c.id, targetId: t.id, amount });
+      c.free -= amount;
+      pending -= amount;
+      applied += amount;
+    }
+  }
+  if (applied > 0) {
+    await tx.insert(activities).values({
+      clientId,
+      kind: "sistema",
+      title: "Saldo a favor aplicado",
+      body: `${pesos(applied)} de saldo a favor se descontaron de facturas pendientes.`,
+    });
+  }
+  return applied;
+}
+
 // ─── Cobros ─────────────────────────────────────────────────────────────────
 
 /** Recibo + imputación + caja + actividad. Lo que sobra queda a favor del cliente. */
 async function registerPaymentTx(tx: DbOrTx, actorId: string, clientId: string, data: ReturnType<typeof paymentCreate.parse>) {
   const { name } = await billingOf(tx, clientId);
+  if (data.invoiceIds?.length) {
+    const found = await tx.execute<{ client_id: string }>(sql`select client_id from documents where id in ${data.invoiceIds} and kind in ('factura', 'nota_debito')`);
+    if (found.length < new Set(data.invoiceIds).size) throw new BadRequestError("Esa factura no existe");
+    if (found.some((d) => d.client_id !== clientId)) throw new BadRequestError("Esa factura es de otro cliente");
+  }
   const targets = await repo.pendingInvoices(tx, clientId, data.invoiceIds);
   if (data.invoiceIds?.length && targets.length === 0) throw new ConflictError("Esa factura ya está cobrada");
 
@@ -176,7 +226,9 @@ async function registerPaymentTx(tx: DbOrTx, actorId: string, clientId: string, 
     title: "Cobro registrado",
     body: `${pesos(data.amount)} por ${METHOD_LABEL[data.method]}${left > 0 ? ` (${pesos(left)} quedan a favor)` : ""}.`,
   });
-  return { receiptId: receipt.id, number: receipt.number, allocated: data.amount - left, credit: left };
+  // Si sobró y hay otras facturas con saldo, el resto se imputa ahí.
+  const reapplied = left > 0 ? await applyCredit(tx, clientId) : 0;
+  return { receiptId: receipt.id, number: receipt.number, allocated: data.amount - left + reapplied, credit: left - reapplied };
 }
 
 export async function registerPayment(db: Db, actorId: string, clientId: string, input: PaymentCreate) {
@@ -187,6 +239,10 @@ export async function registerPayment(db: Db, actorId: string, clientId: string,
 export async function createInvoice(db: Db, actorId: string, clientId: string, input: InvoiceCreate) {
   const data = invoiceCreate.parse(input);
   if (data.dueOn && data.dueOn < data.issuedOn) throw new BadRequestError("El vencimiento no puede ser antes de la emisión");
+  if (data.projectId) {
+    const [p] = await db.execute(sql`select 1 from projects where id = ${data.projectId} and client_id = ${clientId}`);
+    if (!p) throw new BadRequestError("El proyecto no es de ese cliente");
+  }
   return db.transaction(async (tx) => {
     const { termDays } = await billingOf(tx, clientId);
     const id = await insertInvoice(tx, actorId, clientId, {
@@ -194,6 +250,7 @@ export async function createInvoice(db: Db, actorId: string, clientId: string, i
       dueOn: data.dueOn === undefined ? addDaysIso(data.issuedOn, termDays) : data.dueOn,
     });
     await tx.insert(activities).values({ clientId, actorId, documentId: id, kind: "factura", title: "Factura emitida", body: `${data.concept} · ${pesos(data.amount)}` });
+    await applyCredit(tx, clientId);
     return { id };
   });
 }
@@ -339,11 +396,26 @@ export async function runAccrual(db: Db, actorId: string | null, input: AccrualR
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`accrual:${period}`}))`);
-    const due = await tx.execute<{ id: string; client_id: string; client_name: string; name: string; amount: string; billing_day: number; billed: boolean }>(sql`
-      select s.id, s.client_id, c.name as client_name, s.name, s.amount, s.billing_day,
+    const due = await tx.execute<{
+      id: string;
+      client_id: string;
+      client_name: string;
+      name: string;
+      amount: string;
+      billing_day: number;
+      starts_on: string;
+      billed: boolean;
+    }>(sql`
+      select s.id, s.client_id, c.name as client_name, s.name, s.billing_day, s.starts_on::text as starts_on,
+             -- Un aumento que rige más adelante todavía no cuenta: se usa el valor anterior.
+             coalesce((select pi.previous_amount from price_adjustment_items pi
+                         join price_adjustments pa on pa.id = pi.adjustment_id
+                        where pi.subscription_id = s.id and pa.effective_on > ${period}::date
+                        order by pa.effective_on, pa.created_at limit 1), s.amount) as amount,
              exists (select 1 from documents d where d.subscription_id = s.id and d.period = ${period}::date) as billed
       from subscriptions s join clients c on c.id = s.client_id
       where s.active
+        and c.status <> 'baja' -- un cliente dado de baja no se sigue facturando
         and s.starts_on < (${period}::date + interval '1 month')
         and (s.ends_on is null or s.ends_on >= ${period}::date)
       order by c.name, s.name`);
@@ -351,10 +423,15 @@ export async function runAccrual(db: Db, actorId: string | null, input: AccrualR
     const created: AccrualResult["created"] = [];
     for (const s of due) {
       if (s.billed) continue;
-      const amount = Number(s.amount);
-      const issuedOn = `${month}-${String(s.billing_day).padStart(2, "0")}`;
+      // Primer mes de un abono que arranca a mitad de mes: se cobran solo los días que usa (redondeado al peso).
+      const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+      const startDay = s.starts_on.startsWith(month) ? Number(s.starts_on.slice(8, 10)) : 1;
+      const full = Number(s.amount);
+      const amount = startDay > 1 ? Math.round((full * (daysInMonth - startDay + 1)) / daysInMonth / 100) * 100 : full;
+      const billingDate = `${month}-${String(s.billing_day).padStart(2, "0")}`;
+      const issuedOn = startDay > 1 && s.starts_on > billingDate ? s.starts_on : billingDate;
       const { termDays } = await billingOf(tx, s.client_id);
-      const concept = `Abono ${monthName} · ${s.name}`;
+      const concept = `Abono ${monthName}${startDay > 1 ? ` (desde el ${startDay})` : ""} · ${s.name}`;
       const id = await insertInvoice(tx, actorId, s.client_id, {
         concept,
         amount,
@@ -365,6 +442,7 @@ export async function runAccrual(db: Db, actorId: string | null, input: AccrualR
       });
       await tx.insert(activities).values({ clientId: s.client_id, actorId, documentId: id, kind: "factura", title: "Factura de abono", body: `${concept} · ${pesos(amount)}` });
       created.push({ client: s.client_name, concept, amount });
+      await applyCredit(tx, s.client_id);
     }
     return { created, skipped: due.length - created.length };
   });
@@ -388,5 +466,9 @@ export async function markReimbursed(db: Db, id: string) {
     .set({ reimbursedAt: new Date(), updatedAt: new Date() })
     .where(sql`${cashMovements.id} = ${id} and ${cashMovements.reimbursable} and ${cashMovements.reimbursedAt} is null`)
     .returning({ id: cashMovements.id });
-  if (!res.length) throw new ConflictError("Ese gasto no está pendiente de devolución");
+  if (!res.length) {
+    const [exists] = await db.execute(sql`select 1 from cash_movements where id = ${id}`);
+    if (!exists) throw new NotFoundError("Movimiento");
+    throw new ConflictError("Ese gasto no está pendiente de devolución");
+  }
 }

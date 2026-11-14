@@ -22,6 +22,9 @@ interface Rule {
 }
 
 const ACCEPTED = /\bacept[oóa]/i;
+/** "no aceptó", "todavía no la aceptaron", "nunca lo aceptó": la negación hasta dos palabras antes. */
+const NEGATED = /\b(no|nunca|tampoco|ni)\s+(\S+\s+){0,2}acept/i;
+const accepted = (note: string) => ACCEPTED.test(note) && !NEGATED.test(note);
 
 export function ruleFor(event: TaskEvent, typeName: string, note: string | undefined): Rule | null {
   if (event === "in_progress") return { to: "seguimiento", reason: "tarea de seguimiento en curso", onlyFrom: "propuesta" };
@@ -31,7 +34,7 @@ export function ruleFor(event: TaskEvent, typeName: string, note: string | undef
   if (event !== "done") return null;
   if (typeName === "Llamada") return { to: "primer_contacto", reason: "llamada marcada hecha" };
   if (typeName === "Ventas") {
-    return note && ACCEPTED.test(note)
+    return note && accepted(note)
       ? { to: "cierre", reason: "el cliente aceptó (comentario en la tarea)" }
       : { to: "propuesta", reason: "propuesta enviada (tarea hecha)" };
   }

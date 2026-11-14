@@ -19,7 +19,7 @@ import {
   credentialReveal,
   credentialUpdate,
 } from "@crm/shared";
-import { likePattern } from "../../lib/cursor";
+import { likePattern, matches } from "../../lib/cursor";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
 import { toIso } from "../../lib/sql";
 import { decryptSecret, encryptSecret } from "../../lib/vault";
@@ -75,7 +75,7 @@ export async function listCredentials(db: Db, q?: string): Promise<CredentialDto
              where l.credential_id = cr.id and l.action in ('ver', 'copiar')) as last_used_at
     from credentials cr join clients c on c.id = cr.client_id
     where cr.deleted_at is null
-      ${like ? sql`and (c.name ilike ${like} or cr.label ilike ${like} or cr.kind::text ilike ${like} or cr.username ilike ${like})` : sql``}
+      ${like ? sql`and (${matches(sql`c.name`, like)} or ${matches(sql`cr.label`, like)} or ${matches(sql`cr.kind`, like)} or ${matches(sql`cr.username`, like)})` : sql``}
     order by c.name, cr.label
     limit 2000`);
   return rows.map((r) => ({
@@ -117,7 +117,7 @@ export async function listAccessLogs(db: Db, input: AccessLogQuery): Promise<Acc
       ${q.to ? sql`and (l.created_at at time zone ${AR})::date <= ${q.to}` : sql``}
       ${q.clientId ? sql`and c.id = ${q.clientId}` : sql``}
       ${q.userId ? sql`and u.id = ${q.userId}` : sql``}
-      ${like ? sql`and (cr.label ilike ${like} or c.name ilike ${like} or u.name ilike ${like})` : sql``}
+      ${like ? sql`and (${matches(sql`cr.label`, like)} or ${matches(sql`c.name`, like)} or ${matches(sql`u.name`, like)})` : sql``}
     order by l.created_at desc
     limit ${q.limit}`);
   return rows.map((r) => ({

@@ -66,7 +66,7 @@ export function TaskDialog({
   const requestClose = useRef(onClose);
 
   return (
-    <Dialog open={!!taskId} onClose={() => requestClose.current()} title="Tarea" size="xl">
+    <Dialog open={!!taskId} onClose={() => requestClose.current()} title="Tarea" size="full">
       {currentId && (
         <TaskBody
           key={currentId}
@@ -161,7 +161,7 @@ function TaskBody({
   const when = t.startsAt ? `${shortDay(arParts(t.startsAt).date)} ${arParts(t.startsAt).time}` : "Sin fecha";
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-4">
       {t.client && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
           <div className="min-w-0">
@@ -199,10 +199,10 @@ function TaskBody({
         </div>
       )}
 
-      <div className={cn("grid gap-4", t.client && "md:grid-cols-[280px_1fr]")}>
+      <div className={cn("grid gap-4 md:min-h-0 md:flex-1", t.client && "md:grid-cols-[320px_1fr]")}>
         {t.client && <ClientTasks clientId={t.client.id} currentId={id} onPick={(next) => guard(() => onSwitch(next))} />}
 
-        <section className="flex min-w-0 flex-col gap-3">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3">
           <div
             className="flex flex-wrap items-start justify-between gap-3 rounded-xl px-4 py-3"
             style={{ background: tint(t.type.color), boxShadow: `inset 5px 0 0 ${t.type.color}` }}
@@ -227,7 +227,7 @@ function TaskBody({
           </div>
 
           <h4 className="text-sm font-bold">Comentarios</h4>
-          <ol className="flex max-h-64 flex-col gap-2.5 overflow-y-auto">
+          <ol className="flex max-h-80 min-h-24 flex-col gap-2.5 overflow-y-auto md:max-h-none md:flex-1">
             {t.comments.length === 0 && <li className="text-sm text-muted">Todavía no hay comentarios en esta tarea.</li>}
             {t.comments.map((c) => (
               <li key={c.id} className="flex gap-2.5">
@@ -273,8 +273,8 @@ function TaskBody({
             <Input type="time" step={300} value={edit.end} onChange={set("end")} aria-invalid={badRange} className="w-28" />
           </Field>
           {minutes > 0 && <span className="pb-2.5 text-xs text-muted">{durationLabel(minutes)}</span>}
-          <Field label="Responsable" className="ml-auto">
-            <Select value={edit.assigneeId} onChange={set("assigneeId")} className="w-44">
+          <Field label="Responsable" className="ml-auto max-w-full">
+            <Select value={edit.assigneeId} onChange={set("assigneeId")} className="w-auto min-w-44 max-w-full">
               {team.data?.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.id === me ? `${u.name} (yo)` : u.name}
@@ -344,7 +344,7 @@ function ClientTasks({ clientId, currentId, onPick }: { clientId: string; curren
   ];
 
   return (
-    <aside className="flex min-w-0 flex-col gap-2.5">
+    <aside className="flex min-h-0 min-w-0 flex-col gap-2.5">
       <h3 className="text-sm font-bold">Tareas del cliente</h3>
       <div role="tablist" aria-label="Filtrar tareas del cliente" className="flex gap-0.5 rounded-[10px] bg-slate-100 p-0.5">
         {tabs.map(([key, label]) => (
@@ -363,7 +363,7 @@ function ClientTasks({ clientId, currentId, onPick }: { clientId: string; curren
           </button>
         ))}
       </div>
-      <div className="flex max-h-80 flex-col gap-1.5 overflow-y-auto md:max-h-[420px]">
+      <div className="flex max-h-80 flex-col gap-1.5 overflow-y-auto md:max-h-none md:min-h-0 md:flex-1">
         {tasks.isPending && <Skeleton className="h-16" />}
         {shown.map((x) => (
           <button

@@ -98,7 +98,7 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
         <Field label="Nombre comercial" error={errors.name?.message} className="sm:col-span-2">
           <Input {...form.register("name")} />
         </Field>
-        <Field label="Razón social" error={errors.legalName?.message}>
+        <Field label="Razón social" error={errors.legalName?.message} className="sm:col-span-2">
           <Input {...form.register("legalName")} />
         </Field>
         <Field label="CUIT" error={errors.taxId?.message}>
@@ -124,15 +124,6 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
             ))}
           </Select>
         </Field>
-        <Field label="Dirección" error={errors.address?.message} className="sm:col-span-2">
-          <Input {...form.register("address")} />
-        </Field>
-        <Field label="Teléfono / WhatsApp" error={errors.phone?.message}>
-          <Input type="tel" {...form.register("phone")} />
-        </Field>
-        <Field label="Email" error={errors.email?.message}>
-          <Input type="email" {...form.register("email")} />
-        </Field>
         <Field label="Prioridad">
           <Select {...form.register("priority")}>
             {CLIENT_PRIORITIES.map((p) => (
@@ -141,6 +132,15 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="Dirección" error={errors.address?.message} className="sm:col-span-2">
+          <Input {...form.register("address")} />
+        </Field>
+        <Field label="Teléfono / WhatsApp" error={errors.phone?.message}>
+          <Input type="tel" {...form.register("phone")} />
+        </Field>
+        <Field label="Email" error={errors.email?.message}>
+          <Input type="email" {...form.register("email")} />
         </Field>
         {serverError && (
           <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">

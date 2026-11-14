@@ -9,7 +9,7 @@ import {
 } from "fastify-type-provider-zod";
 import { ZodError } from "zod";
 import { env, isProd } from "./env";
-import { AppError } from "./lib/errors";
+import { AppError, isForeignKeyViolation } from "./lib/errors";
 import { meRoutes } from "./modules/auth/me.routes";
 import { automationRoutes } from "./modules/automations/routes";
 import { clientRoutes } from "./modules/clients/routes";
@@ -54,6 +54,9 @@ export async function buildServer() {
     if (err instanceof AppError) {
       return reply.status(err.statusCode).send({ error: err.message });
     }
+    if (isForeignKeyViolation(err)) {
+      return reply.status(400).send({ error: "Alguno de los datos elegidos ya no existe. Recargá la página y probá de nuevo." });
+    }
     const status = err.statusCode ?? 500;
     if (status >= 500) {
       request.log.error({ err }, "Error no controlado");
@@ -64,7 +67,13 @@ export async function buildServer() {
 
   await app.register(sensible);
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
+  // El límite se cuenta por sesión (no por IP): una oficina entera sale por la misma IP.
+  // Sin sesión (login, health) se cuenta por IP.
+  await app.register(rateLimit, {
+    max: 600,
+    timeWindow: "1 minute",
+    keyGenerator: (req) => /session_token=([^;.]+)/.exec(req.headers.cookie ?? "")?.[1] ?? req.ip,
+  });
 
   await app.register(healthRoutes);
   await app.register(authRoutes);

@@ -15,6 +15,16 @@ import { todayAr, toIso, toNumber } from "../../lib/sql";
 
 /** Saldo pendiente de cada factura / nota de débito emitida. */
 export const PENDING = sql`(d.amount - coalesce((select sum(a.amount) from document_allocations a where a.target_id = d.id), 0))`;
+/**
+ * Saldo a favor de cada cliente: lo cobrado (recibos y notas de crédito) que
+ * todavía no está imputado a ninguna factura.
+ */
+export const CLIENT_CREDIT = sql`(
+  select d.client_id, sum(d.amount - coalesce((select sum(a.amount) from document_allocations a where a.source_id = d.id), 0)) as credit
+  from documents d
+  where d.kind in ('recibo', 'nota_credito') and d.status = 'emitido'
+  group by d.client_id
+)`;
 const DEBIT = sql`d.kind in ('factura', 'nota_debito') and d.status = 'emitido'`;
 const MONTH_START = sql`date_trunc('month', ${todayAr})::date`;
 
@@ -33,16 +43,27 @@ export async function getSummary(db: DbOrTx): Promise<FinanceSummary> {
     mrr: string;
   }>(sql`
     with pend as (
-      select ${PENDING} as amount, d.due_on from documents d where ${DEBIT}
+      select d.client_id, ${PENDING} as amount, d.due_on from documents d where ${DEBIT}
       union all
-      select i.amount, i.due_on from installments i where i.invoice_id is null
+      select pl.client_id, i.amount, i.due_on from installments i
+      join installment_plans pl on pl.id = i.plan_id where i.invoice_id is null
+    ),
+    -- Lo que cada cliente tiene a favor se descuenta de lo que debe (nunca por debajo de cero).
+    per_client as (
+      select p.client_id,
+             sum(p.amount) filter (where p.amount > 0) as owed,
+             sum(p.amount) filter (where p.amount > 0 and p.due_on < ${todayAr}) as late,
+             count(*) filter (where p.amount > 0) as n,
+             coalesce(cr.credit, 0) as credit
+      from pend p left join ${CLIENT_CREDIT} cr on cr.client_id = p.client_id
+      group by p.client_id, cr.credit
     )
     select
       (select coalesce(sum(amount), 0) from documents
         where kind = 'recibo' and status = 'emitido' and issued_on >= ${MONTH_START}) as collected,
-      (select coalesce(sum(amount), 0) from pend where amount > 0) as receivable,
-      (select count(*) from pend where amount > 0) as receivable_count,
-      (select coalesce(sum(amount), 0) from pend where amount > 0 and due_on < ${todayAr}) as overdue,
+      (select coalesce(sum(greatest(coalesce(owed, 0) - credit, 0)), 0) from per_client) as receivable,
+      (select coalesce(sum(n), 0) from per_client where coalesce(owed, 0) > credit) as receivable_count,
+      (select coalesce(sum(greatest(coalesce(late, 0) - credit, 0)), 0) from per_client) as overdue,
       (select coalesce(sum(amount), 0) from subscriptions where active) as mrr`);
   return {
     collectedThisMonth: toNumber(row?.collected),
@@ -81,12 +102,26 @@ export async function listReceivables(db: DbOrTx): Promise<ReceivableDto[]> {
     where r.amount > 0
     order by r.due_on nulls last, r.client_name
     limit 500`);
-  return rows.map((r) => ({
+  // El saldo a favor de cada cliente se descuenta de lo que vence primero.
+  const credits = new Map(
+    (await db.execute<{ client_id: string; credit: string }>(sql`select * from ${CLIENT_CREDIT} cr where cr.credit > 0`)).map((c) => [
+      c.client_id,
+      toNumber(c.credit),
+    ]),
+  );
+  const net = rows.flatMap((r) => {
+    const credit = credits.get(r.client_id) ?? 0;
+    const amount = toNumber(r.amount);
+    const used = Math.min(credit, amount);
+    if (used > 0) credits.set(r.client_id, credit - used);
+    return amount - used > 0 ? [{ ...r, amount: amount - used, discounted: used > 0 }] : [];
+  });
+  return net.map((r) => ({
     kind: r.kind,
     id: r.id,
     client: { id: r.client_id, name: r.client_name },
-    concept: r.concept,
-    amount: toNumber(r.amount),
+    concept: r.discounted ? `${r.concept} (descontado el saldo a favor)` : r.concept,
+    amount: r.amount,
     dueOn: r.due_on,
     daysToDue: r.days === null ? null : toNumber(r.days),
     autoReminder: r.auto_reminder,

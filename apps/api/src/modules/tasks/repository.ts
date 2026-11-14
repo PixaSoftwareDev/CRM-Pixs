@@ -73,6 +73,18 @@ export async function listTasksInRange(db: DbOrTx, from: string, to: string): Pr
   return rows.map(toDto);
 }
 
+/** Tareas abiertas sin fecha: se muestran aparte en Mi día para que no queden olvidadas. */
+export async function listUnscheduled(db: DbOrTx): Promise<TaskDto[]> {
+  const rows = await db.execute<TaskRow>(sql`
+    ${TASK_SELECT}
+    where t.archived_at is null
+      and t.starts_at is null
+      and t.status not in ('hecha', 'cancelada')
+    order by t.created_at
+    limit 500`);
+  return rows.map(toDto);
+}
+
 export async function findTask(db: DbOrTx, id: string): Promise<TaskDto | null> {
   const [row] = await db.execute<TaskRow>(sql`${TASK_SELECT} where t.id = ${id}`);
   return row ? toDto(row) : null;

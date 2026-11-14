@@ -13,7 +13,6 @@ import {
   desc,
   eq,
   exists,
-  ilike,
   or,
   type SQL,
   sql,
@@ -34,7 +33,7 @@ import type {
   TaskStatus,
 } from "@crm/shared";
 import { z } from "zod";
-import { decodeCursor, likePattern, toPage } from "../../lib/cursor";
+import { decodeCursor, likePattern, matches, toPage } from "../../lib/cursor";
 import { todayAr, toIso, toNumber } from "../../lib/sql";
 import { progressOf } from "../projects/repository";
 
@@ -80,8 +79,8 @@ export async function listClients(db: DbOrTx, query: ClientListQuery) {
     const byContact = db
       .select({ one: sql`1` })
       .from(clientContacts)
-      .where(and(eq(clientContacts.clientId, clients.id), ilike(clientContacts.name, pattern)));
-    const match = or(ilike(clients.name, pattern), ilike(clients.email, pattern), exists(byContact));
+      .where(and(eq(clientContacts.clientId, clients.id), matches(clientContacts.name, pattern)));
+    const match = or(matches(clients.name, pattern), matches(clients.email, pattern), exists(byContact));
     if (match) filters.push(match);
   }
   if (after) filters.push(sql`(${clients.name}, ${clients.id}) > (${after.n}, ${after.i})`);

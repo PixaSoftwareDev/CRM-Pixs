@@ -3,7 +3,7 @@
  * compañero, cambió de estado) queda como comentario en la tarea, y finalizar
  * una llamada o reunión cuenta como contacto con el cliente.
  */
-import { activities, type Db, type DbOrTx, eq, taskComments, tasks, taskTypes } from "@crm/db";
+import { activities, type Db, type DbOrTx, eq, sql, taskComments, tasks, taskTypes } from "@crm/db";
 import {
   type TaskCommentCreate,
   type TaskCreate,
@@ -19,7 +19,7 @@ import { fmtWhen, nextWorkdayAt } from "../../lib/dates";
 import { BadRequestError, ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
 import { isRuleEnabled, recordRun } from "../automations/service";
 import { advanceFromTask, openOpportunityOfClient, type TaskEvent } from "../sales/automation";
-import { ticketOfWorkTask, workDoneTx } from "../tickets/service";
+import { syncTicketFromWorkTask, ticketOfWorkTask, workDoneTx } from "../tickets/service";
 import * as repo from "./repository";
 
 export { listTaskTypes, listTeam } from "./repository";
@@ -54,11 +54,12 @@ async function checkRefs(db: DbOrTx, refs: { typeId?: string | undefined; client
 }
 
 const comment = (db: DbOrTx, taskId: string, authorId: string, body: string) =>
-  db.insert(taskComments).values({ taskId, authorId, body });
+  db.insert(taskComments).values({ taskId, authorId, body }).returning({ id: taskComments.id });
 
 // ─── Lecturas ───────────────────────────────────────────────────────────────
 
 export const listTasksInRange = (db: Db, q: { from: string; to: string }) => repo.listTasksInRange(db, q.from, q.to);
+export const listUnscheduled = (db: Db) => repo.listUnscheduled(db);
 
 export async function getTask(db: Db, id: string) {
   const task = await repo.getTaskDetail(db, id);
@@ -72,6 +73,11 @@ export async function createTask(db: Db, actorId: string, input: TaskCreate) {
   const data = taskCreate.parse(input);
   const assigneeId = data.assigneeId ?? actorId;
   await checkRefs(db, { typeId: data.typeId, clientId: data.clientId, assigneeId });
+  if (data.projectId) {
+    const [p] = await db.execute<{ client_id: string }>(sql`select client_id from projects where id = ${data.projectId}`);
+    if (!p) throw new BadRequestError("El proyecto no existe");
+    if (data.clientId && p.client_id !== data.clientId) throw new BadRequestError("El proyecto no es de ese cliente");
+  }
 
   const typeName = (await repo.listTaskTypes(db)).find((t) => t.id === data.typeId)?.name ?? "";
 
@@ -123,11 +129,13 @@ export async function updateTask(db: Db, actorId: string, id: string, input: Tas
     }
   }
 
+  let assigneeName: string | undefined;
   if (data.assigneeId !== undefined && data.assigneeId !== before.assignee.id) {
     patch.assigneeId = data.assigneeId;
     patch.assignedById = actorId === data.assigneeId ? null : actorId;
     const team = await repo.listTeam(db);
-    log.push(`Se la pasó a ${team.find((u) => u.id === data.assigneeId)?.name ?? "otra persona"}.`);
+    assigneeName = team.find((u) => u.id === data.assigneeId)?.name ?? "otra persona";
+    log.push(`Se la pasó a ${assigneeName}.`);
   }
 
   const finished = data.status === "hecha" && before.status !== "hecha";
@@ -169,15 +177,26 @@ export async function updateTask(db: Db, actorId: string, id: string, input: Tas
 
     for (const event of events) await advanceFromTask(tx, actorId, { taskId: id, typeName, event, note });
 
+    // La tarea de trabajo de un ticket manda sobre el ticket: responsable, fecha y cancelación.
+    const cancelled = patch.status === "cancelada";
+    if (patch.assigneeId || patch.startsAt !== undefined || cancelled) {
+      await syncTicketFromWorkTask(tx, actorId, id, {
+        ...(patch.assigneeId && { assigneeId: patch.assigneeId, ...(assigneeName && { assigneeName }) }),
+        ...(patch.startsAt !== undefined && { startsAt: patch.startsAt }),
+        cancelled,
+      });
+    }
+
     // Regla "el técnico finalizó la tarea de un ticket → el ticket pasa a confirmar".
-    if (finished) await advanceTicketFromTask(tx, actorId, id, note);
+    if (finished) await advanceTicketFromTask(tx, actorId, id, note, duration);
   });
 }
 
 export async function addComment(db: Db, actorId: string, id: string, input: TaskCommentCreate) {
   const { body } = taskCommentCreate.parse(input);
   await requireTask(db, id);
-  await comment(db, id, actorId, body);
+  const [row] = await comment(db, id, actorId, body);
+  return row;
 }
 
 // ─── Tipos de tarea ─────────────────────────────────────────────────────────
@@ -210,7 +229,7 @@ export async function deleteTaskType(db: Db, id: string) {
  * activa: llama a confirmar quien cargó el ticket (o quien finalizó), el
  * próximo día hábil a las 10.
  */
-async function advanceTicketFromTask(tx: DbOrTx, actorId: string, taskId: string, note: string | undefined) {
+async function advanceTicketFromTask(tx: DbOrTx, actorId: string, taskId: string, note: string | undefined, minutes: number) {
   const ruleId = await isRuleEnabled(tx, "tarea_de_ticket_hecha", "avanzar_ticket");
   if (!ruleId) return;
   const ticket = await ticketOfWorkTask(tx, taskId);
@@ -222,7 +241,8 @@ async function advanceTicketFromTask(tx: DbOrTx, actorId: string, taskId: string
     actorId,
     ticket,
     confirmer,
-    { confirmerId, confirmAt: nextWorkdayAt("10:00").toISOString(), ...(note && { note }) },
+    // Las horas que se cargan son la duración de la tarea finalizada.
+    { confirmerId, confirmAt: nextWorkdayAt("10:00").toISOString(), minutes, ...(note && { note }) },
     { auto: true, closeWork: false },
   );
   await recordRun(tx, ruleId, [{ entityType: "ticket", entityId: ticket.id }]);

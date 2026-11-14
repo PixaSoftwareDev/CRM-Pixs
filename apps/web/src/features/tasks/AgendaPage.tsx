@@ -11,6 +11,7 @@ import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { initials } from "../../lib/format";
 import { agendaRoute } from "../../router";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
 import { useCreateTaskType, useDeleteTaskType, useMyId, useTasksInRange, useTaskTypes, useTeam } from "./api";
 import { TYPE_PALETTE, tint } from "./labels";
 import { layoutLanes } from "./lanes";
@@ -392,6 +393,7 @@ function TypesPanel({
 }) {
   const create = useCreateTaskType();
   const remove = useDeleteTaskType();
+  const isAdmin = useIsAdmin();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(TYPE_PALETTE[1] ?? "#0891b2");
@@ -410,14 +412,16 @@ function TypesPanel({
     <Card className="flex flex-col gap-2 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold">Tipos de evento</h2>
-        <Button variant="ghost" size="sm" aria-label="Nuevo tipo" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
-          <Plus size={14} aria-hidden />
-        </Button>
+        {isAdmin && (
+          <Button variant="ghost" size="sm" aria-label="Nuevo tipo" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+            <Plus size={14} aria-hidden />
+          </Button>
+        )}
       </div>
       <ul className="flex flex-col gap-0.5">
         {types.map((t) => {
           const on = !hidden.has(t.id);
-          const removable = !t.isSystem && t.inUse === 0;
+          const removable = isAdmin && !t.isSystem && t.inUse === 0;
           return (
             <li key={t.id} className="flex items-center gap-1">
               <button

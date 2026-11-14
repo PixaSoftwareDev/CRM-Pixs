@@ -16,7 +16,7 @@ import { requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 export const ticketRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.addHook("preHandler", requireUser);
+  app.addHook("onRequest", requireUser);
   const actor = (req: Parameters<typeof sessionOf>[0]) => sessionOf(req).user.id;
 
   app.get("/api/tickets", { schema: { querystring: ticketListQuery } }, (req) => service.listTickets(db, req.query));

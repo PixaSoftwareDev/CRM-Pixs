@@ -14,7 +14,7 @@ import type {
   TicketType,
 } from "@crm/shared";
 import { z } from "zod";
-import { decodeCursor, likePattern, toPage } from "../../lib/cursor";
+import { decodeCursor, likePattern, matches, toPage } from "../../lib/cursor";
 import { toIso } from "../../lib/sql";
 import { listTasksOfTicket } from "../tasks/repository";
 
@@ -92,7 +92,7 @@ export async function listTickets(db: DbOrTx, q: z.output<typeof ticketListQuery
     q.resolvedById ? sql`t.resolved_by_id = ${q.resolvedById}` : undefined,
     q.assigneeId ? sql`t.assignee_id = ${q.assigneeId}` : undefined,
     // Título por índice trigram; la descripción por ILIKE (es texto largo y menos buscado).
-    q.q ? sql`(t.title ilike ${likePattern(q.q)} or t.description ilike ${likePattern(q.q)})` : undefined,
+    q.q ? sql`(${matches(sql`t.title`, likePattern(q.q))} or ${matches(sql`t.description`, likePattern(q.q))})` : undefined,
     after !== null ? sql`t.number < ${after}` : undefined,
   );
   const rows = await db.execute<Row>(sql`

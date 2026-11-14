@@ -5,9 +5,15 @@ const moneyFmt = new Intl.NumberFormat("es-AR", {
   currency: "ARS",
   maximumFractionDigits: 0,
 });
+const moneyCentsFmt = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
-/** Centavos → "$ 150.000". */
-export const money = (cents: number) => moneyFmt.format(cents / 100);
+/** Centavos → "$ 150.000"; si hay centavos, "$ 12.500,50" (no se redondean para que los saldos cierren). */
+export const money = (cents: number) => (cents % 100 === 0 ? moneyFmt : moneyCentsFmt).format(cents / 100);
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ });
 const shortFmt = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", timeZone: TZ });

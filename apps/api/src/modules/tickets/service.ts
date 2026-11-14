@@ -62,6 +62,18 @@ async function requireTicket(db: DbOrTx, id: string, allowed?: TicketStatus[]) {
   return t;
 }
 
+/**
+ * Bloquea la fila del ticket dentro de la transacción y vuelve a chequear el estado:
+ * un doble clic (o dos personas a la vez) no duplica tareas, horas ni eventos.
+ */
+async function lockTicket(tx: DbOrTx, id: string, allowed: TicketStatus[]) {
+  const [row] = await tx.execute<{ status: TicketStatus }>(sql`select status from tickets where id = ${id} for update`);
+  if (!row || !allowed.includes(row.status)) {
+    throw new ConflictError("El ticket cambió de estado mientras tanto: recargá la página");
+  }
+  return row.status;
+}
+
 async function typeId(db: DbOrTx, name: string) {
   const type = (await listTaskTypes(db)).find((t) => t.name === name);
   if (!type) throw new Error(`Falta el tipo de tarea ${name}: corré pnpm db:seed`);
@@ -233,8 +245,10 @@ export async function assignTicket(db: Db, actorId: string, id: string, input: T
   const at = new Date(data.scheduledAt);
 
   await db.transaction(async (tx) => {
+    // Estado leído con la fila bloqueada: si otro pedido ya asignó, esto es una reasignación.
+    const status = await lockTicket(tx, id, ["nuevo", "en_curso"]);
     // Reasignar: la tarea anterior se cancela, la nueva queda en la agenda del nuevo técnico.
-    if (t.status === "en_curso") await closeTasks(tx, id, "work", "cancelada", actorId, `Reasignado a ${name}.`);
+    if (status === "en_curso") await closeTasks(tx, id, "work", "cancelada", actorId, `Reasignado a ${name}.`);
     await scheduleWork(tx, t, actorId, data.assigneeId, at, data.durationMinutes);
     await tx
       .update(tickets)
@@ -249,7 +263,10 @@ export async function workDone(db: Db, actorId: string, id: string, input: Ticke
   const data = ticketWorkDone.parse(input);
   const t = await requireTicket(db, id, ["en_curso"]);
   const confirmer = await userName(db, data.confirmerId);
-  await db.transaction((tx) => workDoneTx(tx, actorId, t, confirmer, data));
+  await db.transaction(async (tx) => {
+    await lockTicket(tx, id, ["en_curso"]);
+    return workDoneTx(tx, actorId, t, confirmer, data);
+  });
 }
 
 type TicketRow = NonNullable<Awaited<ReturnType<typeof repo.findTicket>>>;
@@ -320,6 +337,7 @@ export async function confirmTicket(db: Db, actorId: string, id: string, input: 
   const quote = data.note ? `: "${data.note}"` : "";
 
   await db.transaction(async (tx) => {
+    await lockTicket(tx, id, ["a_confirmar"]);
     await closeTasks(tx, id, "confirm", "hecha", actorId, data.note);
     if (data.ok) {
       await tx
@@ -362,9 +380,43 @@ export async function cancelTicket(db: Db, actorId: string, id: string, input: T
   const { reason } = ticketCancel.parse(input);
   await requireTicket(db, id, ["nuevo", "en_curso", "a_confirmar"]);
   await db.transaction(async (tx) => {
+    await lockTicket(tx, id, ["nuevo", "en_curso", "a_confirmar"]);
     await closeTasks(tx, id, "work", "cancelada", actorId, `Ticket cancelado: ${reason}`);
     await closeTasks(tx, id, "confirm", "cancelada", actorId, `Ticket cancelado: ${reason}`);
     await tx.update(tickets).set({ status: "cancelado", updatedAt: new Date() }).where(eq(tickets.id, id));
     await event(tx, id, actorId, "estado", `Cancelado: ${reason}`);
   });
+}
+
+/**
+ * Cambios hechos desde Mi día sobre la tarea de trabajo de un ticket en curso:
+ * pasársela a otro → el ticket queda asignado a esa persona; cancelarla (sin
+ * otra tarea de trabajo abierta) → el ticket vuelve a Nuevo para reasignarlo.
+ */
+export async function syncTicketFromWorkTask(
+  tx: DbOrTx,
+  actorId: string,
+  taskId: string,
+  change: { assigneeId?: string; assigneeName?: string; startsAt?: Date | null; cancelled?: boolean },
+) {
+  const ticket = await ticketOfWorkTask(tx, taskId);
+  if (!ticket) return;
+  await lockTicket(tx, ticket.id, ["en_curso"]);
+  if (change.cancelled) {
+    const [open] = await tx.execute(sql`
+      select 1 from tasks t join task_types tt on tt.id = t.type_id
+      where t.ticket_id = ${ticket.id} and t.id <> ${taskId} and tt.name <> ${CONFIRM_TYPE}
+        and t.status in ('pendiente', 'en_curso', 'esperando')`);
+    if (open) return;
+    await tx.update(tickets).set({ status: "nuevo", assigneeId: null, scheduledAt: null, updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
+    await event(tx, ticket.id, actorId, "estado", "Se canceló la tarea de trabajo desde Mi día: el ticket vuelve a Nuevo para asignarlo");
+    return;
+  }
+  const patch: Partial<typeof tickets.$inferInsert> = { updatedAt: new Date() };
+  if (change.assigneeId && change.assigneeId !== ticket.assignee_id) {
+    patch.assigneeId = change.assigneeId;
+    await event(tx, ticket.id, actorId, "asignado", `Reasignado a ${change.assigneeName ?? "otra persona"} desde Mi día`);
+  }
+  if (change.startsAt !== undefined) patch.scheduledAt = change.startsAt;
+  if (Object.keys(patch).length > 1) await tx.update(tickets).set(patch).where(eq(tickets.id, ticket.id));
 }

@@ -285,7 +285,8 @@ await section("Tickets: flujo completo", async () => {
   expectStatus("cancelar sin motivo → 400", await post(`/api/tickets/${c.data?.id}/cancel`, { reason: "" }), 400);
   expectStatus("cancelar", await post(`/api/tickets/${c.data?.id}/cancel`, { reason: "Duplicado" }), 204);
   const pr = await get(`/api/projects/${ctx.projectId}`);
-  check("las horas del ticket se sumaron al proyecto", pr.data?.hoursUsed === 1.5, pr.data?.hoursUsed);
+  // 1,5 h del primer "trabajo terminado" + 1 h de la tarea de retrabajo finalizada en Mi día (su duración).
+  check("las horas del ticket se sumaron al proyecto", pr.data?.hoursUsed === 2.5, pr.data?.hoursUsed);
 });
 
 await section("Finanzas", async () => {

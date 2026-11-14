@@ -5,6 +5,7 @@
  */
 import {
   activities,
+  and,
   clientContacts,
   clients,
   type Db,
@@ -33,7 +34,13 @@ import { isActiveUser, listTaskTypes } from "../tasks/repository";
 import { moveToStage } from "./automation";
 import * as repo from "./repository";
 
-export { getPipeline, listStageOpportunities } from "./repository";
+export { getPipeline } from "./repository";
+
+export async function listStageOpportunities(db: Db, stageId: string) {
+  const [stage] = await db.execute(sql`select 1 from pipeline_stages where id = ${stageId}`);
+  if (!stage) throw new NotFoundError("Etapa");
+  return repo.listStageOpportunities(db, stageId);
+}
 
 async function requireOpen(db: DbOrTx, id: string) {
   const opp = await repo.findOpportunity(db, id);
@@ -142,7 +149,12 @@ export async function winOpportunity(db: Db, actorId: string, id: string, input:
     await tx
       .update(opportunities)
       .set({ status: "ganada", closedAt: new Date(), updatedAt: new Date() })
-      .where(eq(opportunities.id, id));
+      // Solo si sigue abierta: dos clics a la vez no cierran (ni crean el proyecto) dos veces.
+      .where(and(eq(opportunities.id, id), eq(opportunities.status, "abierta")))
+      .returning({ id: opportunities.id })
+      .then((rows) => {
+        if (!rows.length) throw new ConflictError("La oportunidad ya está cerrada");
+      });
     await moveToStage(tx, { id, stageId: opp.stage_id }, implementacion, actorId, "venta cerrada: se creó el proyecto");
 
     const [today] = await tx.execute<{ d: string }>(sql`select ${todayAr}::text as d`);
@@ -205,7 +217,12 @@ export async function loseOpportunity(db: Db, actorId: string, id: string, input
     await tx
       .update(opportunities)
       .set({ status: "perdida", lostReason: reason, closedAt: new Date(), updatedAt: new Date() })
-      .where(eq(opportunities.id, id));
+      // Solo si sigue abierta: dos clics a la vez no cierran (ni crean el proyecto) dos veces.
+      .where(and(eq(opportunities.id, id), eq(opportunities.status, "abierta")))
+      .returning({ id: opportunities.id })
+      .then((rows) => {
+        if (!rows.length) throw new ConflictError("La oportunidad ya está cerrada");
+      });
     await tx.insert(activities).values({
       clientId: opp.client_id,
       actorId,

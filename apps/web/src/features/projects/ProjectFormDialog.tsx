@@ -115,8 +115,8 @@ export function ProjectFormDialog({
             </Select>
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-4">
-          <Field label="Implementa" className="sm:col-span-1">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Implementa" className="sm:col-span-2">
             <Select {...form.register("implementerId")}>
               <option value="">Sin asignar</option>
               {team.data?.map((u) => (
