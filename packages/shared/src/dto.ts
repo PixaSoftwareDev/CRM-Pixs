@@ -25,8 +25,9 @@ export interface ClientListItem {
   statusReason: string | null;
   mainContact: string | null;
   email: string | null;
-  balance: number;
-  hasOverdueDebt: boolean;
+  /** null = quien consulta no tiene acceso a Finanzas. */
+  balance: number | null;
+  hasOverdueDebt: boolean | null;
   lastContactAt: string | null;
   nextTask: { title: string; startsAt: string | null } | null;
 }
@@ -73,11 +74,12 @@ export interface ClientDetail {
   contacts: ContactDto[];
   billingProfile: BillingProfileDto | null;
   summary: {
-    balance: number;
-    hasOverdueDebt: boolean;
+    /** Los tres datos de plata son null si quien consulta no tiene acceso a Finanzas. */
+    balance: number | null;
+    hasOverdueDebt: boolean | null;
     /** Lo vencido (facturas y cuotas sin facturar), descontado el saldo a favor; igual que "Vencido" de Finanzas. */
-    overdueAmount: number;
-    monthlySubscriptions: number;
+    overdueAmount: number | null;
+    monthlySubscriptions: number | null;
     activeProjects: number;
     openTickets: number;
     lastContactAt: string | null;

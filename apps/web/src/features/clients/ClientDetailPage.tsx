@@ -7,6 +7,8 @@ import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { Tabs } from "../../components/ui/Tabs";
+import { cn } from "../../components/ui/cn";
+import { useAccess } from "../../hooks/useAccess";
 import { useCopy } from "../../hooks/useCopy";
 import { isNotFound } from "../../lib/api";
 import { ago, fullDate, initials, money, plural } from "../../lib/format";
@@ -27,6 +29,9 @@ export function ClientDetailPage() {
   const { tab = "actividad" } = clientRoute.useSearch();
   const navigate = useNavigate({ from: clientRoute.fullPath });
   const client = useClient(clientId);
+  const { can } = useAccess();
+  // Cuenta corriente y saldos son de Finanzas: sin ese acceso no se muestran (la API tampoco los manda).
+  const showMoney = can("finanzas", "read");
 
   if (client.error) {
     return isNotFound(client.error) ? (
@@ -46,6 +51,7 @@ export function ClientDetailPage() {
 
   const c = client.data;
   const setTab = (t: TabKey) => void navigate({ search: { tab: t }, replace: true });
+  const current = tab === "cuenta" && !showMoney ? "actividad" : tab;
 
   return (
     <>
@@ -53,32 +59,32 @@ export function ClientDetailPage() {
         <ArrowLeft size={14} aria-hidden /> Clientes
       </Link>
 
-      <ClientHeader client={c} />
+      <ClientHeader client={c} showMoney={showMoney} />
 
       <section className="flex flex-col gap-4">
         <Tabs<TabKey>
           label="Secciones del cliente"
-          value={tab}
+          value={current}
           onChange={setTab}
           items={[
             { key: "actividad", label: "Actividad" },
             { key: "tareas", label: "Tareas" },
-            { key: "cuenta", label: "Cuenta corriente" },
+            ...(showMoney ? [{ key: "cuenta" as const, label: "Cuenta corriente" }] : []),
             { key: "proyectos", label: "Proyectos", badge: c.summary.activeProjects },
             { key: "datos", label: "Datos" },
           ]}
         />
-        {tab === "actividad" && <ActivityTab clientId={c.id} />}
-        {tab === "tareas" && <TasksTab clientId={c.id} />}
-        {tab === "cuenta" && <StatementTab client={c} />}
-        {tab === "proyectos" && <ProjectsTab clientId={c.id} />}
-        {tab === "datos" && <DataTab client={c} />}
+        {current === "actividad" && <ActivityTab clientId={c.id} />}
+        {current === "tareas" && <TasksTab clientId={c.id} />}
+        {current === "cuenta" && <StatementTab client={c} />}
+        {current === "proyectos" && <ProjectsTab clientId={c.id} />}
+        {current === "datos" && <DataTab client={c} />}
       </section>
     </>
   );
 }
 
-function ClientHeader({ client: c }: { client: ClientDetail }) {
+function ClientHeader({ client: c, showMoney }: { client: ClientDetail; showMoney: boolean }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const { copied, copy } = useCopy();
   const status = STATUS[c.status];
@@ -121,9 +127,18 @@ function ClientHeader({ client: c }: { client: ClientDetail }) {
         </div>
       )}
 
-      <dl className="grid grid-cols-2 gap-3 border-t border-line pt-4 sm:grid-cols-4">
-        <Kpi label="Saldo" value={money(c.summary.balance)} danger={c.summary.hasOverdueDebt} hint={c.summary.hasOverdueDebt ? `${money(c.summary.overdueAmount)} vencido` : undefined} />
-        <Kpi label="Abono" value={c.summary.monthlySubscriptions ? `${money(c.summary.monthlySubscriptions)}/mes` : "—"} />
+      <dl className={cn("grid grid-cols-2 gap-3 border-t border-line pt-4", showMoney && c.summary.balance !== null && "sm:grid-cols-4")}>
+        {showMoney && c.summary.balance !== null && (
+          <>
+            <Kpi
+              label="Saldo"
+              value={money(c.summary.balance)}
+              danger={!!c.summary.hasOverdueDebt}
+              hint={c.summary.hasOverdueDebt && c.summary.overdueAmount !== null ? `${money(c.summary.overdueAmount)} vencido` : undefined}
+            />
+            <Kpi label="Abono" value={c.summary.monthlySubscriptions ? `${money(c.summary.monthlySubscriptions)}/mes` : "—"} />
+          </>
+        )}
         <Kpi label="Proyectos" value={`${plural(c.summary.activeProjects, "activo", "activos")} · ${plural(c.summary.openTickets, "ticket", "tickets")}`} />
         <Kpi label="Último contacto" value={ago(c.summary.lastContactAt)} />
       </dl>

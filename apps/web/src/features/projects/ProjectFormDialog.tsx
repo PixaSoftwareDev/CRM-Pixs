@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
+import { useAccess } from "../../hooks/useAccess";
 import { centsToInput, parsePesos } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useClientOptions, useTeam } from "../tasks/api";
@@ -50,6 +51,8 @@ export function ProjectFormDialog({
   const create = useCreateProject();
   const update = useUpdateProject(project?.id ?? "");
   const mutation = project ? update : create;
+  // Monto y forma de pago son de Finanzas: sin ese acceso ni se muestran ni se mandan (así no se pisan).
+  const showMoney = useAccess().can("finanzas", "read");
   const form = useForm<Values>({ resolver: zodResolver(schema) });
   const serverError = useServerErrors(form, mutation.error);
   const err = form.formState.errors;
@@ -78,8 +81,10 @@ export function ProjectFormDialog({
       startsOn: v.startsOn || null,
       dueOn: v.dueOn || null,
       estimatedHours: v.estimatedHours ? Number(v.estimatedHours) : null,
-      saleAmount: v.saleAmount ? parsePesos(v.saleAmount) : null,
-      paymentTerms: v.paymentTerms.trim() || null,
+      ...(showMoney && {
+        saleAmount: v.saleAmount ? parsePesos(v.saleAmount) : null,
+        paymentTerms: v.paymentTerms.trim() || null,
+      }),
       scope: v.scope.trim() || null,
     };
     if (project) {
@@ -137,14 +142,16 @@ export function ProjectFormDialog({
             <Input inputMode="numeric" {...form.register("estimatedHours")} />
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Monto de la venta ($)" error={err.saleAmount?.message}>
-            <Input inputMode="decimal" {...form.register("saleAmount")} />
-          </Field>
-          <Field label="Forma de pago">
-            <Input placeholder="3 cuotas" {...form.register("paymentTerms")} />
-          </Field>
-        </div>
+        {showMoney && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Monto de la venta ($)" error={err.saleAmount?.message}>
+              <Input inputMode="decimal" {...form.register("saleAmount")} />
+            </Field>
+            <Field label="Forma de pago">
+              <Input placeholder="3 cuotas" {...form.register("paymentTerms")} />
+            </Field>
+          </div>
+        )}
         <Field label="Qué se vendió">
           <textarea rows={3} className={textarea} {...form.register("scope")} />
         </Field>

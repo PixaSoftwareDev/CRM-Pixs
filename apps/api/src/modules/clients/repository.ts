@@ -14,6 +14,7 @@ import {
   eq,
   exists,
   ne,
+  notInArray,
   or,
   type SQL,
   sql,
@@ -264,6 +265,8 @@ export async function getClientDetail(db: DbOrTx, id: string): Promise<ClientDet
   };
 }
 
+type ActivityKind = (typeof activities.kind.enumValues)[number];
+
 // ─── Actividad ──────────────────────────────────────────────────────────────
 
 const activityCursor = z.object({ t: z.iso.datetime(), i: z.uuid() });
@@ -271,7 +274,7 @@ const activityCursor = z.object({ t: z.iso.datetime(), i: z.uuid() });
 export async function listActivities(
   db: DbOrTx,
   clientId: string,
-  { cursor, limit }: { cursor?: string | undefined; limit: number },
+  { cursor, limit, excludeKinds }: { cursor?: string | undefined; limit: number; excludeKinds?: readonly ActivityKind[] },
 ) {
   const after = decodeCursor(cursor, activityCursor);
   const rows = await db
@@ -288,6 +291,7 @@ export async function listActivities(
     .where(
       and(
         eq(activities.clientId, clientId),
+        excludeKinds?.length ? notInArray(activities.kind, [...excludeKinds]) : undefined,
         after ? sql`(${activities.occurredAt}, ${activities.id}) < (${after.t}, ${after.i})` : undefined,
       ),
     )

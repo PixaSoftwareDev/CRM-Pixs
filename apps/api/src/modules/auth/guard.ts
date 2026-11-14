@@ -90,6 +90,12 @@ export function requireArea(area: Area) {
   };
 }
 
+/** ¿El usuario de este request puede ver (o más) ese sector? Para ocultar datos dentro de una respuesta. */
+export function canSee(request: FastifyRequest, area: Area): boolean {
+  const mine = request.access?.permissions;
+  return !!mine && hasLevel(mine[area], "read");
+}
+
 /** Sesión garantizada dentro de un handler que pasó por `requireUser`. */
 export function sessionOf(request: FastifyRequest): Session {
   if (!request.session) throw new Error("requireUser no se ejecutó en esta ruta");

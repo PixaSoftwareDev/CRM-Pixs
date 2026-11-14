@@ -9,6 +9,7 @@ import { Chip } from "../../components/ui/Chip";
 import { cn } from "../../components/ui/cn";
 import { Input, selectArrow } from "../../components/ui/Field";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
+import { useAccess } from "../../hooks/useAccess";
 import { useDebounced } from "../../hooks/useDebounced";
 import { ago, initials, money, when } from "../../lib/format";
 import { clientsRoute } from "../../router";
@@ -49,6 +50,8 @@ export function ClientsPage() {
   const summary = useClientSummary(filters);
   const list = useClients(filters);
   const rows = list.data?.pages.flatMap((p) => p.items) ?? [];
+  // La cuenta corriente es de Finanzas: sin ese acceso no hay columna (y la API tampoco manda el saldo).
+  const showMoney = useAccess().can("finanzas", "read");
 
   return (
     <>
@@ -108,19 +111,19 @@ export function ClientsPage() {
                 <th className="px-4 py-2.5">Prioridad</th>
                 <th className="px-4 py-2.5">Último contacto</th>
                 <th className="px-4 py-2.5">Próxima tarea</th>
-                <th className="px-4 py-2.5 text-right">Cuenta corriente</th>
+                {showMoney && <th className="px-4 py-2.5 text-right">Cuenta corriente</th>}
               </tr>
             </thead>
             <tbody className={cn(list.isPlaceholderData && "opacity-60")}>
               {list.isPending
                 ? Array.from({ length: 5 }, (_, i) => (
                     <tr key={i} className="border-b border-slate-100">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={showMoney ? 6 : 5} className="px-4 py-4">
                         <Skeleton />
                       </td>
                     </tr>
                   ))
-                : rows.map((c) => <ClientRow key={c.id} client={c} />)}
+                : rows.map((c) => <ClientRow key={c.id} client={c} showMoney={showMoney} />)}
             </tbody>
           </table>
           {!list.isPending && rows.length === 0 && (
@@ -148,7 +151,7 @@ export function ClientsPage() {
   );
 }
 
-function ClientRow({ client: c }: { client: ClientListItem }) {
+function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney: boolean }) {
   const update = useUpdateClient(c.id);
   const status = STATUS[c.status];
 
@@ -205,19 +208,23 @@ function ClientRow({ client: c }: { client: ClientListItem }) {
           <span className="text-slate-400">—</span>
         )}
       </td>
-      <td className="px-4 py-3 text-right">
-        <Link
-          to="/clientes/$clientId"
-          params={{ clientId: c.id }}
-          search={{ tab: "cuenta" }}
-          className="inline-flex flex-col items-end"
-        >
-          <strong className={cn("tabular-nums", c.hasOverdueDebt ? "text-red-700" : c.balance > 0 ? "text-ink" : "text-slate-500")}>
-            {money(c.balance)}
-          </strong>
-          <span className="text-xs text-brand">{c.hasOverdueDebt ? "Deuda vencida →" : "Ver cta. cte. →"}</span>
-        </Link>
-      </td>
+      {showMoney && (
+        <td className="px-4 py-3 text-right">
+          {c.balance !== null && (
+            <Link
+              to="/clientes/$clientId"
+              params={{ clientId: c.id }}
+              search={{ tab: "cuenta" }}
+              className="inline-flex flex-col items-end"
+            >
+              <strong className={cn("tabular-nums", c.hasOverdueDebt ? "text-red-700" : c.balance > 0 ? "text-ink" : "text-slate-500")}>
+                {money(c.balance)}
+              </strong>
+              <span className="text-xs text-brand">{c.hasOverdueDebt ? "Deuda vencida →" : "Ver cta. cte. →"}</span>
+            </Link>
+          )}
+        </td>
+      )}
     </tr>
   );
 }

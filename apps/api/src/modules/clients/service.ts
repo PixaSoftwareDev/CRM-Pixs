@@ -14,6 +14,10 @@ import {
 } from "@crm/db";
 import {
   type ActivityCreate,
+  type ActivityDto,
+  type ClientDetail,
+  type ClientListItem,
+  type ClientListQuery,
   activityCreate,
   type BillingProfileInput,
   billingProfileInput,
@@ -30,6 +34,7 @@ import {
   contactUpdate,
 } from "@crm/shared";
 import { ConflictError, isUniqueViolation, NotFoundError } from "../../lib/errors";
+import { FINANCE_ACTIVITY_KINDS, redactAmounts } from "../../lib/money";
 import * as repo from "./repository";
 
 const STATUS_LABEL: Record<ClientStatus, string> = {
@@ -171,22 +176,51 @@ export async function addActivity(db: Db, actorId: string, clientId: string, inp
 
 // ─── Lecturas ───────────────────────────────────────────────────────────────
 
-export async function getClient(db: Db, id: string) {
+/** Qué puede ver quien consulta: sin acceso a Finanzas no viaja ningún monto. */
+export interface Visibility {
+  money: boolean;
+}
+
+export async function getClient(db: Db, id: string, { money }: Visibility): Promise<ClientDetail> {
   const detail = await repo.getClientDetail(db, id);
   if (!detail) throw new NotFoundError("Cliente");
-  return detail;
+  if (money) return detail;
+  return { ...detail, summary: { ...detail.summary, balance: null, hasOverdueDebt: null, overdueAmount: null, monthlySubscriptions: null } };
 }
 
-export { countClients, listClientOptions, listClients } from "./repository";
-
-export async function getActivities(db: Db, id: string, page: { cursor?: string | undefined; limit: number }) {
-  await requireClient(db, id);
-  return repo.listActivities(db, id, page);
+export async function listClients(db: Db, query: ClientListQuery, { money }: Visibility) {
+  const page = await repo.listClients(db, query);
+  if (money) return page;
+  return {
+    ...page,
+    items: page.items.map(
+      (c): ClientListItem => ({
+        ...c,
+        balance: null,
+        hasOverdueDebt: null,
+        nextTask: c.nextTask && { ...c.nextTask, title: redactAmounts(c.nextTask.title) },
+      }),
+    ),
+  };
 }
 
-export async function getTasks(db: Db, id: string) {
+export { countClients, listClientOptions } from "./repository";
+
+/** Sin Finanzas, la actividad no trae cobros ni facturas, y los montos sueltos (tareas de cobranza…) van tapados. */
+export async function getActivities(db: Db, id: string, page: { cursor?: string | undefined; limit: number }, { money }: Visibility) {
   await requireClient(db, id);
-  return repo.listClientTasks(db, id);
+  const result = await repo.listActivities(db, id, { ...page, ...(!money && { excludeKinds: FINANCE_ACTIVITY_KINDS }) });
+  if (money) return result;
+  return {
+    ...result,
+    items: result.items.map((a): ActivityDto => ({ ...a, title: redactAmounts(a.title), body: redactAmounts(a.body) })),
+  };
+}
+
+export async function getTasks(db: Db, id: string, { money }: Visibility) {
+  await requireClient(db, id);
+  const tasks = await repo.listClientTasks(db, id);
+  return money ? tasks : tasks.map((t) => ({ ...t, title: redactAmounts(t.title) }));
 }
 
 export async function getStatement(db: Db, id: string, range: { from?: string | undefined; to?: string | undefined }) {

@@ -18,7 +18,7 @@ import {
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { db } from "../../lib/db";
-import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
+import { access, canSee, requireArea, requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
 const contactParams = idParams.extend({ contactId: z.uuid() });
@@ -30,7 +30,7 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   app.addHook("onRequest", requireArea("clientes"));
 
   app.get("/api/clients", { schema: { querystring: clientListQuery } }, (req) =>
-    service.listClients(db, req.query),
+    service.listClients(db, req.query, { money: canSee(req, "finanzas") }),
   );
 
   app.get("/api/clients/summary", { schema: { querystring: clientSummaryQuery } }, (req) =>
@@ -45,7 +45,7 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   });
 
   app.get("/api/clients/:id", { schema: { params: idParams } }, (req) =>
-    service.getClient(db, req.params.id),
+    service.getClient(db, req.params.id, { money: canSee(req, "finanzas") }),
   );
 
   app.patch(
@@ -105,7 +105,7 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     "/api/clients/:id/activities",
     { schema: { params: idParams, querystring: cursorQuery } },
-    (req) => service.getActivities(db, req.params.id, req.query),
+    (req) => service.getActivities(db, req.params.id, req.query, { money: canSee(req, "finanzas") }),
   );
 
   app.post(
@@ -117,7 +117,7 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
 
   // Pestañas de lectura
   app.get("/api/clients/:id/tasks", { config: { access: access(["tareas", "clientes"], "read") }, schema: { params: idParams } }, (req) =>
-    service.getTasks(db, req.params.id),
+    service.getTasks(db, req.params.id, { money: canSee(req, "finanzas") }),
   );
 
   app.get(

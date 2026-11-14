@@ -8,6 +8,7 @@ import { cn } from "../../components/ui/cn";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
+import { useAccess } from "../../hooks/useAccess";
 import { ago, initials } from "../../lib/format";
 import { useClient, useClientTasks } from "../clients/api";
 import { ContactsSection } from "../clients/tabs/DataTab";
@@ -117,6 +118,7 @@ function TaskBody({
   const [pending, setPending] = useState<(() => void) | null>(null);
   /** Contactos o cuenta corriente del cliente, en un modal encima de este. */
   const [panel, setPanel] = useState<ClientPanelKind | null>(null);
+  const showMoney = useAccess().can("finanzas", "read");
 
   useEffect(() => {
     if (task.data && !edit) setEdit(editOf(task.data));
@@ -221,9 +223,11 @@ function TaskBody({
             <button type="button" onClick={() => setPanel("contactos")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
               <Users size={14} aria-hidden /> Contactos
             </button>
-            <button type="button" onClick={() => setPanel("cuenta")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
-              <Receipt size={14} aria-hidden /> Cta. cte.
-            </button>
+            {showMoney && (
+              <button type="button" onClick={() => setPanel("cuenta")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
+                <Receipt size={14} aria-hidden /> Cta. cte.
+              </button>
+            )}
           </div>
         </div>
       )}

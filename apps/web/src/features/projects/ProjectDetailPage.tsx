@@ -10,6 +10,7 @@ import { cn } from "../../components/ui/cn";
 import { Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
+import { useAccess } from "../../hooks/useAccess";
 import { useCopy } from "../../hooks/useCopy";
 import { isNotFound } from "../../lib/api";
 import { day, initials, money, when } from "../../lib/format";
@@ -184,12 +185,18 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function SaleCard({ project: p }: { project: ProjectDetail }) {
+  // Monto y forma de pago son de Finanzas: sin ese acceso no se muestran (la API tampoco los manda).
+  const showMoney = useAccess().can("finanzas", "read");
   return (
     <Card className="flex flex-col gap-3 p-5">
       <h2 className="font-bold">Datos de la venta</h2>
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Monto" value={p.sale.amount === null ? "—" : money(p.sale.amount)} />
-        <Kpi label="Forma de pago" value={p.sale.paymentTerms ?? "—"} />
+      <dl className={cn("grid grid-cols-2 gap-3", showMoney && "sm:grid-cols-4")}>
+        {showMoney && (
+          <>
+            <Kpi label="Monto" value={p.sale.amount === null ? "—" : money(p.sale.amount)} />
+            <Kpi label="Forma de pago" value={p.sale.paymentTerms ?? "—"} />
+          </>
+        )}
         <Kpi label="Vendió" value={p.sale.seller?.name ?? "—"} />
         <Kpi label="Cierre" value={day(p.sale.soldOn)} />
       </dl>

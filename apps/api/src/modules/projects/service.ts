@@ -2,6 +2,7 @@
 import { activities, type Db, eq, projects, sql } from "@crm/db";
 import {
   type ProjectCreate,
+  type ProjectDetail,
   type ProjectUpdate,
   PROJECT_PHASES,
   projectCreate,
@@ -9,6 +10,7 @@ import {
 } from "@crm/shared";
 import { archivedChange } from "../../lib/archive";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
+import { redactAmounts } from "../../lib/money";
 import { isActiveUser } from "../tasks/repository";
 import * as repo from "./repository";
 
@@ -16,10 +18,16 @@ const PHASE_LABEL = ["Kickoff", "Relevamiento", "Desarrollo", "Pruebas", "Entreg
 
 export const listProjects = (db: Db, opts: { archived?: boolean } = {}) => repo.listProjects(db, opts);
 
-export async function getProject(db: Db, id: string) {
+/** Sin acceso a Finanzas no viajan el monto ni la forma de pago, y los montos de las tareas van tapados. */
+export async function getProject(db: Db, id: string, { money }: { money: boolean }): Promise<ProjectDetail> {
   const p = await repo.getProjectDetail(db, id);
   if (!p) throw new NotFoundError("Proyecto");
-  return p;
+  if (money) return p;
+  return {
+    ...p,
+    sale: { ...p.sale, amount: null, paymentTerms: null },
+    tasks: p.tasks.map((t) => ({ ...t, title: redactAmounts(t.title) })),
+  };
 }
 
 async function checkImplementer(db: Db, id: string | null | undefined) {
