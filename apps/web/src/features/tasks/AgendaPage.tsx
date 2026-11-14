@@ -19,10 +19,13 @@ import { TaskDialog } from "./TaskDialog";
 import { type TaskDraft, TaskFormDialog } from "./TaskFormDialog";
 import { addDays, addMonths, arParts, dayTitle, monthGrid, monthTitle, todayAr, toHHMM, weekday, weekStart, weekTitle } from "./time";
 
-const FIRST_HOUR = 8;
-const LAST_HOUR = 20;
+// El día entero (00 a 24): con un rango fijo, lo agendado fuera de él no se veía.
+const FIRST_HOUR = 0;
+const LAST_HOUR = 24;
 const ROW = 56; // px por hora
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => FIRST_HOUR + i);
+/** Hora que queda arriba al abrir la grilla (se scrollea para ver el resto). */
+const SCROLL_TO_HOUR = 8;
 const DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const ALL = "todos";
 
@@ -162,7 +165,16 @@ export function AgendaPage() {
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-[52px_repeat(7,1fr)]">
+                <div
+                  ref={(el) => {
+                    // Al montar arranca a las 08:00; el resto del día queda a un scroll.
+                    if (el && !el.dataset.scrolled) {
+                      el.scrollTop = (SCROLL_TO_HOUR - FIRST_HOUR) * ROW;
+                      el.dataset.scrolled = "1";
+                    }
+                  }}
+                  className="grid max-h-[672px] grid-cols-[52px_repeat(7,1fr)] overflow-y-auto"
+                >
                   <div className="relative">
                     {HOURS.map((h) => (
                       <span key={h} className="block pr-2 text-right text-[11px] text-muted tabular-nums" style={{ height: ROW }}>
@@ -231,7 +243,7 @@ function DayColumn({
       ))}
       {placed.map(({ item: { task: t, start, end }, lane, lanes }) => {
         const top = Math.max(0, ((start - FIRST_HOUR * 60) / 60) * ROW) + 1;
-        const height = Math.max(22, ((end - start) / 60) * ROW - 3);
+        const height = Math.max(22, ((Math.min(end, LAST_HOUR * 60) - start) / 60) * ROW - 3);
         const compact = height < 46;
         const done = t.status === "hecha";
         const range = `${toHHMM(start)} – ${toHHMM(end)}`;
