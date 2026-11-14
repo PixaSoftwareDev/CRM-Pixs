@@ -155,7 +155,7 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
 
 // ─── Personas del negocio ───────────────────────────────────────────────────
 
-function ContactsSection({ client }: { client: ClientDetail }) {
+export function ContactsSection({ client }: { client: ClientDetail }) {
   const [editing, setEditing] = useState<ContactDto | "new" | null>(null);
   const remove = useRemoveContact(client.id);
 

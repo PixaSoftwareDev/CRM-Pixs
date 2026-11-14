@@ -13,8 +13,9 @@ export async function copyText(text: string): Promise<void> {
   area.setAttribute("readonly", "");
   area.style.position = "fixed";
   area.style.opacity = "0";
-  // Dentro de un <dialog> modal el resto de la página es inerte: el textarea va en el modal abierto.
-  (document.querySelector("dialog[open]") ?? document.body).appendChild(area);
+  // Dentro de un <dialog> modal el resto de la página es inerte: el textarea va en el
+  // modal abierto (el último, si hay uno encima de otro).
+  ([...document.querySelectorAll("dialog[open]")].at(-1) ?? document.body).appendChild(area);
   area.select();
   try {
     if (!document.execCommand("copy")) throw new Error("No se pudo copiar");

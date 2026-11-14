@@ -37,7 +37,8 @@ body {
     border: 0;
     box-shadow: none;
   }
-  body[data-print] dialog {
+  /* Los modales no se imprimen, salvo el que contiene el estado de cuenta. */
+  body[data-print] dialog:not(:has(#statement-print)) {
     display: none;
   }
 }

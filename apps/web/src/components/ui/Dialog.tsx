@@ -36,9 +36,12 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      // Con un modal encima de otro, React le hace llegar al de abajo los eventos del
+      // de arriba: cada uno atiende solo los propios.
+      onClose={(e) => e.target === ref.current && onClose()}
       // Esc no cierra solo: avisa al dueño, que decide (p. ej. si hay cambios sin guardar).
       onCancel={(e) => {
+        if (e.target !== ref.current) return;
         e.preventDefault();
         onClose();
       }}

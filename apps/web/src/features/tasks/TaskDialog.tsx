@@ -9,7 +9,9 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { ago, initials } from "../../lib/format";
-import { useClientTasks } from "../clients/api";
+import { useClient, useClientTasks } from "../clients/api";
+import { ContactsSection } from "../clients/tabs/DataTab";
+import { StatementTab } from "../clients/tabs/StatementTab";
 import { useAddTaskComment, useMyId, useTask, useTeam, useUpdateTask } from "./api";
 import { EDITABLE_STATUSES, TASK_STATUS, tint } from "./labels";
 import { arParts, durationLabel, shortDay, toHHMM, toInstant, toMinutes } from "./time";
@@ -103,6 +105,8 @@ function TaskBody({
   const [comment, setComment] = useState("");
   /** Acción que quedó esperando porque había cambios sin guardar. */
   const [pending, setPending] = useState<(() => void) | null>(null);
+  /** Contactos o cuenta corriente del cliente, en un modal encima de este. */
+  const [panel, setPanel] = useState<ClientPanelKind | null>(null);
 
   useEffect(() => {
     if (task.data && !edit) setEdit(editOf(task.data));
@@ -179,22 +183,12 @@ function TaskBody({
             )}
           </div>
           <div className="flex gap-2">
-            <Link
-              to="/clientes/$clientId"
-              params={{ clientId: t.client.id }}
-              search={{ tab: "datos" }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
-            >
+            <button type="button" onClick={() => setPanel("contactos")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
               <Users size={14} aria-hidden /> Contactos
-            </Link>
-            <Link
-              to="/clientes/$clientId"
-              params={{ clientId: t.client.id }}
-              search={{ tab: "cuenta" }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
-            >
+            </button>
+            <button type="button" onClick={() => setPanel("cuenta")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
               <Receipt size={14} aria-hidden /> Cta. cte.
-            </Link>
+            </button>
           </div>
         </div>
       )}
@@ -261,6 +255,19 @@ function TaskBody({
         </section>
       </div>
 
+      {t.client && (
+        <ClientPanel
+          clientId={t.client.id}
+          clientName={t.client.name}
+          panel={panel}
+          onClose={() => {
+            setPanel(null);
+            // Si cambiaron los contactos, el encabezado de la tarea los muestra al día.
+            void task.refetch();
+          }}
+        />
+      )}
+
       <footer className="flex flex-col gap-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Fecha">
@@ -326,6 +333,40 @@ function TaskBody({
       </footer>
     </div>
   );
+}
+
+type ClientPanelKind = "contactos" | "cuenta";
+
+/** Contactos o cuenta corriente del cliente sin salir de la tarea. */
+function ClientPanel({
+  clientId,
+  clientName,
+  panel,
+  onClose,
+}: {
+  clientId: string;
+  clientName: string;
+  panel: ClientPanelKind | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog
+      open={!!panel}
+      onClose={onClose}
+      title={panel === "cuenta" ? "Cuenta corriente" : "Contactos"}
+      description={clientName}
+      size="xl"
+    >
+      {panel && <ClientPanelBody clientId={clientId} panel={panel} />}
+    </Dialog>
+  );
+}
+
+function ClientPanelBody({ clientId, panel }: { clientId: string; panel: ClientPanelKind }) {
+  const client = useClient(clientId);
+  if (client.error) return <ErrorBox error={client.error} onRetry={() => void client.refetch()} />;
+  if (!client.data) return <Skeleton className="h-40" />;
+  return panel === "cuenta" ? <StatementTab client={client.data} /> : <ContactsSection client={client.data} />;
 }
 
 type ListFilter = "pend" | "res" | "todas";
