@@ -1,5 +1,5 @@
 /** Fechas del detalle del ticket (compromiso y llamada de confirmación). */
-import { addDays, toHHMM, toInstant } from "../tasks/time";
+import { addDays, shortDay, toHHMM, toInstant } from "../tasks/time";
 
 /**
  * Fecha de compromiso completa y razonable. Mientras se tipea con el teclado el
@@ -19,10 +19,25 @@ export function validDue(v: string): boolean {
  */
 export function confirmSlots(nowMinutes: number, today: string) {
   const inTwo = Math.ceil((nowMinutes + 120) / 15) * 15;
-  const tomorrow = addDays(today, 1);
+  // Días hábiles, como las tareas automáticas del server: un viernes, "mañana" es el lunes.
+  const first = nextWorkday(today);
+  const second = nextWorkday(first);
+  const name = (d: string) =>
+    d === addDays(today, 1) ? "Mañana" : d === addDays(today, 2) ? "Pasado mañana" : capitalize(shortDay(d));
   return [
-    ...(inTwo <= 19 * 60 ? [{ label: `Hoy ${toHHMM(inTwo)}`, at: toInstant(today, toHHMM(inTwo)) }] : []),
-    { label: "Mañana 10:00", at: toInstant(tomorrow, "10:00") },
-    { label: "Pasado mañana 10:00", at: toInstant(addDays(tomorrow, 1), "10:00") },
+    ...(isWorkday(today) && inTwo <= 19 * 60 ? [{ label: `Hoy ${toHHMM(inTwo)}`, at: toInstant(today, toHHMM(inTwo)) }] : []),
+    { label: `${name(first)} 10:00`, at: toInstant(first, "10:00") },
+    { label: `${name(second)} 10:00`, at: toInstant(second, "10:00") },
   ];
+}
+
+const weekday = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay();
+const isWorkday = (d: string) => weekday(d) !== 0 && weekday(d) !== 6;
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** El siguiente día de lunes a viernes después de `d`. */
+export function nextWorkday(d: string): string {
+  let next = addDays(d, 1);
+  while (!isWorkday(next)) next = addDays(next, 1);
+  return next;
 }

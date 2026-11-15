@@ -96,9 +96,37 @@ function matchTime(text: string): string | null {
   return toHHMM(h * 60 + min);
 }
 
+/**
+ * Lo que dice cuándo ("hoy", "mañana 10hs", "el lunes", "el 2/12 a las 9:30") sale del
+ * título: ya quedó en la fecha y la hora, y si se reprograma el título seguía diciendo "hoy".
+ */
+const WHEN_PARTS = [
+  /\b(?:para |el |este |hoy )?(?:hoy|pasado ma[nñ]ana)\b/giu,
+  /(?<!\bla )\b(?:para )?ma[nñ]ana\b/giu,
+  /\b(?:para |el |este |pr[oó]ximo )?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?: que viene)?\b/giu,
+  /\b(?:para |el )?\d{1,2}\/\d{1,2}\b/gu,
+  /\b(?:a las |tipo )?\d{1,2}(?:[:.]\d{2})?\s*(?:hs|h|horas)\b/giu,
+  /\ba las \d{1,2}(?:[:.]\d{2})?\b/giu,
+  /\b(?:de|por|a) la (?:ma[nñ]ana|tarde|noche)\b/giu,
+  /\b(?:am|pm)\b/giu,
+];
+
+export function cleanTitle(title: string): string {
+  let t = title;
+  for (const re of WHEN_PARTS) t = t.replace(re, " ");
+  t = t
+    .replace(/\s+([,.;:])/g, "$1")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,.;:-]+|[\s,;:-]+$/g, "")
+    .trim();
+  // Si no queda nada con sentido, mejor la frase original.
+  return t.length >= 3 ? t : title;
+}
+
 export function parseQuickTask(raw: string, opts: Options): QuickDraft {
-  const title = raw.trim().replace(/\s+/g, " ");
-  const text = norm(title);
+  const original = raw.trim().replace(/\s+/g, " ");
+  const text = norm(original);
+  const title = cleanTitle(original);
   const typeName = TYPE_RULES.find(([re]) => re.test(text))?.[1] ?? null;
   const { date, warning } = matchDate(text, opts.baseDate);
   return {

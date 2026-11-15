@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutLanes } from "./lanes";
-import { parseQuickTask } from "./quick-parse";
+import { cleanTitle, parseQuickTask } from "./quick-parse";
 import { addDays, arParts, monthGrid, toInstant, weekStart, weekTitle } from "./time";
 
 const clients = [
@@ -15,7 +15,7 @@ describe("parseQuickTask", () => {
   it("saca cliente, tipo y hora", () => {
     const d = parseQuickTask("llamar a La Espiga por la cuota 10hs", opts);
     expect(d).toMatchObject({ clientId: "espiga", typeName: "Cobranza", date: "2026-11-13", start: "10:00", durationMinutes: 30 });
-    expect(d.title).toBe("Llamar a La Espiga por la cuota 10hs");
+    expect(d.title).toBe("Llamar a La Espiga por la cuota");
   });
 
   it("entiende mañana, días de la semana y fechas", () => {
@@ -94,5 +94,20 @@ describe("time", () => {
     expect(grid[0]).toBe("2026-10-26");
     expect(grid.length % 7).toBe(0);
     expect(grid.at(-1)).toBe("2026-12-06");
+  });
+});
+
+describe("cleanTitle", () => {
+  it("saca del título el día y la hora (ya quedan en la agenda)", () => {
+    expect(cleanTitle("Llamar a QA-Cliente hoy 16hs por seguimiento de propuesta")).toBe("Llamar a QA-Cliente por seguimiento de propuesta");
+    expect(cleanTitle("cobrar a ruiz el 2/12 15.30 hs")).toBe("cobrar a ruiz");
+    expect(cleanTitle("reunión con fitzone mañana a las 9:30")).toBe("reunión con fitzone");
+    expect(cleanTitle("propuesta para clinica del sol el lunes")).toBe("propuesta para clinica del sol");
+    expect(cleanTitle("llamar a ruiz a las 7 de la mañana")).toBe("llamar a ruiz");
+    expect(cleanTitle("revisar el sábado que viene")).toBe("revisar");
+  });
+  it("no toca lo que no es fecha y no deja el título vacío", () => {
+    expect(cleanTitle("Mañana")).toBe("Mañana");
+    expect(cleanTitle("Revisar la mañana de capacitación")).toBe("Revisar la mañana de capacitación");
   });
 });

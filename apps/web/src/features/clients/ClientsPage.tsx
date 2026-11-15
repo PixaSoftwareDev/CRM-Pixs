@@ -16,16 +16,18 @@ import { clientsRoute } from "../../router";
 import { useClientSummary, useClients, useUpdateClient } from "./api";
 import { PRIORITY, STATUS } from "./labels";
 import { NewClientDialog } from "./NewClientDialog";
+import { useTitle } from "../../hooks/useTitle";
 
 const FILTERS: { key: ClientStatus | undefined; label: string }[] = [
   { key: undefined, label: "Todos" },
   { key: "potencial", label: "Potenciales" },
   { key: "activo", label: "Activos" },
   { key: "en_riesgo", label: "En riesgo" },
-  { key: "baja", label: "De baja" },
+  { key: "baja", label: "Baja" },
 ];
 
 export function ClientsPage() {
+  useTitle("Clientes");
   const search = clientsRoute.useSearch();
   const navigate = useNavigate({ from: clientsRoute.fullPath });
   const [text, setText] = useState(search.q ?? "");
@@ -202,7 +204,12 @@ function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney
         {c.nextTask ? (
           <span className="block max-w-[220px]">
             <span className="block truncate">{c.nextTask.title}</span>
-            <span className="text-xs text-muted">{when(c.nextTask.startsAt)}</span>
+            {/* Una tarea que ya tendría que haberse hecho no puede verse igual que una que viene. */}
+            {c.nextTask.startsAt && c.nextTask.startsAt < new Date().toISOString() ? (
+              <span className="text-xs font-semibold text-red-700">{when(c.nextTask.startsAt)} · atrasada</span>
+            ) : (
+              <span className="text-xs text-muted">{when(c.nextTask.startsAt)}</span>
+            )}
           </span>
         ) : (
           <span className="text-slate-400">—</span>

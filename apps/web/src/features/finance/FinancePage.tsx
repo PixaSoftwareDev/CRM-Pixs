@@ -32,6 +32,7 @@ import {
 } from "./api";
 import { type CashDraft, CashDialog, type PaymentTarget, PaymentDialog, SubscriptionDialog } from "./dialogs";
 import { parseMovement } from "./quick-movement";
+import { useTitle } from "../../hooks/useTitle";
 
 type Tab = "cobrar" | "abonos" | "movimientos";
 
@@ -39,6 +40,7 @@ type Tab = "cobrar" | "abonos" | "movimientos";
 const cashInMonth = (list: CashMovementDto[], month: string) => list.filter((m) => m.occurredOn.startsWith(month));
 
 export function FinancePage() {
+  useTitle("Finanzas");
   const search = financeRoute.useSearch();
   const navigate = useNavigate({ from: financeRoute.fullPath });
   const tab: Tab = search.tab ?? "cobrar";

@@ -25,10 +25,12 @@ import { NewTicketDialog } from "../tickets/NewTicketDialog";
 import { TICKET_STATUS, TICKET_TYPE } from "../tickets/labels";
 import { alertsOf, HEALTH, PHASE, STATUS_LABEL } from "./labels";
 import { ProjectFormDialog } from "./ProjectFormDialog";
+import { useTitle } from "../../hooks/useTitle";
 
 export function ProjectDetailPage() {
   const { projectId } = projectRoute.useParams();
   const project = useProject(projectId);
+  useTitle(project.data?.name ?? "Proyecto");
   const notice = useNotice();
 
   if (project.error) {

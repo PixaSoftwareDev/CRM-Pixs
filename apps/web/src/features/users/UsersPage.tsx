@@ -33,6 +33,7 @@ import { api } from "../../lib/api";
 import { day, initials } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { taskKeys, useMyId } from "../tasks/api";
+import { useTitle } from "../../hooks/useTitle";
 
 const KEY = ["users"] as const;
 /** Perfil = rol + permisos: administrador (todo), uno de los perfiles listos, o a medida. */
@@ -55,6 +56,7 @@ function useSaveUser() {
 }
 
 export function UsersPage() {
+  useTitle("Usuarios");
   const isAdmin = useIsAdmin();
   const me = useMyId();
   const notice = useNotice();
@@ -63,6 +65,8 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState<UserDto | null>(null);
   const [permsOf, setPermsOf] = useState<UserDto | null>(null);
+  // Confirmación de la baja en la misma fila (antes, el cartel nativo del navegador).
+  const [deactivating, setDeactivating] = useState<string | null>(null);
 
   if (!isAdmin) return <Empty>Los usuarios del sistema los administra un administrador.</Empty>;
   if (users.error) return <ErrorBox error={users.error} onRetry={() => void users.refetch()} />;
@@ -138,17 +142,35 @@ export function UsersPage() {
                       <Button size="sm" variant="secondary" disabled={busy || !u.active} onClick={() => setResetting(u)}>
                         <KeyRound size={13} aria-hidden /> Contraseña
                       </Button>
-                      {!self && (
+                      {!self && deactivating === u.id && (
+                        <span className="flex flex-wrap items-center gap-1.5 text-xs">
+                          ¿Dar de baja a {u.name}? No va a poder entrar hasta que lo reactives.
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={busy}
+                            onClick={() =>
+                              save.mutate(
+                                { id: u.id, active: false },
+                                { onSuccess: () => notice.show(`${u.name} ya no puede entrar.`), onSettled: () => setDeactivating(null) },
+                              )
+                            }
+                          >
+                            Sí, dar de baja
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setDeactivating(null)}>
+                            No
+                          </Button>
+                        </span>
+                      )}
+                      {!self && deactivating !== u.id && (
                         <Button
                           size="sm"
                           variant="ghost"
                           disabled={busy}
                           onClick={() => {
-                            if (u.active && !window.confirm(`¿Dar de baja a ${u.name}? No va a poder entrar al CRM hasta que lo reactives.`)) return;
-                            save.mutate(
-                              { id: u.id, active: !u.active },
-                              { onSuccess: () => notice.show(u.active ? `${u.name} ya no puede entrar.` : `${u.name} vuelve a tener acceso.`) },
-                            );
+                            if (u.active) return setDeactivating(u.id);
+                            save.mutate({ id: u.id, active: true }, { onSuccess: () => notice.show(`${u.name} vuelve a tener acceso.`) });
                           }}
                         >
                           {u.active ? "Dar de baja" : "Reactivar"}

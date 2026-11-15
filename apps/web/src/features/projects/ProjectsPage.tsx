@@ -15,8 +15,10 @@ import { todayAr } from "../tasks/time";
 import { useProjects } from "./api";
 import { alertsOf, HEALTH, PHASE } from "./labels";
 import { ProjectFormDialog } from "./ProjectFormDialog";
+import { useTitle } from "../../hooks/useTitle";
 
 export function ProjectsPage() {
+  useTitle("Proyectos");
   const search = projectsRoute.useSearch();
   const navigate = useNavigate({ from: projectsRoute.fullPath });
   const archived = !!search.baja;

@@ -44,6 +44,7 @@ import {
   type SubscriptionUpdate,
   subscriptionCreate,
   subscriptionUpdate,
+  todayInArgentina,
 } from "@crm/shared";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { todayAr } from "../../lib/sql";
@@ -156,9 +157,26 @@ async function insertInvoice(
     projectId?: string | null | undefined;
     subscriptionId?: string;
     period?: string;
+    /** Factura cargada a mano: la emisión no puede ser anterior a la última del talonario. */
+    inOrder?: boolean;
   },
 ) {
   const billing = await billingOf(tx, clientId);
+  // Con el talonario bloqueado (nextNumber), así nadie emite otra en el medio.
+  const number = await nextNumber(tx, "factura", billing.letter);
+  if (data.inOrder) {
+    // Las fechadas a futuro (de antes de esta regla) no cuentan: si no, trabarían todo el talonario.
+    const [last] = await tx.execute<{ d: string | null }>(sql`
+      select max(issued_on)::text as d from documents
+      where kind = 'factura' and letter is not distinct from ${billing.letter} and point_of_sale = ${POINT_OF_SALE}
+        and issued_on <= ${todayInArgentina()}`);
+    if (last?.d && data.issuedOn < last.d) {
+      const [y, m, d] = last.d.split("-");
+      throw new BadRequestError(
+        `La última factura ${billing.letter} es del ${d}/${m}/${y}: la emisión no puede ser anterior (el número y la fecha tienen que avanzar juntos).`,
+      );
+    }
+  }
   const [doc] = await tx
     .insert(documents)
     .values({
@@ -167,7 +185,7 @@ async function insertInvoice(
       kind: "factura",
       letter: billing.letter,
       pointOfSale: POINT_OF_SALE,
-      number: await nextNumber(tx, "factura", billing.letter),
+      number,
       issuedOn: data.issuedOn,
       dueOn: data.dueOn,
       concept: data.concept,
@@ -312,6 +330,7 @@ export async function createInvoice(db: Db, actorId: string, clientId: string, i
     const id = await insertInvoice(tx, actorId, clientId, {
       ...data,
       dueOn: data.dueOn === undefined ? addDaysIso(data.issuedOn, termDays) : data.dueOn,
+      inOrder: true,
     });
     await tx.insert(activities).values({ clientId, actorId, documentId: id, kind: "factura", title: "Factura emitida", body: `${data.concept} · ${pesos(data.amount)}` });
     await applyCredit(tx, clientId);
@@ -324,8 +343,22 @@ export async function createInvoice(db: Db, actorId: string, clientId: string, i
 
 export async function createInstallmentPlan(db: Db, projectId: string, input: InstallmentPlanCreate) {
   const data = installmentPlanCreate.parse(input);
-  const [project] = await db.execute<{ client_id: string }>(sql`select client_id from projects where id = ${projectId}`);
+  const [project] = await db.execute<{ client_id: string; sale_amount: string | null; planned: string }>(sql`
+    select client_id, sale_amount,
+           (select coalesce(sum(total), 0) from installment_plans where project_id = ${projectId}) as planned
+    from projects where id = ${projectId}`);
   if (!project) throw new NotFoundError("Proyecto");
+  // Las cuotas no pueden sumar más que lo que se vendió (contando los planes que ya tiene).
+  const total = data.items.reduce((a, i) => a + i.amount, 0);
+  const sale = project.sale_amount === null ? null : Number(project.sale_amount);
+  const planned = Number(project.planned);
+  if (sale !== null && sale > 0 && planned + total > sale) {
+    throw new BadRequestError(
+      planned > 0
+        ? `Con este plan las cuotas sumarían ${pesos(planned + total)} y la venta fue de ${pesos(sale)} (ya hay planes por ${pesos(planned)}).`
+        : `El plan suma ${pesos(total)} y la venta fue de ${pesos(sale)}: no puede ser mayor.`,
+    );
+  }
   return db.transaction(async (tx) => {
     const [plan] = await tx
       .insert(installmentPlans)

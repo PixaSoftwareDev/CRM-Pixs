@@ -15,8 +15,14 @@ export interface Affected {
   entityId: string;
 }
 
+/** "$ 4.445" o, si hay centavos, "$ 4.444,50": igual que la cuenta corriente (no se redondea). */
 const pesos = (cents: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(cents / 100);
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100);
 
 async function typeId(db: Db, name: string) {
   const t = (await listTaskTypes(db)).find((x) => x.name === name);

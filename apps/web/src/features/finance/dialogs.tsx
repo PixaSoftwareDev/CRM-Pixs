@@ -158,7 +158,7 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
 // ─── Factura manual ─────────────────────────────────────────────────────────
 
 const invoiceSchema = z
-  .object({ concept: z.string().trim().min(1, { message: "Indicá el concepto" }).max(200), amount: pesosField(), issuedOn: z.iso.date(), dueOn: z.string() })
+  .object({ concept: z.string().trim().min(1, { message: "Indicá el concepto" }).max(200), amount: pesosField(), issuedOn: z.iso.date({ message: "Fecha inválida" }).refine((d) => d <= todayAr(), { message: "No puede ser futura" }), dueOn: z.string() })
   .refine((v) => !v.dueOn || v.dueOn >= v.issuedOn, { message: "No puede vencer antes de emitirse", path: ["dueOn"] });
 
 export function InvoiceDialog({
@@ -203,7 +203,7 @@ export function InvoiceDialog({
             <Input inputMode="decimal" {...form.register("amount")} />
           </Field>
           <Field label="Emisión" error={err.issuedOn?.message}>
-            <Input type="date" {...form.register("issuedOn")} />
+            <Input type="date" max={todayAr()} {...form.register("issuedOn")} />
           </Field>
           <Field label="Vence" error={err.dueOn?.message} hint="Vacío: según el plazo del cliente">
             <Input type="date" {...form.register("dueOn")} />

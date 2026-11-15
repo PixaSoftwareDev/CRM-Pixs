@@ -46,6 +46,7 @@ import {
   ticketTaskCreate,
   ticketUpdate,
   ticketWorkDone,
+  todayInArgentina,
 } from "@crm/shared";
 import type { z } from "zod";
 import { endOfDayAr, fmtWhen } from "../../lib/dates";
@@ -170,6 +171,12 @@ export async function getTicket(db: Db, id: string) {
 export async function createTicket(db: Db, actorId: string, input: TicketCreate) {
   const data = ticketCreate.parse(input);
   const reporterId = data.reportedById ?? actorId;
+  const received = data.receivedAt ? new Date(data.receivedAt) : new Date();
+  // 5 minutos de margen por relojes desparejos.
+  if (received.getTime() > Date.now() + 5 * 60_000) throw new BadRequestError("La fecha de carga no puede ser futura");
+  if (data.dueOn && data.dueOn < todayInArgentina(received)) {
+    throw new BadRequestError("El compromiso no puede ser anterior a la fecha de carga");
+  }
   const [client] = await db.execute(sql`select 1 from clients where id = ${data.clientId}`);
   if (!client) throw new BadRequestError("El cliente no existe");
   if (data.projectId) {
@@ -191,7 +198,7 @@ export async function createTicket(db: Db, actorId: string, input: TicketCreate)
         title: data.title,
         description: data.description || null,
         reportedById: reporterId,
-        receivedAt: data.receivedAt ? new Date(data.receivedAt) : new Date(),
+        receivedAt: received,
         dueAt: data.dueOn ? endOfDayAr(data.dueOn) : null,
       })
       .returning({ id: tickets.id, number: tickets.number });
@@ -240,6 +247,9 @@ export async function updateTicket(db: Db, actorId: string, id: string, input: T
   if (data.priority !== undefined && data.priority !== before.priority) {
     patch.priority = data.priority;
     notes.push(`Urgencia: ${PRIORITY_LABEL[before.priority]} → ${PRIORITY_LABEL[data.priority]}`);
+  }
+  if (data.dueOn && data.dueOn < todayInArgentina(new Date(before.received_at))) {
+    throw new BadRequestError("El compromiso no puede ser anterior a la fecha de carga");
   }
   if (data.dueOn !== undefined) {
     patch.dueAt = data.dueOn ? endOfDayAr(data.dueOn) : null;

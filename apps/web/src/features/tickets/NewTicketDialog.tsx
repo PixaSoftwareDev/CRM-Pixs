@@ -21,7 +21,7 @@ const schema = z
     type: z.enum(TICKET_TYPES),
     channel: z.enum(TICKET_CHANNELS),
     reportedById: z.string().min(1),
-    receivedDate: z.iso.date({ message: "Fecha inválida" }),
+    receivedDate: z.iso.date({ message: "Fecha inválida" }).refine((d) => d <= todayAr(), { message: "No puede ser futura" }),
     receivedTime: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
     assigneeId: z.string(),
     workDate: z.string(),
@@ -31,6 +31,7 @@ const schema = z
     title: z.string().trim().min(1, { message: "Poné un título" }).max(200),
     description: z.string().max(8000),
   })
+  .refine((v) => !v.dueOn || v.dueOn >= v.receivedDate, { message: "No puede ser antes de la carga", path: ["dueOn"] })
   .refine((v) => !v.assigneeId || (/^\d{4}-\d{2}-\d{2}$/.test(v.workDate) && /^\d{2}:\d{2}$/.test(v.workTime)), {
     message: "Indicá cuándo lo trabaja",
     path: ["workDate"],
@@ -178,7 +179,7 @@ export function NewTicketDialog({
             </Select>
           </Field>
           <Field label="Fecha de carga" error={err.receivedDate?.message}>
-            <Input type="date" {...form.register("receivedDate")} />
+            <Input type="date" max={todayAr()} {...form.register("receivedDate")} />
           </Field>
           <Field label="Hora" error={err.receivedTime?.message}>
             <Input type="time" {...form.register("receivedTime")} />
@@ -205,8 +206,8 @@ export function NewTicketDialog({
           ) : (
             <div className="sm:col-span-2" />
           )}
-          <Field label="Compromiso con el cliente">
-            <Input type="date" {...form.register("dueOn")} />
+          <Field label="Compromiso con el cliente" error={err.dueOn?.message}>
+            <Input type="date" min={form.watch("receivedDate")} {...form.register("dueOn")} />
           </Field>
         </div>
         <Field label="Título" error={err.title?.message}>

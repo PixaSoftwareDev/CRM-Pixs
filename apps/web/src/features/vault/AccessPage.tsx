@@ -22,11 +22,13 @@ import { useClientOptions, useTeam } from "../tasks/api";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useAccessLogs, useCreateCredential, useCredentials, useDeleteCredential, useReveal, useUpdateCredential } from "./api";
 import { KIND } from "./labels";
+import { useTitle } from "../../hooks/useTitle";
 
 /** Cuánto queda visible una clave antes de ocultarse sola. */
 const VISIBLE_MS = 20_000;
 
 export function AccessPage() {
+  useTitle("Accesos");
   const [q, setQ] = useState("");
   const dq = useDebounced(q, 250);
   const creds = useCredentials(dq.trim());

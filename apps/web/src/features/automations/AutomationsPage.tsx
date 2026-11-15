@@ -10,10 +10,12 @@ import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { useAccess } from "../../hooks/useAccess";
 import { api } from "../../lib/api";
 import { ago, plural } from "../../lib/format";
+import { useTitle } from "../../hooks/useTitle";
 
 const KEY = ["automations"] as const;
 
 export function AutomationsPage() {
+  useTitle("Automatizaciones");
   const qc = useQueryClient();
   const notice = useNotice();
   const isAdmin = useAccess().can("automatizaciones", "manage");

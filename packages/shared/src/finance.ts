@@ -38,7 +38,8 @@ export type PaymentCreate = z.input<typeof paymentCreate>;
 export const invoiceCreate = z.object({
   concept: text(200, "Indicá el concepto"),
   amount: cents,
-  issuedOn: docDate,
+  // Ni a futuro (el saldo de hoy la sumaba) ni, en el server, antes de la última del talonario.
+  issuedOn: pastDate,
   dueOn: docDate.nullable().optional(),
   projectId: z.uuid().nullable().optional(),
 });

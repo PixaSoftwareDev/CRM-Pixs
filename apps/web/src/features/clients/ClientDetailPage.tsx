@@ -22,6 +22,7 @@ import { DataTab } from "./tabs/DataTab";
 import { ProjectsTab } from "./tabs/ProjectsTab";
 import { StatementTab } from "./tabs/StatementTab";
 import { TasksTab } from "./tabs/TasksTab";
+import { useTitle } from "../../hooks/useTitle";
 
 type TabKey = "actividad" | "tareas" | "cuenta" | "proyectos" | "archivos" | "datos";
 
@@ -30,6 +31,8 @@ export function ClientDetailPage() {
   const { tab = "actividad" } = clientRoute.useSearch();
   const navigate = useNavigate({ from: clientRoute.fullPath });
   const client = useClient(clientId);
+  const TAB_TITLE: Record<TabKey, string> = { actividad: "Actividad", tareas: "Tareas", cuenta: "Cuenta corriente", proyectos: "Proyectos", archivos: "Archivos", datos: "Datos" };
+  useTitle(client.data?.name ?? "Cliente", TAB_TITLE[tab]);
   const { can } = useAccess();
   // Cuenta corriente y saldos son de Finanzas: sin ese acceso no se muestran (la API tampoco los manda).
   const showMoney = can("finanzas", "read");

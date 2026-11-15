@@ -17,6 +17,7 @@ import { parseQuickTask } from "./quick-parse";
 import { TaskDialog } from "./TaskDialog";
 import { type TaskDraft, TaskFormDialog } from "./TaskFormDialog";
 import { addDays, arParts, dayTitle, nextSlot, nowMinutesAr, toHHMM, todayAr } from "./time";
+import { useTitle } from "../../hooks/useTitle";
 
 const FIRST_HOUR = 8;
 const LAST_HOUR = 19;
@@ -33,6 +34,7 @@ const toggle = (set: ReadonlySet<string>, key: string) => {
 };
 
 export function MyDayPage() {
+  useTitle("Mi día");
   const search = myDayRoute.useSearch();
   const navigate = useNavigate({ from: myDayRoute.fullPath });
   const me = useMyId();

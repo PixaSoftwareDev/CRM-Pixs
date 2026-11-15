@@ -31,10 +31,12 @@ import {
 } from "./api";
 import { confirmSlots, validDue } from "./dates";
 import { STEPS, TICKET_CHANNEL, TICKET_PRIORITY, TICKET_STATUS, TICKET_TYPE } from "./labels";
+import { useTitle } from "../../hooks/useTitle";
 
 export function TicketDetailPage() {
   const { ticketId } = ticketRoute.useParams();
   const ticket = useTicket(ticketId);
+  useTitle(ticket.data ? `#${ticket.data.number} ${ticket.data.title}` : "Ticket");
   const notice = useNotice();
 
   // Link viejo o mal copiado (id inválido o ticket inexistente): no tiene sentido "Reintentar".
@@ -201,6 +203,7 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
           <dd className="flex items-center gap-2">
             <DueDateInput
               saved={t.dueAt ? arParts(t.dueAt).date : ""}
+              min={arParts(t.receivedAt).date}
               disabled={closed}
               overdue={t.overdue}
               onSave={(dueOn) => update.mutate({ dueOn }, { onSuccess: () => onNotice("Compromiso actualizado.") })}
@@ -233,22 +236,25 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
  */
 function DueDateInput({
   saved,
+  min,
   disabled,
   overdue,
   onSave,
 }: {
   saved: string;
+  min: string;
   disabled: boolean;
   overdue: boolean;
   onSave: (dueOn: string | null) => void;
 }) {
   const [value, setValue] = useState(saved);
   useEffect(() => setValue(saved), [saved]);
-  const invalid = value !== "" && !validDue(value);
+  // Antes de la carga del ticket no se guarda (el server también lo rechaza).
+  const invalid = value !== "" && (!validDue(value) || value < min);
   const commit = () => {
     if (value === saved) return;
     if (value === "") onSave(null);
-    else if (validDue(value)) onSave(value);
+    else if (!invalid) onSave(value);
   };
   return (
     <Input
@@ -256,7 +262,7 @@ function DueDateInput({
       aria-label="Fecha de compromiso"
       value={value}
       disabled={disabled}
-      min="2000-01-01"
+      min={min}
       max="2100-12-31"
       aria-invalid={invalid}
       onChange={(e) => setValue(e.target.value)}

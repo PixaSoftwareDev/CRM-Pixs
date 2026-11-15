@@ -18,10 +18,12 @@ import { arParts, todayAr } from "../tasks/time";
 import { useTickets } from "./api";
 import { TICKET_PRIORITY, TICKET_STATUS, TICKET_TYPE } from "./labels";
 import { NewTicketDialog } from "./NewTicketDialog";
+import { useTitle } from "../../hooks/useTitle";
 
 type Search = ReturnType<typeof ticketsRoute.useSearch>;
 
 export function TicketsPage() {
+  useTitle("Tickets");
   const search = ticketsRoute.useSearch();
   const navigate = useNavigate({ from: ticketsRoute.fullPath });
   const clients = useClientOptions();
@@ -274,7 +276,15 @@ function TicketRow({ ticket: t }: { ticket: TicketListItem }) {
       <td className={cn(cell, t.overdue && "font-bold text-red-700", dueToday && "font-bold text-amber-700")}>
         {t.dueAt ? when(t.dueAt, false) : "—"}
         <span className="block text-xs font-normal">
-          {t.overdue ? "vencido" : dueToday ? "vence hoy" : t.status === "resuelto" ? "cumplido" : ""}
+          {t.overdue
+            ? "vencido"
+            : dueToday
+              ? "vence hoy"
+              : t.status === "resuelto" && t.dueAt
+                ? t.resolvedAt && t.resolvedAt > t.dueAt
+                  ? "resuelto tarde"
+                  : "cumplido"
+                : ""}
         </span>
       </td>
     </tr>

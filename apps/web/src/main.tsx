@@ -1,5 +1,6 @@
 import "@fontsource-variable/inter";
 import "./styles.css";
+import "@crm/shared"; // mensajes de validación en español (z.config) antes de cualquier formulario
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";

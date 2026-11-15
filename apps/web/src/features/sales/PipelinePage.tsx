@@ -18,11 +18,13 @@ import { arParts } from "../tasks/time";
 import { usePipeline, useMoveOpportunity, useStageOpportunities } from "./api";
 import { LoseDialog, WinDialog } from "./CloseDialogs";
 import { NewOpportunityDialog } from "./NewOpportunityDialog";
+import { useTitle } from "../../hooks/useTitle";
 
 /** A partir de cuántos días quieta en una etapa se marca en rojo. */
 const STALE_DAYS = 7;
 
 export function PipelinePage() {
+  useTitle("Embudo");
   const pipeline = usePipeline();
   const notice = useNotice();
   const [stageId, setStageId] = useState<string | null>(null);

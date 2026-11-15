@@ -129,7 +129,7 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
           <Input {...form.register("legalName")} />
         </Field>
         <Field label="CUIT" error={errors.taxId?.message}>
-          <Input inputMode="numeric" placeholder="30-12345678-9" {...form.register("taxId")} />
+          <Input inputMode="numeric" placeholder="30-12345678-1" {...form.register("taxId")} />
         </Field>
         <Field label="Condición frente al IVA">
           <Select {...form.register("taxCondition", { setValueAs: (v) => v || null })}>
@@ -185,6 +185,8 @@ function ClientInfoForm({ client }: { client: ClientDetail }) {
 export function ContactsSection({ client }: { client: ClientDetail }) {
   const [editing, setEditing] = useState<ContactDto | "new" | null>(null);
   const remove = useRemoveContact(client.id);
+  // Confirmación en la misma fila (antes, el cartel nativo del navegador).
+  const [removing, setRemoving] = useState<string | null>(null);
 
   return (
     <Card className="flex flex-col gap-3 p-5">
@@ -221,17 +223,26 @@ export function ContactsSection({ client }: { client: ClientDetail }) {
                 <Button variant="ghost" size="sm" aria-label={`Editar a ${p.name}`} onClick={() => setEditing(p)}>
                   <Pencil size={14} aria-hidden />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Quitar a ${p.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => {
-                    if (window.confirm(`¿Quitar a ${p.name} de las personas del negocio?`)) remove.mutate(p.id);
-                  }}
-                >
-                  <Trash2 size={14} aria-hidden />
-                </Button>
+                {removing === p.id ? (
+                  <span className="flex items-center gap-1.5 text-xs">
+                    ¿Quitar a {p.name}?
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(p.id, { onSettled: () => setRemoving(null) })}
+                    >
+                      Sí, quitar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setRemoving(null)}>
+                      No
+                    </Button>
+                  </span>
+                ) : (
+                  <Button variant="ghost" size="sm" aria-label={`Quitar a ${p.name}`} disabled={remove.isPending} onClick={() => setRemoving(p.id)}>
+                    <Trash2 size={14} aria-hidden />
+                  </Button>
+                )}
               </div>
             </li>
           ))}

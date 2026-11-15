@@ -11,6 +11,17 @@ import {
 import { archivedChange } from "../../lib/archive";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
 import { redactAmounts } from "../../lib/money";
+
+/** "$ 250.000" o "$ 1.500,50"; "sin monto" si no hay. Sin acceso a Finanzas la actividad lo tapa (redactAmounts). */
+const pesos = (cents: number | null | undefined) =>
+  cents == null
+    ? "sin monto"
+    : new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+        minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+        maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+      }).format(cents / 100);
 import { isActiveUser } from "../tasks/repository";
 import * as repo from "./repository";
 
@@ -91,6 +102,10 @@ export async function updateProject(db: Db, actorId: string, id: string, input: 
     const notes: string[] = [];
     if (patch.phase && patch.phase !== before.phase) notes.push(`Etapa: ${PHASE_LABEL[PROJECT_PHASES.indexOf(patch.phase)]}`);
     if (data.status === "entregado" && before.status !== "entregado") notes.push("Proyecto entregado");
+    // Cambiar lo que se vendió queda registrado (con quién lo cambió, en la actividad del cliente).
+    if (data.saleAmount !== undefined && data.saleAmount !== before.sale.amount) {
+      notes.push(`Monto de la venta: ${pesos(before.sale.amount)} → ${pesos(data.saleAmount)}`);
+    }
     if (archiveChange === "baja") notes.push("Proyecto dado de baja");
     if (archiveChange === "reactivado") notes.push("Proyecto reactivado");
     for (const title of notes) {

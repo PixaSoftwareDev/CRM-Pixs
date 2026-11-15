@@ -1,3 +1,5 @@
+// Primero: mensajes de validación en español para todo lo que use Zod.
+import "./zod-es";
 export * from "./automations";
 export * from "./clients";
 export * from "./cuit";

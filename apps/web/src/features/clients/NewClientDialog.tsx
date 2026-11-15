@@ -41,7 +41,7 @@ export function NewClientDialog({ open, onClose }: { open: boolean; onClose: () 
           <Input autoFocus placeholder="Ej: Óptica Central" {...form.register("name")} />
         </Field>
         <Field label="CUIT" error={errors.taxId?.message} hint="Opcional">
-          <Input inputMode="numeric" placeholder="30-12345678-9" {...form.register("taxId")} />
+          <Input inputMode="numeric" placeholder="30-12345678-1" {...form.register("taxId")} />
         </Field>
         <Field label="Prioridad" error={errors.priority?.message}>
           <Select {...form.register("priority")}>

@@ -18,6 +18,7 @@ import { layoutLanes } from "./lanes";
 import { TaskDialog } from "./TaskDialog";
 import { type TaskDraft, TaskFormDialog } from "./TaskFormDialog";
 import { addDays, addMonths, arParts, dayTitle, monthGrid, monthTitle, todayAr, toHHMM, weekday, weekStart, weekTitle } from "./time";
+import { useTitle } from "../../hooks/useTitle";
 
 // El día entero (00 a 24): con un rango fijo, lo agendado fuera de él no se veía.
 const FIRST_HOUR = 0;
@@ -36,6 +37,7 @@ interface Placed {
 }
 
 export function AgendaPage() {
+  useTitle("Agenda");
   const search = agendaRoute.useSearch();
   const navigate = useNavigate({ from: agendaRoute.fullPath });
   const me = useMyId();

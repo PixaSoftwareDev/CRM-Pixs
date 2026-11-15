@@ -35,7 +35,7 @@ function arDay(date: Date): string {
 
 export const todayIso = () => arDay(new Date());
 
-/** "hoy 15:00", "mañana 10:00", "ayer", "14/09". */
+/** "hoy 15:00", "mañana 10:00", "ayer", "14/09"; de otro año, "01/01/2020" (sin el año se leía "1/1" a secas). */
 export function when(iso: string | null | undefined, withTime = true): string {
   if (!iso) return "sin fecha";
   const date = new Date(iso);
@@ -46,7 +46,8 @@ export function when(iso: string | null | undefined, withTime = true): string {
   if (diff === 0) return `hoy${time}`;
   if (diff === 1) return `mañana${time}`;
   if (diff === -1) return `ayer${time}`;
-  return `${shortFmt.format(date)}${time}`;
+  const otherYear = arDay(date).slice(0, 4) !== arDay(new Date()).slice(0, 4);
+  return `${(otherYear ? dateFmt : shortFmt).format(date)}${time}`;
 }
 
 /** "hace 3 días", "hoy", "hace 2 meses". */
@@ -77,7 +78,8 @@ export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 
  * Centavos → texto para un input de pesos ("1234,56"), el inverso de parsePesos.
  * Con punto decimal parsePesos lo tomaba como miles y multiplicaba el monto por 100.
  */
-export const centsToInput = (cents: number) => String(cents / 100).replace(".", ",");
+export const centsToInput = (cents: number) =>
+  (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)).replace(".", ",");
 
 /**
  * Un número escrito a mano, en pesos → número (sin redondear). null si no se entiende.
