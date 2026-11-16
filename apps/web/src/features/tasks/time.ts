@@ -59,9 +59,16 @@ export const toMinutes = (hhmm: string) => {
   return h * 60 + m;
 };
 
+/** Minutos → "HH:MM"; pasada la medianoche sigue en el día siguiente (24:30 → 00:30). */
 export const toHHMM = (minutes: number) => {
-  const m = Math.max(0, Math.min(minutes, 24 * 60 - 1));
+  const m = ((Math.round(minutes) % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
+/** Duración entre "desde" y "hasta"; si "hasta" es menor, termina al día siguiente (22:00–01:00 = 180). */
+export const spanMinutes = (start: string, end: string) => {
+  const d = toMinutes(end) - toMinutes(start);
+  return d < 0 ? d + 1440 : d;
 };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

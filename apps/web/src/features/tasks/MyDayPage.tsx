@@ -19,9 +19,12 @@ import { type TaskDraft, TaskFormDialog } from "./TaskFormDialog";
 import { addDays, arParts, dayTitle, nextSlot, nowMinutesAr, toHHMM, todayAr } from "./time";
 import { useTitle } from "../../hooks/useTitle";
 
-const FIRST_HOUR = 8;
-const LAST_HOUR = 19;
+// El día entero: con un rango fijo, lo agendado fuera de él se veía en otra hora.
+const FIRST_HOUR = 0;
+const LAST_HOUR = 23;
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, i) => FIRST_HOUR + i);
+/** Hora que queda arriba al abrir (si no es hoy). */
+const SCROLL_TO_HOUR = 8;
 
 const isOpen = (t: TaskDto) => t.status !== "hecha";
 const startOf = (t: TaskDto) => (t.startsAt ? arParts(t.startsAt) : null);
@@ -184,12 +187,24 @@ export function MyDayPage() {
       ) : tasks.isPending ? (
         <Skeleton className="h-96" />
       ) : (
-        <Card className={cn("divide-y divide-slate-100", tasks.isPlaceholderData && "opacity-60")}>
+        <Card
+          key={date}
+          ref={(el: HTMLDivElement | null) => {
+            // Al abrir el día arranca en las 08 (hoy: una hora antes de ahora); el resto queda a un scroll.
+            if (el && !el.dataset.scrolled) {
+              const hour = isToday ? Math.max(0, nowHour - 1) : SCROLL_TO_HOUR;
+              const row = el.querySelector<HTMLElement>(`[data-hour="${hour}"]`);
+              if (row) el.scrollTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+              el.dataset.scrolled = "1";
+            }
+          }}
+          className={cn("max-h-[70vh] divide-y divide-slate-100 overflow-y-auto", tasks.isPlaceholderData && "opacity-60")}
+        >
           {HOURS.map((h) => {
             const rows = byHour.get(h) ?? [];
             const label = `${String(h).padStart(2, "0")}:00`;
             return (
-              <div key={h} className="relative flex gap-3 px-3 py-2 sm:gap-4 sm:px-4">
+              <div key={h} data-hour={h} className="relative flex gap-3 px-3 py-2 sm:gap-4 sm:px-4">
                 <span className="w-12 shrink-0 pt-1.5 text-xs font-semibold text-muted tabular-nums">{label}</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   {rows.map((t) => (

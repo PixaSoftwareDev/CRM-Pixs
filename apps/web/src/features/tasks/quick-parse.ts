@@ -84,7 +84,10 @@ function matchDate(text: string, base: string): { date: string; warning: string 
 }
 
 function matchTime(text: string): string | null {
-  const m = text.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(?:hs|h|horas)\b/) ?? text.match(/\ba las (\d{1,2})(?:[:.](\d{2}))?\b/);
+  const m =
+    text.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(?:hs|h|horas)\b/) ??
+    text.match(/\ba las (\d{1,2})(?:[:.](\d{2}))?\b/) ??
+    text.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(?:de|por) la (?:manana|tarde|noche)\b/);
   if (!m) return null;
   let h = Number(m[1]);
   const min = Number(m[2] ?? 0);

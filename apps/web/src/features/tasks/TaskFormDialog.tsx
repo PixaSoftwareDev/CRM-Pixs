@@ -7,7 +7,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useClientOptions, useCreateTask, useMyId, useTaskTypes, useTeam } from "./api";
-import { durationLabel, toHHMM, toInstant, toMinutes } from "./time";
+import { durationLabel, spanMinutes, toHHMM, toInstant, toMinutes } from "./time";
 
 const formSchema = z
   .object({
@@ -19,9 +19,10 @@ const formSchema = z
     start: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
     end: z.string().regex(/^\d{2}:\d{2}$/, { message: "Hora inválida" }),
   })
-  .refine((v) => toMinutes(v.end) > toMinutes(v.start), { message: "Tiene que terminar después de empezar", path: ["end"] })
+  // "Hasta" menor que "Desde" = termina al día siguiente (22:00 a 01:00).
+  .refine((v) => spanMinutes(v.start, v.end) > 0, { message: "Tiene que terminar después de empezar", path: ["end"] })
   // El server no acepta menos de 5 minutos: avisarlo acá en vez de fallar al guardar.
-  .refine((v) => toMinutes(v.end) <= toMinutes(v.start) || toMinutes(v.end) - toMinutes(v.start) >= 5, {
+  .refine((v) => spanMinutes(v.start, v.end) === 0 || spanMinutes(v.start, v.end) >= 5, {
     message: "Mínimo 5 minutos",
     path: ["end"],
   });
@@ -114,14 +115,14 @@ export function TaskFormDialog({
       ...(draft?.ticketId && { ticketId: draft.ticketId }),
       assigneeId: v.assigneeId,
       startsAt: toInstant(v.date, v.start),
-      durationMinutes: toMinutes(v.end) - toMinutes(v.start),
+      durationMinutes: spanMinutes(v.start, v.end),
     });
     const who = team.data?.find((u) => u.id === v.assigneeId);
     onCreated?.(`Agendada "${v.title}"${v.assigneeId !== me && who ? ` en la agenda de ${who.name}` : ""}.`);
     onClose();
   };
 
-  const minutes = start && end ? toMinutes(end) - toMinutes(start) : 0;
+  const minutes = start && end ? spanMinutes(start, end) : 0;
   const err = form.formState.errors;
 
   return (

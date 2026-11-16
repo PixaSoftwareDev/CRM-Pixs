@@ -15,7 +15,7 @@ import { ContactsSection } from "../clients/tabs/DataTab";
 import { StatementTab } from "../clients/tabs/StatementTab";
 import { useAddTaskComment, useMyId, useTask, useTaskTypes, useTeam, useUpdateTask } from "./api";
 import { EDITABLE_STATUSES, TASK_STATUS, tint } from "./labels";
-import { arParts, durationLabel, shortDay, toHHMM, toInstant, toMinutes } from "./time";
+import { arParts, durationLabel, shortDay, spanMinutes, toHHMM, toInstant } from "./time";
 
 interface Edit {
   title: string;
@@ -46,9 +46,8 @@ function diff(t: TaskDetailDto, e: Edit, comment: string): TaskUpdate {
   const patch: TaskUpdate = {};
   if (e.date && e.start && e.end && (e.date !== o.date || e.start !== o.start || e.end !== o.end)) {
     patch.startsAt = toInstant(e.date, e.start);
-    // Si solo cambió el día, se conserva la duración: el "Hasta" se muestra topeado
-    // a 23:59 y recalcularla recortaba las tareas que pasan la medianoche.
-    if (e.start !== o.start || e.end !== o.end) patch.durationMinutes = toMinutes(e.end) - toMinutes(e.start);
+    // Si solo cambió el día, se conserva la duración. "Hasta" menor que "Desde" = termina al día siguiente.
+    if (e.start !== o.start || e.end !== o.end) patch.durationMinutes = spanMinutes(e.start, e.end);
   }
   if (e.title.trim() !== o.title) patch.title = e.title.trim();
   if (e.typeId !== o.typeId) patch.typeId = e.typeId;
@@ -144,7 +143,7 @@ function TaskBody({
   // Un horario a medio cargar no entra en el PATCH, pero cuenta como cambio: si no,
   // "Guardar" cerraba sin guardar y "Cerrar" no avisaba.
   const dirty = Object.keys(patch).length > 0 || scheduleChanged;
-  const minutes = edit.start && edit.end ? toMinutes(edit.end) - toMinutes(edit.start) : 0;
+  const minutes = edit.start && edit.end ? spanMinutes(edit.start, edit.end) : 0;
   const scheduleError =
     scheduleChanged && !(edit.date && edit.start && edit.end)
       ? "Completá fecha, desde y hasta"
