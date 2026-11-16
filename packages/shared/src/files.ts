@@ -8,18 +8,19 @@ import { z } from "zod";
 export const FILE_MAX_BYTES = 24 * 1024 * 1024;
 export const FILE_MAX_LABEL = "24 MB";
 
-export const FILE_OWNERS = ["client", "project", "ticket"] as const;
+export const FILE_OWNERS = ["client", "project", "ticket", "task"] as const;
 export type FileOwnerKind = (typeof FILE_OWNERS)[number];
 
-/** De quién son los archivos: exactamente uno de los tres. */
+/** De quién son los archivos: exactamente uno. */
 export const fileOwnerQuery = z
   .object({
     clientId: z.uuid().optional(),
     projectId: z.uuid().optional(),
     ticketId: z.uuid().optional(),
+    taskId: z.uuid().optional(),
   })
-  .refine((q) => [q.clientId, q.projectId, q.ticketId].filter(Boolean).length === 1, {
-    message: "Indicá un cliente, un proyecto o un ticket",
+  .refine((q) => [q.clientId, q.projectId, q.ticketId, q.taskId].filter(Boolean).length === 1, {
+    message: "Indicá un cliente, un proyecto, un ticket o una tarea",
   });
 export type FileOwnerQuery = z.infer<typeof fileOwnerQuery>;
 

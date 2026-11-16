@@ -1,5 +1,5 @@
 /**
- * Contenedor de archivos: cada archivo es de un cliente, un proyecto o un ticket.
+ * Contenedor de archivos: cada archivo es de un cliente, un proyecto, un ticket o una tarea.
  * La ficha del cliente muestra también los de sus proyectos y tickets, y la del
  * proyecto los de sus tickets (cada uno marcado con de qué es).
  */
@@ -34,14 +34,15 @@ interface Row extends Record<string, unknown> {
 const SELECT = sql`
   select a.id, a.storage_key, a.filename, a.mime_type, a.size_bytes, a.created_at,
          u.id as uploaded_by_id, u.name as uploaded_by_name,
-         case when a.client_id is not null then 'client' when a.project_id is not null then 'project' else 'ticket' end as owner_kind,
-         coalesce(a.client_id, a.project_id, a.ticket_id) as owner_id,
-         coalesce(c.name, p.name, '#' || t.number || ' · ' || t.title) as owner_name
+         case when a.client_id is not null then 'client' when a.project_id is not null then 'project' when a.ticket_id is not null then 'ticket' else 'task' end as owner_kind,
+         coalesce(a.client_id, a.project_id, a.ticket_id, a.task_id) as owner_id,
+         coalesce(c.name, p.name, '#' || t.number || ' · ' || t.title, k.title) as owner_name
   from attachments a
   left join users u on u.id = a.uploaded_by_id
   left join clients c on c.id = a.client_id
   left join projects p on p.id = a.project_id
-  left join tickets t on t.id = a.ticket_id`;
+  left join tickets t on t.id = a.ticket_id
+  left join tasks k on k.id = a.task_id`;
 
 const toDto = (r: Row, viewer: Viewer): FileDto => ({
   id: r.id,
@@ -55,7 +56,11 @@ const toDto = (r: Row, viewer: Viewer): FileDto => ({
 });
 
 export const ownerOf = (q: FileOwnerQuery): { kind: FileOwnerKind; id: string } =>
-  q.clientId ? { kind: "client", id: q.clientId } : q.projectId ? { kind: "project", id: q.projectId } : { kind: "ticket", id: q.ticketId as string };
+  q.clientId ? { kind: "client", id: q.clientId } : q.projectId
+      ? { kind: "project", id: q.projectId }
+      : q.ticketId
+        ? { kind: "ticket", id: q.ticketId }
+        : { kind: "task", id: q.taskId as string };
 
 export async function listFiles(db: DbOrTx, viewer: Viewer, q: FileOwnerQuery): Promise<FileDto[]> {
   const owner = ownerOf(q);
@@ -70,7 +75,9 @@ export async function listFiles(db: DbOrTx, viewer: Viewer, q: FileOwnerQuery): 
       : owner.kind === "project"
         ? sql`a.project_id = ${owner.id}
             ${tickets ? sql`or a.ticket_id in (select id from tickets where project_id = ${owner.id})` : sql``}`
-        : sql`a.ticket_id = ${owner.id}`;
+        : owner.kind === "ticket"
+          ? sql`a.ticket_id = ${owner.id}`
+          : sql`a.task_id = ${owner.id}`;
   const rows = await db.execute<Row>(sql`${SELECT} where ${where} order by a.created_at desc`);
   return rows.map((r) => toDto(r, viewer));
 }
@@ -85,8 +92,9 @@ const TABLE: Record<FileOwnerKind, ReturnType<typeof sql.raw>> = {
   client: sql.raw("clients"),
   project: sql.raw("projects"),
   ticket: sql.raw("tickets"),
+  task: sql.raw("tasks"),
 };
-const WHAT: Record<FileOwnerKind, string> = { client: "Cliente", project: "Proyecto", ticket: "Ticket" };
+const WHAT: Record<FileOwnerKind, string> = { client: "Cliente", project: "Proyecto", ticket: "Ticket", task: "Tarea" };
 
 async function requireOwner(db: DbOrTx, kind: FileOwnerKind, id: string) {
   const [row] = await db.execute(sql`select 1 from ${TABLE[kind]} where id = ${id}`);
@@ -114,6 +122,7 @@ export async function uploadFile(
         clientId: owner.kind === "client" ? owner.id : null,
         projectId: owner.kind === "project" ? owner.id : null,
         ticketId: owner.kind === "ticket" ? owner.id : null,
+        taskId: owner.kind === "task" ? owner.id : null,
         uploadedById: viewer.id,
       })
       .returning({ id: attachments.id });

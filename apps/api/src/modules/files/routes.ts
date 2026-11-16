@@ -9,7 +9,7 @@ import { FileTooLargeError, openFile } from "../../lib/storage";
 import { requireUser, sessionOf } from "../auth/guard";
 import * as service from "./service";
 
-const AREA: Record<FileOwnerKind, Area> = { client: "clientes", project: "proyectos", ticket: "tickets" };
+const AREA: Record<FileOwnerKind, Area> = { client: "clientes", project: "proyectos", ticket: "tickets", task: "tareas" };
 
 function viewerOf(req: FastifyRequest): service.Viewer {
   const perms = req.access?.permissions;
@@ -17,14 +17,14 @@ function viewerOf(req: FastifyRequest): service.Viewer {
   return {
     id: sessionOf(req).user.id,
     isAdmin: req.access?.role === "admin",
-    sees: { client: sees("client"), project: sees("project"), ticket: sees("ticket") },
+    sees: { client: sees("client"), project: sees("project"), ticket: sees("ticket"), task: sees("task") },
   };
 }
 
 function need(req: FastifyRequest, kind: FileOwnerKind, level: Level) {
   const perms = req.access?.permissions;
   if (perms && hasLevel(perms[AREA[kind]], level)) return;
-  const what = { client: "Clientes", project: "Proyectos", ticket: "Tickets" }[kind];
+  const what = { client: "Clientes", project: "Proyectos", ticket: "Tickets", task: "Tareas" }[kind];
   throw new AppError(403, `No tenés permiso para ${level === "read" ? "ver" : "cambiar"} archivos de ${what}. Pedíselo a un administrador.`);
 }
 

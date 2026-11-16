@@ -510,7 +510,7 @@ export interface FileDto {
   sizeBytes: number;
   createdAt: string;
   uploadedBy: Ref | null;
-  owner: { kind: "client" | "project" | "ticket"; id: string; name: string };
+  owner: { kind: "client" | "project" | "ticket" | "task"; id: string; name: string };
   /** Lo puede borrar quien lo subió o un administrador. */
   canDelete: boolean;
 }

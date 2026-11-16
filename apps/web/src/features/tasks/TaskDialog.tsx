@@ -1,6 +1,6 @@
 import { type TaskDetailDto, type TaskDto, type TaskStatus, type TaskUpdate, taskTitle } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, Receipt, Users } from "lucide-react";
+import { Check, FolderOpen, Receipt, Users } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Chip } from "../../components/ui/Chip";
@@ -13,6 +13,7 @@ import { ago, initials } from "../../lib/format";
 import { useClient, useClientTasks } from "../clients/api";
 import { ContactsSection } from "../clients/tabs/DataTab";
 import { StatementTab } from "../clients/tabs/StatementTab";
+import { FilesCard } from "../files/FilesCard";
 import { useAddTaskComment, useMyId, useTask, useTaskTypes, useTeam, useUpdateTask } from "./api";
 import { EDITABLE_STATUSES, TASK_STATUS, tint } from "./labels";
 import { arParts, durationLabel, shortDay, spanMinutes, toHHMM, toInstant } from "./time";
@@ -117,6 +118,8 @@ function TaskBody({
   const [pending, setPending] = useState<(() => void) | null>(null);
   /** Contactos o cuenta corriente del cliente, en un modal encima de este. */
   const [panel, setPanel] = useState<ClientPanelKind | null>(null);
+  /** Contenedor de archivos de la tarea, en un modal encima de este. */
+  const [filesOpen, setFilesOpen] = useState(false);
   const showMoney = useAccess().can("finanzas", "read");
 
   useEffect(() => {
@@ -259,6 +262,13 @@ function TaskBody({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setFilesOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
+              >
+                <FolderOpen size={14} aria-hidden /> Contenedor
+              </button>
               <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
                 Tipo
                 <Select aria-label="Tipo de tarea" value={edit.typeId} onChange={set("typeId")} className="h-8 w-auto max-w-48 bg-white">
@@ -330,6 +340,10 @@ function TaskBody({
           }}
         />
       )}
+
+      <Dialog open={filesOpen} onClose={() => setFilesOpen(false)} title="Contenedor" description={t.title} size="xl">
+        {filesOpen && <FilesCard owner={{ taskId: t.id }} area="tareas" className="border-0 p-0" />}
+      </Dialog>
 
       <footer className="flex flex-col gap-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-end gap-3">

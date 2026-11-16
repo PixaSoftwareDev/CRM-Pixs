@@ -64,6 +64,13 @@
       "when": 1794664054272,
       "tag": "0008_tareas_de_ticket",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794832014645,
+      "tag": "0009_archivos_de_tareas",
+      "breakpoints": true
     }
   ]
 }

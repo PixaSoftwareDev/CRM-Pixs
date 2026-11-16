@@ -87,7 +87,7 @@ export function FilesCard({ owner, area, className }: { owner: FileOwnerQuery; a
     if (canEdit && e.dataTransfer.files.length) void send(e.dataTransfer.files);
   };
 
-  const mainId = owner.clientId ?? owner.projectId ?? owner.ticketId;
+  const mainId = owner.clientId ?? owner.projectId ?? owner.ticketId ?? owner.taskId;
   const groups = groupByOwner(files.data ?? [], mainId);
 
   return (
@@ -170,7 +170,7 @@ export function FilesCard({ owner, area, className }: { owner: FileOwnerQuery; a
         <div className="flex flex-col gap-4">
           {groups.map((g) => (
             <section key={g.key} className="flex flex-col gap-1">
-              {groups.length > 1 || g.key !== "main" ? <GroupTitle group={g} main={owner.clientId ? "Del cliente" : owner.projectId ? "Del proyecto" : "Del ticket"} /> : null}
+              {groups.length > 1 || g.key !== "main" ? <GroupTitle group={g} main={owner.clientId ? "Del cliente" : owner.projectId ? "Del proyecto" : owner.ticketId ? "Del ticket" : "De la tarea"} /> : null}
               <ul className="flex flex-col divide-y divide-slate-100">
                 {g.files.map((f) => (
                   <FileRow key={f.id} file={f} canEdit={canEdit} />

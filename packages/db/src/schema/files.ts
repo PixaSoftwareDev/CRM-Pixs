@@ -11,6 +11,7 @@ import { clients } from "./clients";
 import { users } from "./identity";
 import { projects } from "./projects";
 import { tickets } from "./support";
+import { tasks } from "./work";
 
 export const attachments = pgTable(
   "attachments",
@@ -24,15 +25,17 @@ export const attachments = pgTable(
     clientId: ref().references(() => clients.id, { onDelete: "cascade" }),
     projectId: ref().references(() => projects.id, { onDelete: "cascade" }),
     ticketId: ref().references(() => tickets.id, { onDelete: "cascade" }),
+    taskId: ref().references(() => tasks.id, { onDelete: "cascade" }),
     uploadedById: ref().references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("attachments_storage_key_uq").on(t.storageKey),
-    check("attachments_one_owner_ck", sql`num_nonnulls(${t.clientId}, ${t.projectId}, ${t.ticketId}) = 1`),
+    check("attachments_one_owner_ck", sql`num_nonnulls(${t.clientId}, ${t.projectId}, ${t.ticketId}, ${t.taskId}) = 1`),
     check("attachments_size_ck", sql`${t.sizeBytes} >= 0`),
     index("attachments_client_idx").on(t.clientId).where(sql`${t.clientId} IS NOT NULL`),
     index("attachments_project_idx").on(t.projectId).where(sql`${t.projectId} IS NOT NULL`),
     index("attachments_ticket_idx").on(t.ticketId).where(sql`${t.ticketId} IS NOT NULL`),
+    index("attachments_task_idx").on(t.taskId).where(sql`${t.taskId} IS NOT NULL`),
   ],
 );

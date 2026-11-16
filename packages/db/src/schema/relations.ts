@@ -174,6 +174,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     relationName: "task_assigner",
   }),
   client: one(clients, { fields: [tasks.clientId], references: [clients.id] }),
+  attachments: many(attachments),
   project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
   opportunity: one(opportunities, {
     fields: [tasks.opportunityId],
@@ -273,6 +274,7 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
   client: one(clients, { fields: [attachments.clientId], references: [clients.id] }),
   project: one(projects, { fields: [attachments.projectId], references: [projects.id] }),
   ticket: one(tickets, { fields: [attachments.ticketId], references: [tickets.id] }),
+  task: one(tasks, { fields: [attachments.taskId], references: [tasks.id] }),
   uploadedBy: one(users, { fields: [attachments.uploadedById], references: [users.id] }),
 }));
 export const automationRulesRelations = relations(automationRules, ({ many }) => ({
