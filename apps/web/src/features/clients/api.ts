@@ -11,6 +11,7 @@ import type {
   ClientListItem,
   ClientListQuery,
   ClientProjectDto,
+  ClientSearchOption,
   ClientStatusChange,
   ClientSummaryCounts,
   ClientTaskDto,
@@ -36,7 +37,18 @@ export const clientKeys = {
   projects: (id: string) => ["clients", id, "projects"] as const,
   /** Selectores de cliente (tareas, proyectos, tickets): nombre y estado salen de acá. */
   options: ["clients", "options"] as const,
+  search: (q: string) => ["clients", "search", q] as const,
 };
+
+/** Buscador de los selectores de cliente (nombre, razón social, CUIT, contactos, teléfonos, emails). */
+export const useClientSearch = (q: string, enabled: boolean) =>
+  useQuery({
+    queryKey: clientKeys.search(q),
+    queryFn: () => api.get<ClientSearchOption[]>("/api/clients/search", { q }),
+    enabled,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
 
 export function useClients(filters: ListFilters) {
   return useInfiniteQuery({

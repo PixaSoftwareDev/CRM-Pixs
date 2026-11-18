@@ -10,7 +10,7 @@ import { cn } from "../../components/ui/cn";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
-import { Tabs } from "../../components/ui/Tabs";
+import { tabPanelProps, Tabs } from "../../components/ui/Tabs";
 import { useCopy } from "../../hooks/useCopy";
 import { useAccess } from "../../hooks/useAccess";
 import { downloadCsv } from "../../lib/csv";
@@ -146,6 +146,7 @@ export function FinancePage() {
 
       <section className="flex flex-col gap-4">
         <Tabs<Tab>
+          id="finanzas"
           label="Secciones de finanzas"
           value={tab}
           onChange={(t) => set({ tab: t === "cobrar" ? undefined : t })}
@@ -155,16 +156,21 @@ export function FinancePage() {
             { key: "movimientos", label: "Movimientos" },
           ]}
         />
-        {tab === "cobrar" && <ReceivablesTab onPay={setPayTarget} onNotice={notice.show} />}
-        {tab === "abonos" && <SubscriptionsTab onNotice={notice.show} />}
-        {tab === "movimientos" && (
-          <MovementsTab
-            month={month}
-            onMonth={(m) => set({ mes: m === todayAr().slice(0, 7) ? undefined : m })}
-            onNew={() => setCashDraft({ direction: "egreso", amount: 0, concept: "" })}
-            onNotice={notice.show}
-          />
-        )}
+        <div
+          {...tabPanelProps("finanzas", tab)}
+          className="flex flex-col gap-4 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+        >
+          {tab === "cobrar" && <ReceivablesTab onPay={setPayTarget} onNotice={notice.show} />}
+          {tab === "abonos" && <SubscriptionsTab onNotice={notice.show} />}
+          {tab === "movimientos" && (
+            <MovementsTab
+              month={month}
+              onMonth={(m) => set({ mes: m === todayAr().slice(0, 7) ? undefined : m })}
+              onNew={() => setCashDraft({ direction: "egreso", amount: 0, concept: "" })}
+              onNotice={notice.show}
+            />
+          )}
+        </div>
       </section>
 
       <PaymentDialog target={payTarget} onClose={() => setPayTarget(null)} onDone={notice.show} />
@@ -257,6 +263,7 @@ function ReceivablesTab({ onPay, onNotice }: { onPay: (t: PaymentTarget) => void
             </Button>
             <Button
               size="sm"
+              aria-label={`Cobrada: ${r.client.name} · ${r.concept}`}
               onClick={() =>
                 onPay({
                   clientId: r.client.id,
@@ -364,7 +371,16 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
           {adjust.error && <p role="alert" className="text-sm text-red-700">{adjust.error.message}</p>}
           <div className="border-t border-line pt-3">
             <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">Historial de aumentos</h3>
-            {adjustments.data?.length ? (
+            {adjustments.error ? (
+              <p role="alert" className="text-sm text-red-700">
+                No se pudo cargar el historial.{" "}
+                <button type="button" className="font-semibold underline" onClick={() => void adjustments.refetch()}>
+                  Reintentar
+                </button>
+              </p>
+            ) : adjustments.isPending ? (
+              <Skeleton className="h-12" />
+            ) : adjustments.data.length ? (
               <ul className="flex flex-col gap-1 text-sm">
                 {adjustments.data.map((a) => (
                   <li key={a.id} className="flex justify-between gap-2">
@@ -409,7 +425,7 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
           <p className="text-xs text-muted">La facturación automática el día de cada abono llega con Automatizaciones (paso 7).</p>
           {accrual.error && <p role="alert" className="text-sm text-red-700">{accrual.error.message}</p>}
           {accrual.data && (
-            <div className="flex flex-col gap-1.5 rounded-[10px] bg-green-50 px-3 py-2.5 text-sm text-green-900">
+            <div role="status" className="flex flex-col gap-1.5 rounded-[10px] bg-green-50 px-3 py-2.5 text-sm text-green-900">
               <strong>
                 {accrual.data.created.length
                   ? `Se generaron ${plural(accrual.data.created.length, "factura", "facturas")} · ${money(accrual.data.created.reduce((a, d) => a + d.amount, 0))}`
@@ -455,7 +471,9 @@ function SubscriptionsTab({ onNotice }: { onNotice: (m: string) => void }) {
               <label className="flex min-w-0 items-center gap-3">
                 <input type="checkbox" className={cn("size-4 accent-brand", !isAdmin && "hidden")} disabled={!s.active} checked={s.active && sel.has(s.id)} onChange={() => toggle(s.id)} />
                 <span className="min-w-0">
-                  <strong className="block truncate">{s.client.name}</strong>
+                  <strong className="block truncate" title={s.client.name}>
+                    {s.client.name}
+                  </strong>
                   <span className="block text-xs text-muted">
                     {s.name} · {s.active ? `próxima factura ${day(nextInvoiceDate(s, today)).slice(0, 5)}` : "dado de baja"}
                   </span>
@@ -568,15 +586,24 @@ function MovementsTab({
               <div className="flex min-w-0 items-center gap-3">
                 <span className="w-12 shrink-0 text-xs font-semibold text-muted tabular-nums">{day(m.occurredOn).slice(0, 5)}</span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{m.concept}</p>
-                  <p className="truncate text-xs text-muted">
-                    {[m.category, m.paidBy && `pagó ${m.paidBy.name}`, m.reimbursable && (m.reimbursedAt ? "devuelto" : "a devolver")]
-                      .filter(Boolean)
-                      .join(" · ") || "—"}
+                  <p className="truncate text-sm font-medium" title={m.concept}>
+                    {m.concept}
                   </p>
+                  {(() => {
+                    const meta =
+                      [m.category, m.paidBy && `pagó ${m.paidBy.name}`, m.reimbursable && (m.reimbursedAt ? "devuelto" : "a devolver")]
+                        .filter(Boolean)
+                        .join(" · ") || "—";
+                    return (
+                      <p className="truncate text-xs text-muted" title={meta}>
+                        {meta}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
               <strong className={cn("shrink-0 tabular-nums", m.direction === "ingreso" ? "text-green-700" : "text-red-700")}>
+                <span className="sr-only">{m.direction === "ingreso" ? "Ingreso: " : "Gasto: "}</span>
                 {m.direction === "ingreso" ? "" : "− "}
                 {money(m.amount)}
               </strong>

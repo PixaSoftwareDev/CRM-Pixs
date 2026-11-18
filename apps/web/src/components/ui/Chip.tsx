@@ -14,15 +14,18 @@ const TONES: Record<Tone, string> = {
 };
 
 export function Chip({ tone = "slate", className, children }: { tone?: Tone; className?: string; children: ReactNode }) {
+  // Un texto largo se corta con "…" (y se ve entero al pasar el mouse) en vez de salirse del contenedor.
+  const text = typeof children === "string" || typeof children === "number" ? String(children) : undefined;
   return (
     <span
+      title={text}
       className={cn(
-        "inline-flex h-[22px] items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap",
+        "inline-flex h-[22px] max-w-full items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap",
         TONES[tone],
         className,
       )}
     >
-      {children}
+      {text !== undefined ? <span className="min-w-0 truncate">{text}</span> : children}
     </span>
   );
 }

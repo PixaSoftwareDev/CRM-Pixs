@@ -32,3 +32,14 @@ export function cuitSearchDigits(q: string): string | null {
   const digits = normalizeCuit(q);
   return digits.length >= 3 ? digits : null;
 }
+
+/**
+ * Si lo que se busca parece un teléfono o CUIT (o un pedazo), devuelve sus dígitos
+ * para compararlos contra el guardado sin separadores: "(011) 4567" → "0114567".
+ * Con letras no es un número (null); menos de 3 dígitos trae demasiado.
+ */
+export function numberSearchDigits(q: string): string | null {
+  if (!/^[\d\s.()+\/-]+$/.test(q.trim())) return null;
+  const digits = normalizeCuit(q);
+  return digits.length >= 3 ? digits : null;
+}

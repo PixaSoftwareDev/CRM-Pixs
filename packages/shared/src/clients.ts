@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { isValidCuit, normalizeCuit } from "./cuit";
+import { bodyText } from "./text";
 
 export const CLIENT_STATUSES = ["potencial", "activo", "en_riesgo", "baja"] as const;
 export const CLIENT_PRIORITIES = ["alta", "media", "baja"] as const;
@@ -75,6 +76,20 @@ export const clientListQuery = z.object({
 });
 export type ClientListQuery = z.infer<typeof clientListQuery>;
 
+/** Buscador de clientes de los selectores (agendar tarea…): nombre, razón social, CUIT, contactos, teléfonos, emails. */
+export const clientSearchQuery = z.object({
+  q: z.string().trim().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type ClientSearchQuery = z.infer<typeof clientSearchQuery>;
+
+/** Resultado del buscador: `hint` dice por qué apareció si no fue por el nombre ("CUIT 30-…", "Contacto: Ana"). */
+export interface ClientSearchOption {
+  id: string;
+  name: string;
+  hint: string | null;
+}
+
 const clientFields = {
   name: text(160),
   legalName: optionalText(200),
@@ -141,7 +156,7 @@ export type BillingProfileInput = z.input<typeof billingProfileInput>;
 
 export const activityCreate = z.object({
   kind: z.enum(MANUAL_ACTIVITY_KINDS),
-  body: text(2000),
+  body: bodyText().min(1),
 });
 export type ActivityCreate = z.input<typeof activityCreate>;
 

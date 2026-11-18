@@ -3,6 +3,7 @@
  * fecha y hora es un evento de agenda).
  */
 import { z } from "zod";
+import { bodyText, titleText } from "./text";
 
 export const TASK_STATUSES = ["pendiente", "en_curso", "esperando", "hecha", "cancelada"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -13,7 +14,7 @@ export const MAX_RANGE_DAYS = 42;
 const isoDate = z.iso.date({ message: "Fecha inválida" });
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, { message: "Color inválido" });
 /** Título de una tarea (alta, edición y tareas agregadas a un ticket). */
-export const taskTitle = z.string().trim().min(1, { message: "Escribí qué hay que hacer" }).max(200);
+export const taskTitle = titleText().min(1, { message: "Escribí qué hay que hacer" });
 const title = taskTitle;
 const minutes = z.number().int().min(5).max(24 * 60);
 
@@ -36,6 +37,8 @@ export const taskCreate = z.object({
   /** null = sin agendar. */
   startsAt: z.iso.datetime({ offset: true }).nullable().optional(),
   durationMinutes: minutes.default(60),
+  /** Agendar aunque se pise con otra tarea del responsable (si no, 409). */
+  allowOverlap: z.boolean().optional(),
 });
 export type TaskCreate = z.input<typeof taskCreate>;
 
@@ -49,13 +52,15 @@ export const taskUpdate = z
     durationMinutes: minutes,
     status: z.enum(TASK_STATUSES),
     /** Comentario que se guarda junto con los cambios ("Guardar" del modal). */
-    comment: z.string().trim().max(2000),
+    comment: bodyText(),
+    /** Guardar aunque el nuevo horario se pise con otra tarea del responsable (si no, 409). */
+    allowOverlap: z.boolean(),
   })
   .partial();
 export type TaskUpdate = z.input<typeof taskUpdate>;
 
 export const taskCommentCreate = z.object({
-  body: z.string().trim().min(1, { message: "Escribí el comentario" }).max(2000),
+  body: bodyText().min(1, { message: "Escribí el comentario" }),
 });
 export type TaskCommentCreate = z.input<typeof taskCommentCreate>;
 

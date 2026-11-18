@@ -80,7 +80,7 @@ export function TicketsPage() {
         }
       />
 
-      <Card className="flex flex-col gap-3 p-4" aria-label="Filtros de búsqueda">
+      <Card role="search" className="flex flex-col gap-3 p-4" aria-label="Filtros de búsqueda">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <span className="flex flex-wrap items-center gap-2">
             <strong>Filtros de búsqueda</strong>
@@ -196,8 +196,9 @@ export function TicketsPage() {
               : "Todavía no hay tickets."}
         </Empty>
       ) : (
-        <Card className={cn("overflow-x-auto", tickets.isPlaceholderData && "opacity-60")}>
-          <table className="w-full min-w-[960px] border-collapse text-sm">
+        <Card className={cn("lg:overflow-x-auto", tickets.isPlaceholderData && "opacity-60")}>
+          {/* En el celular cada ticket es una ficha (stack-table), sin scroll de costado. */}
+          <table className="stack-table w-full border-collapse text-sm lg:min-w-[940px]">
             <thead>
               <tr className="border-b border-line bg-slate-50 text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
                 <th className="px-4 py-2.5">Nro.</th>
@@ -248,18 +249,27 @@ function TicketRow({ ticket: t }: { ticket: TicketListItem }) {
     <tr className="relative border-b border-slate-100 last:border-0 hover:bg-slate-50">
       <td className={cn(cell, "text-muted tabular-nums")}>
         {/* El link cubre toda la fila: se navega con teclado y se puede abrir en otra pestaña. */}
-        <Link to="/tickets/$ticketId" params={{ ticketId: t.id }} className="after:absolute after:inset-0">
+        <Link
+          to="/tickets/$ticketId"
+          params={{ ticketId: t.id }}
+          aria-label={`Ticket #${t.number}: ${t.title}`}
+          className="after:absolute after:inset-0"
+        >
           #{t.number}
         </Link>
       </td>
       <td className={cn(cell, "font-medium")}>{t.client.name}</td>
-      <td className={cell}>
+      <td data-cell="end" className={cn(cell, "max-lg:text-xs max-lg:text-muted")}>
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2 rounded-full" style={{ background: type.color }} aria-hidden />
           {type.label}
         </span>
       </td>
-      <td className={cn(cell, closed ? "text-muted" : "font-semibold")}>{t.title}</td>
+      <td data-cell="full" className={cn(cell, closed ? "text-muted" : "font-semibold")}>
+        <span className="line-clamp-2 [overflow-wrap:anywhere]" title={t.title}>
+          {t.title}
+        </span>
+      </td>
       <td className={cell}>
         <Chip tone={TICKET_PRIORITY[t.priority].tone}>{TICKET_PRIORITY[t.priority].label}</Chip>
       </td>
@@ -269,13 +279,19 @@ function TicketRow({ ticket: t }: { ticket: TicketListItem }) {
           <span className="block pt-1 text-xs text-muted">{t.archivedAt ? "De baja" : "Proyecto de baja"}</span>
         )}
       </td>
-      <td className={cell}>
+      <td data-cell="full" data-label="Carga:" className={cn(cell, "max-lg:order-1 max-lg:text-xs")}>
         {when(t.receivedAt)}
-        <span className="block text-xs text-muted">por {t.reportedBy?.name ?? "canal automático"}</span>
+        <span className="block text-xs text-muted max-lg:inline">
+          <span className="lg:hidden"> · </span>por {t.reportedBy?.name ?? "canal automático"}
+        </span>
       </td>
-      <td className={cn(cell, t.overdue && "font-bold text-red-700", dueToday && "font-bold text-amber-700")}>
+      <td
+        data-cell="end"
+        data-label="Compromiso:"
+        className={cn(cell, "max-lg:text-xs", t.overdue && "font-bold text-red-700", dueToday && "font-bold text-amber-700")}
+      >
         {t.dueAt ? when(t.dueAt, false) : "—"}
-        <span className="block text-xs font-normal">
+        <span className="block text-xs font-normal max-lg:inline max-lg:pl-1">
           {t.overdue
             ? "vencido"
             : dueToday

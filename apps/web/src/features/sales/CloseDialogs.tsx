@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { money } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
@@ -100,7 +100,7 @@ export function WinDialog({
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Proyecto" error={err.projectName?.message}>
-            <Input {...form.register("projectName")} />
+            <Input aria-invalid={!!err.projectName} {...form.register("projectName")} />
           </Field>
           <Field label="Implementa" error={err.implementerId?.message}>
             <Select aria-invalid={!!err.implementerId} {...form.register("implementerId")}>
@@ -126,21 +126,21 @@ export function WinDialog({
         </Field>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Inicio" error={err.startsOn?.message}>
-            <Input type="date" {...form.register("startsOn")} />
+            <Input type="date" aria-invalid={!!err.startsOn} {...form.register("startsOn")} />
           </Field>
           <Field label="Entrega estimada" error={err.dueOn?.message}>
-            <Input type="date" {...form.register("dueOn")} />
+            <Input type="date" aria-invalid={!!err.dueOn} {...form.register("dueOn")} />
           </Field>
           <Field label="Horas estimadas" error={err.estimatedHours?.message}>
-            <Input inputMode="numeric" placeholder="80" {...form.register("estimatedHours")} />
+            <Input inputMode="numeric" placeholder="80" aria-invalid={!!err.estimatedHours} {...form.register("estimatedHours")} />
           </Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Kickoff (llamada)" error={err.kickoffDate?.message}>
-            <Input type="date" {...form.register("kickoffDate")} />
+            <Input type="date" aria-invalid={!!err.kickoffDate} {...form.register("kickoffDate")} />
           </Field>
           <Field label="Hora" error={err.kickoffTime?.message}>
-            <Input type="time" step={300} {...form.register("kickoffTime")} />
+            <Input type="time" step={300} aria-invalid={!!err.kickoffTime} {...form.register("kickoffTime")} />
           </Field>
         </div>
         <p className="rounded-[10px] bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
@@ -148,14 +148,14 @@ export function WinDialog({
           del implementador. El plan de cuotas se arma en Finanzas.
         </p>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex flex-wrap justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
             Pasar a implementación
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );
@@ -194,17 +194,17 @@ export function LoseDialog({
     <Dialog open={!!opp} onClose={onClose} title="Marcar como perdida" description={opp ? `${opp.client.name} · ${opp.title}` : undefined}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <Field label="Motivo" error={form.formState.errors.reason?.message}>
-          <Input autoFocus placeholder="Ej: precio, eligió otro proveedor, no responde…" {...form.register("reason")} />
+          <Input autoFocus data-autofocus aria-invalid={!!form.formState.errors.reason} placeholder="Ej: precio, eligió otro proveedor, no responde…" {...form.register("reason")} />
         </Field>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2">
+        <DialogActions className="flex flex-wrap justify-end gap-2 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" variant="danger" disabled={form.formState.isSubmitting}>
             Marcar perdida
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

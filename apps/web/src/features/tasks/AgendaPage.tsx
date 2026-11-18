@@ -84,12 +84,12 @@ export function AgendaPage() {
         subtitle="Reuniones, llamadas y todo lo que hay que hacer con cada cliente"
         actions={
           <>
-            <label className="flex items-center gap-2 text-sm whitespace-nowrap text-muted">
+            <label className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted max-sm:w-full">
               Agenda de
               <Select
                 value={userId}
                 onChange={(e) => go({ user: e.target.value === me ? undefined : e.target.value })}
-                className="h-[38px] w-auto"
+                className="h-10 min-w-0 max-sm:flex-1 sm:h-[38px] sm:w-auto sm:max-w-56"
               >
                 <option value={ALL}>Todo el equipo ({count(tasks.data, null)})</option>
                 {team.data?.map((u) => (
@@ -119,8 +119,10 @@ export function AgendaPage() {
         <span className="ml-1 font-semibold">{weekTitle(monday)}</span>
       </div>
 
-      <div className="grid gap-[18px] lg:grid-cols-[236px_1fr]">
-        <aside className="flex flex-col gap-[18px]">
+      {/* La columna del mes va al costado recién desde xl: antes, la grilla de la semana no entraba
+          al lado y scrolleaba de costado. En pantallas más chicas, mes y tipos van debajo. */}
+      <div className="grid gap-[18px] xl:grid-cols-[236px_1fr]">
+        <aside className="flex flex-col gap-[18px] max-xl:order-last lg:max-xl:grid lg:max-xl:grid-cols-2 lg:max-xl:items-start">
           <MiniMonth selected={selected} today={today} onPick={(d) => go({ date: d === today ? undefined : d })} />
           <TypesPanel
             hidden={hidden}
@@ -143,7 +145,18 @@ export function AgendaPage() {
           ) : tasks.isPending ? (
             <Skeleton className="h-[600px]" />
           ) : (
-            <Card className={cn("overflow-x-auto", tasks.isPlaceholderData && "opacity-60")}>
+            <>
+            {/* Celular y tablet: la grilla de 7 columnas no entra; una tira con los días de la
+                semana y, debajo, la lista del día elegido. */}
+            <WeekStrip
+              days={days}
+              selected={selected}
+              today={today}
+              counts={(d) => byDay.get(d)?.length ?? 0}
+              onPick={(d) => go({ date: d === today ? undefined : d })}
+              className={cn("lg:hidden", tasks.isPlaceholderData && "opacity-60")}
+            />
+            <Card className={cn("overflow-x-auto max-lg:hidden", tasks.isPlaceholderData && "opacity-60")}>
               <div className="min-w-[680px]">
                 <div className="grid grid-cols-[52px_repeat(7,1fr)] border-b border-line">
                   <span />
@@ -153,6 +166,7 @@ export function AgendaPage() {
                       type="button"
                       onClick={() => go({ date: d === today ? undefined : d })}
                       aria-pressed={d === selected}
+                      aria-label={dayTitle(d)}
                       className="flex flex-col items-center gap-0.5 py-2 hover:bg-slate-50"
                     >
                       <span className="text-xs text-muted">{DOW[i]}</span>
@@ -198,6 +212,7 @@ export function AgendaPage() {
                 </div>
               </div>
             </Card>
+            </>
           )}
 
           <DayList date={selected} items={[...(byDay.get(selected) ?? [])].sort((a, b) => a.start - b.start)} onOpen={setOpenId} />
@@ -238,6 +253,7 @@ function DayColumn({
           key={h}
           type="button"
           onClick={() => onSlot(h)}
+          tabIndex={-1}
           aria-label={`Agendar el ${dayTitle(date)} a las ${h}:00`}
           className="block w-full border-b border-slate-100 hover:bg-indigo-50"
           style={{ height: ROW }}
@@ -249,12 +265,14 @@ function DayColumn({
         const compact = height < 46;
         const done = t.status === "hecha";
         const range = `${toHHMM(start)} – ${toHHMM(end)}`;
+        const label = `${t.title} — ${range}${t.client ? ` · ${t.client.name}` : ""} · ${t.assignee.name}`;
         return (
           <button
             key={t.id}
             type="button"
             onClick={() => onOpen(t.id)}
-            title={`${t.title} — ${range}${t.client ? ` · ${t.client.name}` : ""} · ${t.assignee.name}`}
+            title={label}
+            aria-label={label}
             className={cn(
               "absolute flex flex-col overflow-hidden rounded-lg px-2 py-1 text-left text-xs leading-tight transition hover:z-10 hover:shadow-md",
               compact ? "justify-center" : "justify-start",
@@ -285,7 +303,7 @@ function DayColumn({
               </>
             )}
             {showOwner && (
-              <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-white text-[8px] font-bold text-slate-700">
+              <span aria-hidden className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-white text-[8px] font-bold text-slate-700">
                 {initials(t.assignee.name)}
               </span>
             )}
@@ -296,9 +314,55 @@ function DayColumn({
   );
 }
 
+function WeekStrip({
+  days,
+  selected,
+  today,
+  counts,
+  onPick,
+  className,
+}: {
+  days: string[];
+  selected: string;
+  today: string;
+  counts: (date: string) => number;
+  onPick: (date: string) => void;
+  className?: string;
+}) {
+  return (
+    <Card className={cn("grid grid-cols-7 p-1", className)}>
+      {days.map((d, i) => {
+        const n = counts(d);
+        return (
+          <button
+            key={d}
+            type="button"
+            onClick={() => onPick(d)}
+            aria-pressed={d === selected}
+            aria-label={`${dayTitle(d)}${n ? `, ${n} ${n === 1 ? "evento" : "eventos"}` : ""}`}
+            className="flex min-w-0 flex-col items-center gap-0.5 rounded-[10px] py-1.5 hover:bg-slate-50"
+          >
+            <span className="text-[11px] text-muted">{DOW[i]}</span>
+            <span
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full text-sm font-semibold tabular-nums",
+                d === selected ? "bg-brand text-white" : d === today && "text-brand",
+              )}
+            >
+              {Number(d.slice(8))}
+            </span>
+            {/* Puntito si ese día hay algo. */}
+            <span aria-hidden className={cn("size-1.5 rounded-full", n ? "bg-brand-soft" : "bg-transparent")} />
+          </button>
+        );
+      })}
+    </Card>
+  );
+}
+
 function DayList({ date, items, onOpen }: { date: string; items: Placed[]; onOpen: (id: string) => void }) {
   return (
-    <Card className="flex flex-col gap-3 p-5">
+    <Card className="flex flex-col gap-3 p-4 sm:p-5">
       <h2 className="font-bold">{dayTitle(date)}</h2>
       {items.length === 0 ? (
         <p className="text-sm text-muted">No hay eventos de los tipos seleccionados este día.</p>
@@ -306,17 +370,19 @@ function DayList({ date, items, onOpen }: { date: string; items: Placed[]; onOpe
         <ul className="flex flex-col divide-y divide-slate-100">
           {items.map(({ task: t, start, end }) => (
             <li key={t.id} className="flex items-center gap-3 py-2.5">
-              <span className="w-24 shrink-0 text-xs font-semibold text-slate-600 tabular-nums">
+              <span className="w-[4.5rem] shrink-0 text-xs font-semibold text-slate-600 tabular-nums sm:w-24">
                 {toHHMM(start)} – {toHHMM(end)}
               </span>
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: t.type.color }} aria-hidden />
-              <button type="button" onClick={() => onOpen(t.id)} className="min-w-0 flex-1 text-left">
+              <button type="button" onClick={() => onOpen(t.id)} title={t.title} className="min-h-10 min-w-0 flex-1 text-left">
                 <span className={cn("block truncate text-sm font-medium hover:underline", t.status === "hecha" && "line-through")}>
                   {t.title}
                 </span>
                 <span className="block text-xs text-muted">
                   {t.type.name} · {t.assignee.name}
                   {t.assignedBy && t.assignedBy.id !== t.assignee.id && ` (se la pasó ${t.assignedBy.name})`}
+                  {/* En móvil el link al cliente no entra: al menos se ve de quién es. */}
+                  {t.client && <span className="sm:hidden"> · {t.client.name}</span>}
                 </span>
               </button>
               {t.client && (
@@ -350,7 +416,9 @@ function MiniMonth({ selected, today, onPick }: { selected: string; today: strin
   return (
     <Card className="p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-bold">{monthTitle(base)}</h2>
+        <h2 className="text-sm font-bold" aria-live="polite">
+          {monthTitle(base)}
+        </h2>
         <div className="flex">
           <Button variant="ghost" size="sm" aria-label="Mes anterior" onClick={() => setMonth(addMonths(base, -1).slice(0, 7))}>
             <ChevronLeft size={14} aria-hidden />

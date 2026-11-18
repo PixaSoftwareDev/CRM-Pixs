@@ -82,13 +82,12 @@ export function ClientsPage() {
             className="pl-9"
           />
         </label>
-        <div role="tablist" aria-label="Filtrar por estado" className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
               key={f.label}
               type="button"
-              role="tab"
-              aria-selected={search.status === f.key}
+              aria-pressed={search.status === f.key}
               onClick={() => void navigate({ search: (s) => ({ ...s, status: f.key }) })}
               className={cn(
                 "h-8 rounded-full px-3.5 text-[13px] font-medium transition",
@@ -104,8 +103,9 @@ export function ClientsPage() {
       {list.error ? (
         <ErrorBox error={list.error} onRetry={() => void list.refetch()} />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[880px] border-collapse text-sm">
+        <Card className="lg:overflow-x-auto">
+          {/* En el celular cada cliente es una ficha (stack-table), sin scroll de costado. */}
+          <table className="stack-table w-full border-collapse text-sm lg:min-w-[880px]">
             <thead>
               <tr className="border-b border-line bg-slate-50 text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
                 <th className="px-4 py-2.5">Cliente</th>
@@ -120,7 +120,7 @@ export function ClientsPage() {
               {list.isPending
                 ? Array.from({ length: 5 }, (_, i) => (
                     <tr key={i} className="border-b border-slate-100">
-                      <td colSpan={showMoney ? 6 : 5} className="px-4 py-4">
+                      <td colSpan={showMoney ? 6 : 5} data-cell="full" className="px-4 py-4">
                         <Skeleton />
                       </td>
                     </tr>
@@ -159,7 +159,7 @@ function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney
 
   return (
     <tr className="border-b border-slate-100 align-middle last:border-0 hover:bg-slate-50/60">
-      <td className="px-4 py-3">
+      <td data-cell="full" className="px-4 py-3">
         <Link
           to="/clientes/$clientId"
           params={{ clientId: c.id }}
@@ -169,8 +169,10 @@ function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney
             {initials(c.name)}
           </span>
           <span className="min-w-0">
-            <span className="block font-semibold text-ink">{c.name}</span>
-            <span className="block truncate text-xs text-muted">{c.mainContact ?? c.email ?? "Sin contacto"}</span>
+            <span className="block font-semibold break-words text-ink">{c.name}</span>
+            <span className="block truncate text-xs text-muted" title={c.mainContact ?? c.email ?? undefined}>
+              {c.mainContact ?? c.email ?? "Sin contacto"}
+            </span>
             {c.statusReason && <span className="block text-xs text-amber-700">Motivo: {c.statusReason}</span>}
           </span>
         </Link>
@@ -199,11 +201,15 @@ function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney
           ))}
         </select>
       </td>
-      <td className="px-4 py-3 text-slate-600">{ago(c.lastContactAt)}</td>
-      <td className="px-4 py-3">
+      <td data-cell="full" data-label="Último contacto:" className="px-4 py-3 text-slate-600 max-lg:order-2 max-lg:text-xs">
+        {ago(c.lastContactAt)}
+      </td>
+      <td data-cell="full" className={cn("px-4 py-3 max-lg:order-1", !c.nextTask && "max-lg:hidden")}>
         {c.nextTask ? (
-          <span className="block max-w-[220px]">
-            <span className="block truncate">{c.nextTask.title}</span>
+          <span className="block max-w-[220px] max-lg:max-w-none">
+            <span className="block truncate" title={c.nextTask.title}>
+              {c.nextTask.title}
+            </span>
             {/* Una tarea que ya tendría que haberse hecho no puede verse igual que una que viene. */}
             {c.nextTask.startsAt && c.nextTask.startsAt < new Date().toISOString() ? (
               <span className="text-xs font-semibold text-red-700">{when(c.nextTask.startsAt)} · atrasada</span>
@@ -216,7 +222,7 @@ function ClientRow({ client: c, showMoney }: { client: ClientListItem; showMoney
         )}
       </td>
       {showMoney && (
-        <td className="px-4 py-3 text-right">
+        <td data-cell="end" className="px-4 py-3 text-right">
           {c.balance !== null && (
             <Link
               to="/clientes/$clientId"

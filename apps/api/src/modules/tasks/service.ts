@@ -5,11 +5,14 @@
  */
 import { activities, type Db, type DbOrTx, eq, sql, taskComments, tasks, taskTypes, ticketEvents } from "@crm/db";
 import {
+  BUSY_STATUSES,
+  type TaskBusyQuery,
   type TaskCommentCreate,
   type TaskCreate,
   type TaskStatus,
   type TaskTypeCreate,
   type TaskUpdate,
+  taskBusyQuery,
   taskCommentCreate,
   taskCreate,
   taskTypeCreate,
@@ -60,6 +63,21 @@ async function checkRefs(db: DbOrTx, refs: { typeId?: string | undefined; client
   if (!userOk) throw new BadRequestError("El responsable no existe o está inactivo");
 }
 
+/**
+ * Agenda de una persona: si [startsAt, +duración) se pisa con otra tarea abierta
+ * suya, 409 con cuál es (salvo que se pida agendar igual).
+ */
+async function assertFree(db: DbOrTx, assigneeId: string, startsAt: string, duration: number, excludeId?: string) {
+  const start = new Date(startsAt);
+  const end = new Date(start.getTime() + duration * 60_000);
+  const [clash] = await repo.listBusy(db, assigneeId, start, end, excludeId);
+  if (!clash) return;
+  const who = (await repo.listTeam(db)).find((u) => u.id === assigneeId)?.name ?? "esa persona";
+  throw new ConflictError(
+    `Ese horario ya está ocupado en la agenda de ${who}: ${clash.title} ${fmtWhen(clash.startsAt).slice(-5)}–${fmtWhen(clash.endsAt).slice(-5)}`,
+  );
+}
+
 const comment = (db: DbOrTx, taskId: string, authorId: string, body: string) =>
   db.insert(taskComments).values({ taskId, authorId, body }).returning({ id: taskComments.id });
 
@@ -67,6 +85,13 @@ const comment = (db: DbOrTx, taskId: string, authorId: string, body: string) =>
 
 export const listTasksInRange = (db: Db, q: { from: string; to: string }) => repo.listTasksInRange(db, q.from, q.to);
 export const listUnscheduled = (db: Db) => repo.listUnscheduled(db);
+
+/** Lo que ocupa la agenda de una persona en un día de Argentina (incluye lo que viene del día anterior). */
+export function listBusy(db: Db, q: TaskBusyQuery) {
+  const { assigneeId, date, excludeId } = taskBusyQuery.parse(q);
+  const from = new Date(`${date}T00:00:00-03:00`);
+  return repo.listBusy(db, assigneeId, from, new Date(from.getTime() + 86_400_000), excludeId);
+}
 
 export async function getTask(db: Db, id: string) {
   const task = await repo.getTaskDetail(db, id);
@@ -85,6 +110,7 @@ export async function createTask(db: Db, actorId: string, input: TaskCreate) {
     if (!p) throw new BadRequestError("El proyecto no existe");
     if (data.clientId && p.client_id !== data.clientId) throw new BadRequestError("El proyecto no es de ese cliente");
   }
+  if (data.startsAt && !data.allowOverlap) await assertFree(db, assigneeId, data.startsAt, data.durationMinutes);
 
   const typeName = (await repo.listTaskTypes(db)).find((t) => t.id === data.typeId)?.name ?? "";
 
@@ -112,7 +138,7 @@ export async function createTask(db: Db, actorId: string, input: TaskCreate) {
 }
 
 export async function updateTask(db: Db, actorId: string, id: string, input: TaskUpdate) {
-  const { comment: note, ...data } = taskUpdate.parse(input);
+  const { comment: note, allowOverlap, ...data } = taskUpdate.parse(input);
   const before = await requireTask(db, id);
   await checkRefs(db, data);
 
@@ -134,6 +160,14 @@ export async function updateTask(db: Db, actorId: string, id: string, input: Tas
     } else {
       log.push("La dejó sin fecha.");
     }
+  }
+
+  // Si cambió cuándo o de quién es (y sigue abierta), el nuevo horario tiene que estar libre.
+  const assigneeId = data.assigneeId ?? before.assignee.id;
+  const status = data.status ?? before.status;
+  const moved = patch.startsAt !== undefined || assigneeId !== before.assignee.id;
+  if (moved && startsAt && !allowOverlap && (BUSY_STATUSES as readonly string[]).includes(status)) {
+    await assertFree(db, assigneeId, startsAt, duration, id);
   }
 
   let assigneeName: string | undefined;

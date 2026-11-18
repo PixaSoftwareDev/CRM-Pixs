@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { useAccess } from "../../hooks/useAccess";
 import { centsToInput, parsePesos } from "../../lib/format";
@@ -107,7 +107,7 @@ export function ProjectFormDialog({
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Proyecto" error={err.name?.message}>
-            <Input autoFocus aria-invalid={!!err.name} {...form.register("name")} />
+            <Input autoFocus data-autofocus aria-invalid={!!err.name} {...form.register("name")} />
           </Field>
           <Field label="Cliente" error={err.clientId?.message}>
             <Select disabled={!!project} aria-invalid={!!err.clientId} {...form.register("clientId")}>
@@ -136,16 +136,16 @@ export function ProjectFormDialog({
             <Input type="date" {...form.register("startsOn")} />
           </Field>
           <Field label="Entrega" error={err.dueOn?.message}>
-            <Input type="date" {...form.register("dueOn")} />
+            <Input type="date" aria-invalid={!!err.dueOn} {...form.register("dueOn")} />
           </Field>
           <Field label="Horas estimadas" error={err.estimatedHours?.message}>
-            <Input inputMode="numeric" {...form.register("estimatedHours")} />
+            <Input inputMode="numeric" aria-invalid={!!err.estimatedHours} {...form.register("estimatedHours")} />
           </Field>
         </div>
         {showMoney && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Monto de la venta ($)" error={err.saleAmount?.message}>
-              <Input inputMode="decimal" {...form.register("saleAmount")} />
+              <Input inputMode="decimal" aria-invalid={!!err.saleAmount} {...form.register("saleAmount")} />
             </Field>
             <Field label="Forma de pago">
               <Input placeholder="3 cuotas" {...form.register("paymentTerms")} />
@@ -156,14 +156,14 @@ export function ProjectFormDialog({
           <textarea rows={3} className={textarea} {...form.register("scope")} />
         </Field>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex flex-wrap justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {project ? "Guardar" : "Crear proyecto"}
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

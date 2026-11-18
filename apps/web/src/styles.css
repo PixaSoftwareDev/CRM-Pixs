@@ -73,3 +73,51 @@ body {
     cursor: not-allowed;
   }
 }
+
+/*
+ * Tablas que en el celular pasan a ser una lista de fichas (sin scroll de costado):
+ * cada fila es un bloque con sus celdas en renglones que se acomodan solos.
+ *   data-cell="full"  → ocupa todo el ancho (nombre, título, acciones)
+ *   data-cell="end"   → se corre a la derecha de su renglón (importe, estado)
+ *   data-label="…"    → muestra el nombre de la columna antes del valor
+ * Desde lg (1024px) es la tabla de siempre.
+ */
+@media screen and (width < 64rem) {
+  .stack-table,
+  .stack-table > tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  .stack-table > thead {
+    display: none;
+  }
+  .stack-table > tbody > tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    /* Las tablas que ya van con margen propio (dentro de un Card con padding) lo ponen en 0. */
+    padding: 0.75rem var(--stack-px, 1rem);
+  }
+  .stack-table > tbody > tr > td {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+  }
+  .stack-table > tbody > tr > td[data-cell="full"] {
+    flex-basis: 100%;
+  }
+  .stack-table > tbody > tr > td[data-cell="end"] {
+    margin-left: auto;
+    text-align: right;
+  }
+  .stack-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label) " ";
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+}

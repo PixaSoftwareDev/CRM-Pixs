@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { taskTitle } from "./tasks";
+import { bodyText, titleText } from "./text";
 
 export const TICKET_TYPES = ["falla", "implementacion", "consulta", "mejora"] as const;
 export const TICKET_CHANNELS = ["telefono", "whatsapp", "email", "web", "presencial"] as const;
@@ -25,7 +26,7 @@ export type TicketTaskRole = (typeof TICKET_TASK_ROLES)[number];
 
 const isoDate = z.iso.date({ message: "Fecha inválida" });
 const instant = z.iso.datetime({ offset: true, message: "Fecha y hora inválidas" });
-const note = z.string().trim().max(2000);
+const note = bodyText();
 
 /** Filtros del buscador (todos opcionales, viajan en la URL). */
 export const ticketListQuery = z.object({
@@ -58,8 +59,8 @@ export const ticketCreate = z.object({
   type: z.enum(TICKET_TYPES),
   channel: z.enum(TICKET_CHANNELS),
   priority: z.enum(TICKET_PRIORITIES).default("normal"),
-  title: z.string().trim().min(1, { message: "Poné un título" }).max(200),
-  description: z.string().trim().max(8000).optional(),
+  title: titleText().min(1, { message: "Poné un título" }),
+  description: bodyText().optional(),
   /** Quién lo cargó; por defecto, quien está logueado. */
   reportedById: z.uuid().optional(),
   receivedAt: instant.optional(),
@@ -72,8 +73,8 @@ export type TicketCreate = z.input<typeof ticketCreate>;
 
 export const ticketUpdate = z
   .object({
-    title: z.string().trim().min(1).max(200),
-    description: z.string().trim().max(8000).nullable(),
+    title: titleText().min(1, { message: "Poné un título" }),
+    description: bodyText().nullable(),
     type: z.enum(TICKET_TYPES),
     priority: z.enum(TICKET_PRIORITIES),
     projectId: z.uuid().nullable(),
@@ -126,8 +127,8 @@ export const ticketConfirm = z
   .refine((v) => v.ok || !!v.retryAt, { message: "Indicá cuándo lo retoma", path: ["retryAt"] });
 export type TicketConfirm = z.input<typeof ticketConfirm>;
 
-export const ticketNote = z.object({ body: z.string().trim().min(1, { message: "Escribí la nota" }).max(2000) });
+export const ticketNote = z.object({ body: bodyText().min(1, { message: "Escribí la nota" }) });
 export type TicketNote = z.input<typeof ticketNote>;
 
-export const ticketCancel = z.object({ reason: z.string().trim().min(1, { message: "Indicá el motivo" }).max(500) });
+export const ticketCancel = z.object({ reason: bodyText().min(1, { message: "Indicá el motivo" }) });
 export type TicketCancel = z.input<typeof ticketCancel>;

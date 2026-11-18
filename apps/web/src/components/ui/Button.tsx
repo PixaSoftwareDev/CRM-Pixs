@@ -11,8 +11,9 @@ const VARIANTS: Record<Variant, string> = {
   danger: "bg-red-600 text-white hover:bg-red-700",
 };
 const SIZES: Record<Size, string> = {
-  md: "h-[38px] px-4 text-sm",
-  sm: "h-8 px-2.5 text-xs",
+  md: "min-h-[38px] px-4 text-sm",
+  // En el celular, al menos 40px de alto para el dedo.
+  sm: "min-h-10 px-2.5 text-xs sm:min-h-8",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -25,7 +26,8 @@ export function Button({ variant = "primary", size = "md", className, type = "bu
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold whitespace-nowrap transition disabled:pointer-events-none disabled:opacity-60",
+        // En el celular un texto largo pasa a dos líneas en vez de salirse; desde sm, siempre en una.
+        "inline-flex max-w-full items-center justify-center gap-2 rounded-[10px] py-1 text-center leading-tight font-semibold whitespace-normal transition outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-60 sm:whitespace-nowrap [&>svg]:shrink-0",
         VARIANTS[variant],
         SIZES[size],
         className,

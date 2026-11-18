@@ -7,12 +7,12 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { cn } from "../../components/ui/cn";
-import { Dialog } from "../../components/ui/Dialog";
-import { Field, Input, Select } from "../../components/ui/Field";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
+import { Field, Input, Select, TextArea } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { ApiError } from "../../lib/api";
-import { ago, initials, when } from "../../lib/format";
+import { ago, clip, initials, when } from "../../lib/format";
 import { ticketRoute } from "../../router";
 import { FilesCard } from "../files/FilesCard";
 import { useMyId, useTeam } from "../tasks/api";
@@ -36,7 +36,7 @@ import { useTitle } from "../../hooks/useTitle";
 export function TicketDetailPage() {
   const { ticketId } = ticketRoute.useParams();
   const ticket = useTicket(ticketId);
-  useTitle(ticket.data ? `#${ticket.data.number} ${ticket.data.title}` : "Ticket");
+  useTitle(ticket.data ? `#${ticket.data.number} ${clip(ticket.data.title, 60)}` : "Ticket");
   const notice = useNotice();
 
   // Link viejo o mal copiado (id inválido o ticket inexistente): no tiene sentido "Reintentar".
@@ -113,6 +113,7 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
   const type = TICKET_TYPE[t.type];
   const stepIdx = STEPS.findIndex((s) => s.status === t.status);
   const closed = t.status === "resuelto" || t.status === "cancelado";
+  const contactLine = t.contact ? [t.contact.name, t.contact.phone, t.contact.email].filter(Boolean).join(" · ") : "Sin contacto cargado";
 
   return (
     <Section n={1} title="Datos del cliente y del ticket">
@@ -158,15 +159,17 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
       <Link
         to="/clientes/$clientId"
         params={{ clientId: t.client.id }}
-        className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 hover:bg-slate-100"
+        className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 hover:bg-slate-100"
       >
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-sm font-bold text-indigo-800">
           {initials(t.client.name)}
         </span>
-        <span className="min-w-0 flex-1">
-          <strong className="block truncate">{t.client.name} ↗</strong>
-          <span className="block truncate text-xs text-muted">
-            {t.contact ? [t.contact.name, t.contact.phone, t.contact.email].filter(Boolean).join(" · ") : "Sin contacto cargado"}
+        <span className="min-w-0 flex-1 basis-40">
+          <strong className="block truncate" title={t.client.name}>
+            {t.client.name} ↗
+          </strong>
+          <span className="block truncate text-xs text-muted" title={contactLine}>
+            {contactLine}
           </span>
         </span>
         <Chip tone={t.clientPriority === "alta" ? "red" : t.clientPriority === "media" ? "amber" : "slate"}>
@@ -183,12 +186,13 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
           <dt className="text-xs text-muted">Urgencia</dt>
           <dd>
             <Select
+              aria-label="Urgencia"
               value={t.priority}
               disabled={closed}
               onChange={(e) =>
                 update.mutate({ priority: e.target.value as TicketDetail["priority"] }, { onSuccess: () => onNotice("Urgencia actualizada.") })
               }
-              className="h-8 w-36"
+              className="h-8 w-full max-w-36"
             >
               {TICKET_PRIORITIES.map((p) => (
                 <option key={p} value={p}>
@@ -200,7 +204,7 @@ function ClientSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-muted">Compromiso</dt>
-          <dd className="flex items-center gap-2">
+          <dd className="flex flex-wrap items-center gap-2">
             <DueDateInput
               saved={t.dueAt ? arParts(t.dueAt).date : ""}
               min={arParts(t.receivedAt).date}
@@ -268,7 +272,7 @@ function DueDateInput({
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), commit())}
-      className={cn("h-8 w-40", overdue && "border-red-400 text-red-700")}
+      className={cn("h-8 w-full max-w-40", overdue && "border-red-400 text-red-700")}
     />
   );
 }
@@ -289,11 +293,11 @@ function DetailSection({ ticket: t }: { ticket: TicketDetail }) {
     <Section n={2} title="Detalle del ticket">
       <div>
         <p className="text-xs text-muted">Título</p>
-        <h1 className="text-xl font-bold">{t.title}</h1>
+        <h1 className="text-xl font-bold [overflow-wrap:anywhere]">{t.title}</h1>
       </div>
       <div>
         <p className="text-xs text-muted">Detalle</p>
-        <p className="mt-0.5 text-sm whitespace-pre-line">{t.description ?? "Sin descripción."}</p>
+        <p className="mt-0.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{t.description ?? "Sin descripción."}</p>
       </div>
     </Section>
   );
@@ -363,7 +367,7 @@ function TasksSection({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
           {t.events.map((e) => (
             <li key={e.id} className="flex gap-2.5 text-sm">
               <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" aria-hidden />
-              <span>
+              <span className="min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap">
                 {e.kind === "nota" && <strong>{e.actorName ?? "Alguien"}: </strong>}
                 {e.message} <span className="text-xs text-muted">· {ago(e.createdAt)}</span>
               </span>
@@ -399,7 +403,9 @@ function TaskRow({ task: x, onOpen }: { task: TaskDto; onOpen: () => void }) {
         {initials(x.assignee.name)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-sm font-semibold", closed && "line-through")}>{x.title}</span>
+        <span className={cn("block truncate text-sm font-semibold", closed && "line-through")} title={x.title}>
+          {x.title}
+        </span>
         <span className="block text-xs text-slate-600">
           {x.assignee.name}
           {x.assignedBy && x.assignedBy.id !== x.assignee.id && ` (se la pasó ${x.assignedBy.name})`} · {x.type.name} · {when(x.startsAt)}
@@ -422,15 +428,15 @@ function NoteInput({ ticketId }: { ticketId: string }) {
     if (text) once(() => note.mutateAsync({ body: text }).then(() => setBody("")));
   };
   return (
-    <div className="flex gap-2">
+    <div className="flex items-start gap-2">
       <label className="min-w-0 flex-1">
         <span className="sr-only">Nota</span>
-        <Input
+        <TextArea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), send())}
+          // Enter anota; Shift+Enter agrega un renglón.
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), send())}
           placeholder="Agregar una nota al historial…"
-          maxLength={2000}
         />
       </label>
       <Button variant="secondary" onClick={send} disabled={!body.trim() || note.isPending}>
@@ -489,7 +495,7 @@ function AssignPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: 
       hint={`Se crea sola una tarea en la agenda de ${name} con el trabajo a realizar.`}
       error={assign.error}
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
         <PersonSelect label={`Lo hace${t.suggestedAssignee ? ` (sugerido: ${t.suggestedAssignee.name})` : ""}`} value={who} onChange={setWho} />
         <Field label="Día">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -584,7 +590,7 @@ function WorkDonePanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice
               </Field>
             )}
             <Field label="Qué se hizo (opcional)" className={t.project ? "" : "sm:col-span-2"}>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: era el driver de la impresora" />
+              <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: era el driver de la impresora" />
             </Field>
           </div>
           <Button
@@ -632,6 +638,9 @@ function ReassignForm({ onSubmit }: { onSubmit: (assigneeId: string, at: string,
   );
 }
 
+/** Botones con texto largo (incluyen el nombre del técnico): en el celular bajan de renglón en vez de desbordar. */
+const wrapBtn = "h-auto min-h-[38px] py-2 text-left whitespace-normal";
+
 function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice: (m: string) => void }) {
   const confirm = useConfirmTicket(t.id);
   const once = useSingleFlight();
@@ -650,7 +659,7 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
         {t.contact && ` · llamar a ${t.contact.name}${t.contact.phone ? ` (${t.contact.phone})` : ""}`}
       </p>
       <Field label="Comentario de la llamada (opcional)">
-        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: ya imprime bien" />
+        <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: ya imprime bien" />
       </Field>
       {retry && (
         <div className="grid gap-3 sm:grid-cols-[auto_auto_1fr] sm:items-end">
@@ -665,6 +674,7 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
       <div className="flex flex-wrap gap-2">
         {!retry && (
           <Button
+            className={wrapBtn}
             disabled={confirm.isPending}
             onClick={() => once(() => confirm.mutateAsync({ ok: true, ...extra }).then(() => onNotice(`Ticket #${t.number} cerrado.`)))}
           >
@@ -675,6 +685,7 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
           <>
             <Button
               variant="danger"
+              className={wrapBtn}
               disabled={confirm.isPending || !date || !time}
               onClick={() =>
                 once(() =>
@@ -691,7 +702,7 @@ function ConfirmPanel({ ticket: t, onNotice }: { ticket: TicketDetail; onNotice:
             </Button>
           </>
         ) : (
-          <Button variant="secondary" onClick={() => setRetry(true)}>
+          <Button variant="secondary" className={wrapBtn} onClick={() => setRetry(true)}>
             <X size={16} aria-hidden /> No quedó bien → vuelve a {tech}
           </Button>
         )}
@@ -707,10 +718,10 @@ function CancelDialog({ ticket: t, open, onClose, onDone }: { ticket: TicketDeta
     <Dialog open={open} onClose={onClose} title={`Cancelar ticket #${t.number}`} description="Se cancelan también sus tareas pendientes.">
       <div className="flex flex-col gap-3">
         <Field label="Motivo">
-          <Input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: el cliente lo resolvió solo, era un duplicado…" />
+          <TextArea autoFocus data-autofocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: el cliente lo resolvió solo, era un duplicado…" />
         </Field>
         {cancel.error && <p role="alert" className="text-sm text-red-700">{cancel.error.message}</p>}
-        <div className="flex justify-end gap-2">
+        <DialogActions className="flex justify-end gap-2 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Volver
           </Button>
@@ -721,7 +732,7 @@ function CancelDialog({ ticket: t, open, onClose, onDone }: { ticket: TicketDeta
           >
             Cancelar ticket
           </Button>
-        </div>
+        </DialogActions>
       </div>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { parsePesos } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
@@ -85,7 +85,7 @@ export function NewOpportunityDialog({
     <Dialog open={open} onClose={onClose} title="Nuevo potencial" description="Entra en la etapa Potencial; el embudo avanza solo con sus tareas.">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <Field label="Cliente" error={err.clientId?.message}>
-          <Select {...form.register("clientId")}>
+          <Select aria-invalid={!!err.clientId} {...form.register("clientId")}>
             <option value={NEW}>+ Cliente nuevo</option>
             {clients.data?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -97,7 +97,7 @@ export function NewOpportunityDialog({
         {clientId === NEW && (
           <div className="grid gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-3">
             <Field label="Negocio" error={err.clientName?.message}>
-              <Input autoFocus placeholder="Óptica Central" aria-invalid={!!err.clientName} {...form.register("clientName")} />
+              <Input autoFocus data-autofocus placeholder="Óptica Central" aria-invalid={!!err.clientName} {...form.register("clientName")} />
             </Field>
             <Field label="Contacto">
               <Input placeholder="Martín Sosa" {...form.register("contactName")} />
@@ -112,7 +112,7 @@ export function NewOpportunityDialog({
             <Input placeholder="Web institucional + turnos" aria-invalid={!!err.title} {...form.register("title")} />
           </Field>
           <Field label="Monto estimado ($)" error={err.amount?.message}>
-            <Input inputMode="decimal" placeholder="380.000" {...form.register("amount")} />
+            <Input inputMode="decimal" placeholder="380.000" aria-invalid={!!err.amount} {...form.register("amount")} />
           </Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -133,14 +133,14 @@ export function NewOpportunityDialog({
           </Field>
         </div>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex flex-wrap justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
             Agregar al embudo
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

@@ -1,6 +1,6 @@
 import type { TaskDto } from "@crm/shared";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Plus, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -54,6 +54,8 @@ export function MyDayPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<string>>(new Set());
   const [hiddenClients, setHiddenClients] = useState<ReadonlySet<string>>(new Set());
+  /** En el celular las horas vacías de la madrugada arrancan plegadas (no hay scroll interno). */
+  const [showEarly, setShowEarly] = useState(false);
 
   const go = (patch: { date?: string | undefined; user?: string | undefined }) =>
     void navigate({ search: (s) => ({ ...s, ...patch }), replace: true });
@@ -80,13 +82,19 @@ export function MyDayPage() {
   const undated = (unscheduled.data ?? []).filter((t) => t.assignee.id === userId);
   const nowHour = isToday ? Math.floor(nowMinutesAr() / 60) : -1;
   const viewingOther = userId !== me;
+  // Hora con la que arranca la lista (igual que el scroll inicial en desktop); antes, en el
+  // celular, solo se pliegan las horas vacías.
+  const startHour = isToday ? Math.max(0, nowHour - 1) : SCROLL_TO_HOUR;
+  const firstBusy = Math.min(LAST_HOUR, ...[...byHour.keys()]);
+  const foldBefore = Math.min(startHour, firstBusy);
 
   const quickAdd = () => {
     if (!text.trim()) return;
     const { warning, ...d } = parseQuickTask(text, {
       clients: clients.data ?? [],
-      baseDate: date,
-      defaultStart: isToday ? nextSlot() : "10:00",
+      // Siempre desde hoy, aunque estés mirando otro día: "mañana" es mañana de verdad.
+      baseDate: todayAr(),
+      defaultStart: nextSlot(),
     });
     if (warning) notice.show(warning);
     setDraft({ ...d, assigneeId: userId });
@@ -95,7 +103,7 @@ export function MyDayPage() {
   return (
     <>
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" aria-label="Día anterior" onClick={() => go({ date: addDays(date, -1) })}>
             <ChevronLeft size={16} aria-hidden />
           </Button>
@@ -105,17 +113,18 @@ export function MyDayPage() {
           <Button variant="secondary" size="sm" aria-label="Día siguiente" onClick={() => go({ date: addDays(date, 1) })}>
             <ChevronRight size={16} aria-hidden />
           </Button>
-          <h1 className="ml-2 text-[26px] font-bold tracking-tight">{dayTitle(date)}</h1>
+          {/* En el celular el título va en su propio renglón, debajo de las flechas. */}
+          <h1 className="basis-full text-[22px] leading-tight font-bold tracking-tight sm:ml-2 sm:basis-auto sm:text-[26px]">{dayTitle(date)}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Chip tone="indigo">{mine.filter(isOpen).length} por hacer</Chip>
           <Chip tone="green">{mine.filter((t) => !isOpen(t)).length} hechas</Chip>
-          <label className="flex items-center gap-2 text-sm whitespace-nowrap text-muted">
+          <label className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted max-sm:basis-full">
             Agenda de
             <Select
               value={userId}
               onChange={(e) => go({ user: e.target.value === me ? undefined : e.target.value })}
-              className="h-9 w-auto"
+              className="h-10 min-w-0 max-sm:flex-1 sm:h-9 sm:w-auto sm:max-w-56"
             >
               {team.data?.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -198,13 +207,28 @@ export function MyDayPage() {
               el.dataset.scrolled = "1";
             }
           }}
-          className={cn("max-h-[70vh] divide-y divide-slate-100 overflow-y-auto", tasks.isPlaceholderData && "opacity-60")}
+          // En el celular, sin scroll adentro de la página: la lista va en el flujo.
+          className={cn("divide-y divide-slate-100 md:max-h-[70vh] md:overflow-y-auto", tasks.isPlaceholderData && "opacity-60")}
         >
+          {foldBefore > FIRST_HOUR && !showEarly && (
+            <button
+              type="button"
+              onClick={() => setShowEarly(true)}
+              className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-xs text-muted hover:bg-slate-50 hover:text-brand md:hidden"
+            >
+              <ChevronDown size={14} aria-hidden className="w-12 shrink-0" />
+              Ver de 00:00 a {String(foldBefore - 1).padStart(2, "0")}:59 (sin tareas)
+            </button>
+          )}
           {HOURS.map((h) => {
             const rows = byHour.get(h) ?? [];
             const label = `${String(h).padStart(2, "0")}:00`;
             return (
-              <div key={h} data-hour={h} className="relative flex gap-3 px-3 py-2 sm:gap-4 sm:px-4">
+              <div
+                key={h}
+                data-hour={h}
+                className={cn("relative flex gap-3 px-3 py-2 sm:gap-4 sm:px-4", h < foldBefore && !showEarly && "max-md:hidden")}
+              >
                 <span className="w-12 shrink-0 pt-1.5 text-xs font-semibold text-muted tabular-nums">{label}</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   {rows.map((t) => (
@@ -215,7 +239,7 @@ export function MyDayPage() {
                     onClick={() => setDraft({ date, start: label, assigneeId: userId })}
                     className={cn(
                       "flex items-center gap-1.5 rounded-lg px-2 text-left text-xs text-slate-400 hover:bg-slate-50 hover:text-brand",
-                      rows.length ? "h-6" : "h-8",
+                      rows.length ? "h-8 md:h-6" : "h-10 md:h-8",
                     )}
                   >
                     <Plus size={12} aria-hidden />
@@ -223,7 +247,7 @@ export function MyDayPage() {
                   </button>
                 </div>
                 {h === nowHour && (
-                  <span className="pointer-events-none absolute inset-x-0 top-0 flex items-center" aria-label="Ahora">
+                  <span className="pointer-events-none absolute inset-x-0 top-0 flex items-center">
                     <span className="h-0.5 flex-1 bg-red-500" />
                     <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">ahora</span>
                   </span>
@@ -276,20 +300,30 @@ function TaskRow({ task: t, viewerId, onOpen }: { task: TaskDto; viewerId: strin
     <button
       type="button"
       onClick={onOpen}
+      title={t.client ? `${t.title} · ${t.client.name}` : t.title}
       className={cn("flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] px-3 py-2 text-left transition hover:brightness-95", done && "opacity-70")}
       style={{ background: tint(t.type.color, done), boxShadow: `inset 4px 0 0 ${t.type.color}` }}
     >
       <span className="text-xs font-semibold text-slate-600 tabular-nums">
         {p ? `${p.time}–${toHHMM(p.minutes + t.durationMinutes)}` : "—"}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm">
-        <strong className={cn(done && "text-slate-500 line-through")}>
-          {done && "✓ "}
+      {/* El cliente adelante y siempre visible; el texto de la tarea se corta si no entra.
+          En el celular va en su propio renglón: el cliente entero y el texto en hasta 2 líneas. */}
+      <span className="flex min-w-0 flex-1 items-baseline gap-1.5 text-sm max-sm:order-last max-sm:basis-full max-sm:flex-col max-sm:items-start max-sm:gap-0.5">
+        {done && <span aria-hidden className="max-sm:hidden">✓</span>}
+        {t.client && (
+          <>
+            {/* Se achica último: primero se corta el texto de la tarea. */}
+            <strong className="max-w-[60%] shrink-0 truncate max-sm:max-w-full max-sm:whitespace-normal">{t.client.name}</strong>
+            <span aria-hidden className="text-slate-500 max-sm:hidden">·</span>
+          </>
+        )}
+        <span className={cn("min-w-0 truncate max-sm:line-clamp-2 max-sm:whitespace-normal", !t.client && "font-semibold", done && "text-slate-500 line-through")}>
+          {done && <span className="sr-only">Hecha: </span>}
           {t.title}
-        </strong>
-        {t.client && <span className="text-slate-600"> · {t.client.name}</span>}
+        </span>
       </span>
-      <span className="flex items-center gap-1.5">
+      <span className="flex min-w-0 flex-wrap items-center gap-1.5 max-sm:ml-auto max-sm:justify-end">
         {from && <Chip tone="amber">de {from}</Chip>}
         <Chip tone={TASK_STATUS[t.status].tone} className="bg-white/70">
           {TASK_STATUS[t.status].label}

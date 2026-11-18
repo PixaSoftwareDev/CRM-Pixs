@@ -74,7 +74,9 @@ function matchDate(text: string, base: string): { date: string; warning: string 
     if (date) return ok(date);
     return { date: base, warning: `La fecha ${dm[0]} no existe: revisá el día antes de agendar.` };
   }
-  const wd = WEEKDAYS.findIndex((d) => new RegExp(`\\b${d}\\b`).test(text));
+  // Solo "el viernes", "este viernes", "para el viernes", "próximo viernes": un "viernes" suelto
+  // en la descripción ("la prueba del viernes") no mueve la tarea de día.
+  const wd = WEEKDAYS.findIndex((d) => new RegExp(`\\b(?:el|este|para|proximo)\\s+(?:proximo\\s+)?${d}\\b`).test(text));
   if (wd >= 0) {
     // El próximo día con ese nombre (si es hoy, el de la semana que viene).
     const diff = (wd - weekday(base) + 7) % 7 || 7;

@@ -24,7 +24,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { cn } from "../../components/ui/cn";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { Notice, useNotice } from "../../components/ui/Notice";
 import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
@@ -96,15 +96,16 @@ export function UsersPage() {
         </p>
       )}
 
-      <Card className="overflow-x-auto">
-        <table className="w-full min-w-[820px] border-collapse text-sm">
+      <Card className="lg:overflow-x-auto">
+        {/* En el celular cada usuario es una ficha (stack-table), sin scroll de costado. */}
+        <table className="stack-table w-full border-collapse text-sm lg:min-w-[820px]">
           <thead>
             <tr className="border-b border-line bg-slate-50 text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
-              <th className="px-4 py-2.5">Usuario</th>
-              <th className="px-4 py-2.5">Perfil</th>
-              <th className="px-4 py-2.5">Estado</th>
-              <th className="px-4 py-2.5">Alta</th>
-              <th className="px-4 py-2.5 text-right">Acciones</th>
+              <th scope="col" className="px-4 py-2.5">Usuario</th>
+              <th scope="col" className="px-4 py-2.5">Perfil</th>
+              <th scope="col" className="px-4 py-2.5">Estado</th>
+              <th scope="col" className="px-4 py-2.5">Alta</th>
+              <th scope="col" className="px-4 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -113,9 +114,9 @@ export function UsersPage() {
               const self = u.id === me;
               return (
                 <tr key={u.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3">
+                  <td data-cell="full" className="px-4 py-3">
                     <span className="flex items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-800">
+                      <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-800">
                         {initials(u.name)}
                       </span>
                       <span className="min-w-0">
@@ -133,9 +134,9 @@ export function UsersPage() {
                   <td className="px-4 py-3">
                     <Chip tone={u.active ? "green" : "slate"}>{u.active ? "Con acceso" : "Dado de baja"}</Chip>
                   </td>
-                  <td className="px-4 py-3 text-muted">{day(u.createdAt.slice(0, 10))}</td>
-                  <td className="px-4 py-3">
-                    <span className="flex justify-end gap-1.5">
+                  <td data-cell="end" data-label="Alta:" className="px-4 py-3 text-muted max-lg:text-xs">{day(u.createdAt.slice(0, 10))}</td>
+                  <td data-cell="full" className="px-4 py-3">
+                    <span className="flex flex-wrap justify-end gap-1.5 max-lg:justify-start">
                       <Button size="sm" variant="secondary" disabled={busy || !u.active || self} onClick={() => setPermsOf(u)}>
                         <ShieldCheck size={13} aria-hidden /> Permisos
                       </Button>
@@ -225,7 +226,7 @@ function NewUserDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
     <Dialog open={open} onClose={onClose} title="Nuevo usuario" description="Entra con su email y la contraseña que le pongas acá.">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <Field label="Nombre" error={err.name?.message}>
-          <Input autoFocus placeholder="Ej: Lucía Pérez" {...form.register("name")} />
+          <Input autoFocus data-autofocus placeholder="Ej: Lucía Pérez" {...form.register("name")} />
         </Field>
         <Field label="Email" error={err.email?.message}>
           <Input type="email" autoComplete="off" placeholder="nombre@empresa.com" {...form.register("email")} />
@@ -243,14 +244,14 @@ function NewUserDialog({ open, onClose, onDone }: { open: boolean; onClose: () =
           <Input type="text" autoComplete="off" spellCheck={false} className="font-mono" {...form.register("password")} />
         </Field>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={create.isPending}>
             Crear usuario
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );
@@ -282,7 +283,7 @@ function PasswordDialog({ user, onClose, onDone }: { user: UserDto | null; onClo
       >
         <Field label="Nueva contraseña" hint="Mínimo 8 caracteres.">
           <Input
-            autoFocus
+            autoFocus data-autofocus
             type="text"
             autoComplete="off"
             spellCheck={false}
@@ -292,14 +293,14 @@ function PasswordDialog({ user, onClose, onDone }: { user: UserDto | null; onClo
           />
         </Field>
         {save.error && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{save.error.message}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={password.length < 8 || save.isPending}>
             Guardar contraseña
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );
@@ -392,14 +393,14 @@ function PermissionsDialog({ user, onClose, onDone }: { user: UserDto | null; on
         </div>
 
         {save.error && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{save.error.message}</p>}
-        <div className="flex justify-end gap-2">
+        <DialogActions className="flex justify-end gap-2 max-sm:[&>:last-child]:flex-1">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={save.isPending}>
             Guardar permisos
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

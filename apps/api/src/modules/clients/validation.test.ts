@@ -1,4 +1,4 @@
-import { clientCreate, clientUpdate, contactInput, cuitSearchDigits, isValidPhone, opportunityCreate } from "@crm/shared";
+import { clientCreate, clientUpdate, contactInput, cuitSearchDigits, isValidPhone, numberSearchDigits, opportunityCreate } from "@crm/shared";
 import { describe, expect, it } from "vitest";
 
 describe("teléfono", () => {
@@ -40,5 +40,19 @@ describe("búsqueda por CUIT", () => {
     expect(cuitSearchDigits("Local 2")).toBeNull();
     expect(cuitSearchDigits("12")).toBeNull();
     expect(cuitSearchDigits("--")).toBeNull();
+  });
+});
+
+describe("buscador de clientes por número", () => {
+  it("teléfonos y CUIT con separadores quedan en dígitos", () => {
+    expect(numberSearchDigits("(011) 4567-8910")).toBe("01145678910");
+    expect(numberSearchDigits("+54 11 5555")).toBe("54115555");
+    expect(numberSearchDigits("30-71234567-8")).toBe("30712345678");
+  });
+
+  it("texto o muy pocos dígitos no es un número", () => {
+    expect(numberSearchDigits("Local 2")).toBeNull();
+    expect(numberSearchDigits("12")).toBeNull();
+    expect(numberSearchDigits("ana@mail.com")).toBeNull();
   });
 });

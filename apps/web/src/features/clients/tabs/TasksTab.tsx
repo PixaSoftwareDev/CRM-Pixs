@@ -39,7 +39,10 @@ export function TasksTab({ clientId }: { clientId: string }) {
               <span className="flex min-w-0 items-center gap-3">
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: t.typeColor }} aria-hidden />
                 <span className="min-w-0">
-                  <span className={closed ? "block truncate text-sm text-muted line-through" : "block truncate text-sm font-medium"}>
+                  <span
+                    title={t.title}
+                    className={closed ? "block truncate text-sm text-muted line-through" : "block truncate text-sm font-medium"}
+                  >
                     {t.title}
                   </span>
                   <span className="block text-xs text-muted">

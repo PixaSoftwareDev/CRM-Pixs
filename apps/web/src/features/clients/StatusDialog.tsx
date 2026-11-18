@@ -9,7 +9,7 @@ import {
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { useChangeStatus } from "./api";
 import { STATUS } from "./labels";
@@ -58,14 +58,14 @@ export function StatusDialog({ client, open, onClose }: { client: ClientDetail; 
           </Field>
         )}
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
+        <DialogActions className="flex justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" variant={status === "baja" ? "danger" : "primary"} disabled={form.formState.isSubmitting}>
             {status === "baja" ? "Dar de baja" : "Guardar"}
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

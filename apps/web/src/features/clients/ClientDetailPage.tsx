@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Chip } from "../../components/ui/Chip";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
-import { Tabs } from "../../components/ui/Tabs";
+import { tabPanelProps, Tabs } from "../../components/ui/Tabs";
 import { cn } from "../../components/ui/cn";
 import { useAccess } from "../../hooks/useAccess";
 import { useCopy } from "../../hooks/useCopy";
@@ -67,6 +67,7 @@ export function ClientDetailPage() {
 
       <section className="flex flex-col gap-4">
         <Tabs<TabKey>
+          id="cliente"
           label="Secciones del cliente"
           value={current}
           onChange={setTab}
@@ -79,12 +80,17 @@ export function ClientDetailPage() {
             { key: "datos", label: "Datos" },
           ]}
         />
-        {current === "actividad" && <ActivityTab clientId={c.id} />}
-        {current === "tareas" && <TasksTab clientId={c.id} />}
-        {current === "cuenta" && <StatementTab client={c} />}
-        {current === "proyectos" && <ProjectsTab clientId={c.id} />}
-        {current === "archivos" && <FilesCard owner={{ clientId: c.id }} area="clientes" />}
-        {current === "datos" && <DataTab client={c} />}
+        <div
+          {...tabPanelProps("cliente", current)}
+          className="flex flex-col gap-4 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+        >
+          {current === "actividad" && <ActivityTab clientId={c.id} />}
+          {current === "tareas" && <TasksTab clientId={c.id} />}
+          {current === "cuenta" && <StatementTab client={c} />}
+          {current === "proyectos" && <ProjectsTab clientId={c.id} />}
+          {current === "archivos" && <FilesCard owner={{ clientId: c.id }} area="clientes" />}
+          {current === "datos" && <DataTab client={c} />}
+        </div>
       </section>
     </>
   );
@@ -105,10 +111,13 @@ function ClientHeader({ client: c, showMoney }: { client: ClientDetail; showMone
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{c.name}</h1>
-              <Chip tone={status.tone}>
-                {status.label}
-                {c.statusReason && ` · ${c.statusReason}`}
+              <h1 className="min-w-0 text-2xl font-bold tracking-tight break-words">{c.name}</h1>
+              {/* El motivo puede ser largo: se corta con "…" y se lee entero al pasar el mouse. */}
+              <Chip tone={status.tone} className="max-w-full">
+                <span className="truncate" title={c.statusReason ? `${status.label} · ${c.statusReason}` : undefined}>
+                  {status.label}
+                  {c.statusReason && ` · ${c.statusReason}`}
+                </span>
               </Chip>
             </div>
             <p className="mt-0.5 text-sm text-muted">
@@ -156,14 +165,16 @@ function ClientHeader({ client: c, showMoney }: { client: ClientDetail; showMone
 
 function CopyPill({ icon, text, done, onCopy }: { icon: React.ReactNode; text: string; done: boolean; onCopy: () => void }) {
   return (
-    <span className="inline-flex h-8 items-center gap-2 rounded-full bg-slate-100 pr-1 pl-3 text-sm text-slate-700">
+    <span className="inline-flex h-8 max-w-full min-w-0 items-center gap-2 rounded-full bg-slate-100 pr-1 pl-3 text-sm text-slate-700">
       {icon}
-      {text}
+      <span className="min-w-0 truncate" title={text}>
+        {text}
+      </span>
       <button
         type="button"
         onClick={onCopy}
         aria-label={`Copiar ${text}`}
-        className="flex size-6 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-ink"
+        className="flex size-6 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-ink"
       >
         {done ? <Check size={13} aria-hidden className="text-green-700" /> : <Copy size={13} aria-hidden />}
       </button>

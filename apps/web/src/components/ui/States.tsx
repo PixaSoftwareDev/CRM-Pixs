@@ -11,9 +11,9 @@ export function Empty({ children }: { children: ReactNode }) {
 export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => void }) {
   return (
     <div role="alert" className="flex items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800">
-      <span>{error.message}</span>
+      <span className="min-w-0 break-words">{error.message}</span>
       {onRetry && (
-        <button type="button" onClick={onRetry} className="font-semibold underline">
+        <button type="button" onClick={onRetry} className="shrink-0 font-semibold underline">
           Reintentar
         </button>
       )}
@@ -22,5 +22,5 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
 }
 
 export function Skeleton({ className = "h-4 w-full" }: { className?: string }) {
-  return <span className={`block animate-pulse rounded bg-slate-200 ${className}`} />;
+  return <span aria-hidden className={`block animate-pulse rounded bg-slate-200 ${className}`} />;
 }

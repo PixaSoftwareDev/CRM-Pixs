@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { layoutLanes } from "./lanes";
 import { cleanTitle, parseQuickTask } from "./quick-parse";
-import { addDays, arParts, monthGrid, toInstant, weekStart, weekTitle } from "./time";
+import { addDays, arParts, monthGrid, shiftEnd, toInstant, weekStart, weekTitle } from "./time";
 
 const clients = [
   { id: "espiga", name: "Panadería La Espiga" },
@@ -22,6 +22,9 @@ describe("parseQuickTask", () => {
     expect(parseQuickTask("reunión con fitzone mañana a las 9:30", opts)).toMatchObject({ clientId: "fitzone", typeName: "Reunión", date: "2026-11-14", start: "09:30", durationMinutes: 60 });
     expect(parseQuickTask("propuesta para clinica del sol el lunes", opts)).toMatchObject({ clientId: "sol", typeName: "Ventas", date: "2026-11-16" });
     expect(parseQuickTask("demo el viernes", opts).date).toBe("2026-11-20");
+    expect(parseQuickTask("llamar para el martes", opts).date).toBe("2026-11-17");
+    // Un día mencionado de pasada en la descripción no cambia la fecha.
+    expect(parseQuickTask("ver como le fue con la prueba del martes", opts).date).toBe("2026-11-13");
     expect(parseQuickTask("cobrar a ruiz el 2/12 15.30 hs", opts)).toMatchObject({ clientId: "ruiz", date: "2026-12-02", start: "15:30" });
   });
 
@@ -109,5 +112,27 @@ describe("cleanTitle", () => {
   it("no toca lo que no es fecha y no deja el título vacío", () => {
     expect(cleanTitle("Mañana")).toBe("Mañana");
     expect(cleanTitle("Revisar la mañana de capacitación")).toBe("Revisar la mañana de capacitación");
+  });
+});
+
+describe("shiftEnd", () => {
+  it("conserva la duración al mover el desde", () => {
+    expect(shiftEnd("15:00", "15:30", "09:30")).toBe("10:00");
+    expect(shiftEnd("10:00", "11:30", "14:15")).toBe("15:45");
+  });
+
+  it("sin duración válida queda en 1 hora", () => {
+    expect(shiftEnd("", "", "09:30")).toBe("10:30");
+    expect(shiftEnd("10:00", "", "09:30")).toBe("10:30");
+    expect(shiftEnd("10:00", "10:00", "09:30")).toBe("10:30");
+  });
+
+  it("cruza la medianoche como el resto de la agenda", () => {
+    expect(shiftEnd("22:00", "01:00", "23:00")).toBe("02:00");
+    expect(shiftEnd("10:00", "11:00", "23:30")).toBe("00:30");
+  });
+
+  it("con el desde incompleto no toca el hasta", () => {
+    expect(shiftEnd("10:00", "11:00", "")).toBe("11:00");
   });
 });

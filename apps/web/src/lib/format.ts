@@ -71,6 +71,9 @@ export function initials(name: string): string {
     .toUpperCase();
 }
 
+/** Recorta un texto largo para avisos y subtítulos: clip("una tarea con título muy largo…", 20). */
+export const clip = (text: string, max = 80) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
 /** plural(1, "activo", "activos") → "1 activo". */
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

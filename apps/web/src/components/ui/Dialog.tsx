@@ -29,7 +29,12 @@ export function Dialog({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (open && !el.open) el.showModal();
+    if (open && !el.open) {
+      el.showModal();
+      // React hace autoFocus al montar, cuando el <dialog> todavía está cerrado (y no
+      // se puede enfocar); al abrirlo el navegador manda el foco a la X. Lo corregimos.
+      el.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    }
     if (!open && el.open) el.close();
   }, [open]);
 
@@ -53,28 +58,50 @@ export function Dialog({
           : size === "xl"
             ? "max-w-5xl"
             : "max-w-lg",
+        // En el celular, cualquier modal es una hoja a pantalla completa: título y X fijos
+        // arriba, el contenido scrollea adentro (un solo scroll) y las acciones quedan abajo.
+        "max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:rounded-none max-sm:border-0",
         className,
       )}
     >
       {open && (
-        <div className={cn("flex flex-col", size === "full" && "h-full")}>
-          <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-            <div>
+        <div className={cn("flex flex-col max-sm:h-full", size === "full" && "h-full")}>
+          <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
+            <div className="min-w-0 break-words">
               <h2 className="text-lg font-bold">{title}</h2>
-              {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+              {description && <p className="mt-0.5 text-xs [overflow-wrap:anywhere] text-muted">{description}</p>}
             </div>
             <button
               type="button"
               aria-label="Cerrar"
               onClick={onClose}
-              className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              className="-mr-1.5 flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:mr-0 sm:size-8"
             >
               <X size={16} aria-hidden />
             </button>
           </header>
-          <div className={cn("p-5", size === "full" && "min-h-0 flex-1 overflow-y-auto")}>{children}</div>
+          <div className={cn("p-4 max-sm:min-h-0 max-sm:flex-1 max-sm:overflow-y-auto max-sm:overscroll-contain sm:p-5", size === "full" && "min-h-0 flex-1 overflow-y-auto")}>
+            {children}
+          </div>
         </div>
       )}
     </dialog>
+  );
+}
+
+/**
+ * Botonera de un modal. En el celular queda pegada abajo de la hoja (siempre a mano
+ * aunque el formulario sea largo); en pantallas grandes es una fila más, como siempre.
+ */
+export function DialogActions({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "max-sm:sticky max-sm:-bottom-4 max-sm:z-10 max-sm:-mx-4 max-sm:-mb-4 max-sm:border-t max-sm:border-line max-sm:bg-white max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(12px,env(safe-area-inset-bottom))]",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }

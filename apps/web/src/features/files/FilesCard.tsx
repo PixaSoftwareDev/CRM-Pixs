@@ -133,9 +133,16 @@ export function FilesCard({ owner, area, className }: { owner: FileOwnerQuery; a
           {uploads.map((u) => (
             <li key={u.key} className={cn("rounded-[10px] px-3 py-2 text-sm", u.error ? "bg-red-50 text-red-800" : "bg-slate-50")}>
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate font-medium">{u.name}</span>
+                <span className="min-w-0 truncate font-medium" title={u.name}>
+                  {u.name}
+                </span>
                 {u.error ? (
-                  <button type="button" className="text-xs underline" onClick={() => setUploads((l) => l.filter((x) => x.key !== u.key))}>
+                  <button
+                    type="button"
+                    aria-label={`Cerrar el aviso de ${u.name}`}
+                    className="shrink-0 text-xs underline"
+                    onClick={() => setUploads((l) => l.filter((x) => x.key !== u.key))}
+                  >
                     Cerrar
                   </button>
                 ) : (
@@ -147,7 +154,14 @@ export function FilesCard({ owner, area, className }: { owner: FileOwnerQuery; a
                   {u.error}
                 </p>
               ) : (
-                <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <span
+                  role="progressbar"
+                  aria-label={`Subiendo ${u.name}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(u.progress * 100)}
+                  className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200"
+                >
                   <span className="block h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.max(u.progress * 100, 3)}%` }} />
                 </span>
               )}
@@ -255,7 +269,7 @@ function FileRow({ file: f, canEdit }: { file: FileDto; canEdit: boolean }) {
         </span>
       </span>
       {confirming ? (
-        <span className="flex items-center gap-1.5 text-xs">
+        <span className="flex flex-wrap items-center gap-1.5 text-xs">
           ¿Borrarlo?
           <Button size="sm" variant="danger" disabled={del.isPending} onClick={() => del.mutate(f.id)}>
             Sí, borrar
@@ -270,6 +284,7 @@ function FileRow({ file: f, canEdit }: { file: FileDto; canEdit: boolean }) {
             href={fileUrl(f.id, true)}
             download
             aria-label={`Descargar ${f.filename}`}
+            title="Descargar"
             className="flex size-8 items-center justify-center rounded-[10px] text-slate-600 hover:bg-slate-100"
           >
             <Download size={15} aria-hidden />
@@ -278,6 +293,7 @@ function FileRow({ file: f, canEdit }: { file: FileDto; canEdit: boolean }) {
             <button
               type="button"
               aria-label={`Borrar ${f.filename}`}
+              title="Borrar"
               onClick={() => setConfirming(true)}
               className="flex size-8 items-center justify-center rounded-[10px] text-slate-600 hover:bg-red-50 hover:text-red-700"
             >

@@ -71,6 +71,19 @@ export const spanMinutes = (start: string, end: string) => {
   return d < 0 ? d + 1440 : d;
 };
 
+const HHMM = /^\d{2}:\d{2}$/;
+
+/**
+ * Nuevo "hasta" al mover "desde": acompaña conservando la duración que tenía la
+ * tarea. Si no había una válida (vacía o cero), queda en 1 hora. Si el nuevo
+ * "desde" está incompleto, "hasta" no se toca.
+ */
+export function shiftEnd(prevStart: string, prevEnd: string, nextStart: string): string {
+  if (!HHMM.test(nextStart)) return prevEnd;
+  const span = HHMM.test(prevStart) && HHMM.test(prevEnd) ? spanMinutes(prevStart, prevEnd) : 0;
+  return toHHMM(toMinutes(nextStart) + (span > 0 ? span : 60));
+}
+
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** "Viernes 13 de noviembre" */

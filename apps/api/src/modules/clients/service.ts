@@ -204,7 +204,7 @@ export async function listClients(db: Db, query: ClientListQuery, { money }: Vis
   };
 }
 
-export { countClients, listClientOptions } from "./repository";
+export { countClients, listClientOptions, searchClientOptions } from "./repository";
 
 /** Sin Finanzas, la actividad no trae cobros ni facturas, y los montos sueltos (tareas de cobranza…) van tapados. */
 export async function getActivities(db: Db, id: string, page: { cursor?: string | undefined; limit: number }, { money }: Visibility) {

@@ -1,22 +1,28 @@
 import { type TaskDetailDto, type TaskDto, type TaskStatus, type TaskUpdate, taskTitle } from "@crm/shared";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, FolderOpen, Receipt, Users } from "lucide-react";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, FolderOpen, Receipt, Users } from "lucide-react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Chip } from "../../components/ui/Chip";
 import { cn } from "../../components/ui/cn";
-import { Dialog } from "../../components/ui/Dialog";
-import { Field, Input, Select } from "../../components/ui/Field";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
+import { Field, Input, Select, TextArea } from "../../components/ui/Field";
+import { InlineConfirm } from "../../components/ui/InlineConfirm";
 import { ErrorBox, Skeleton } from "../../components/ui/States";
 import { useAccess } from "../../hooks/useAccess";
-import { ago, initials } from "../../lib/format";
+import { useEnterFlow } from "../../hooks/useEnterFlow";
+import { ago, clip, initials } from "../../lib/format";
 import { useClient, useClientTasks } from "../clients/api";
 import { ContactsSection } from "../clients/tabs/DataTab";
 import { StatementTab } from "../clients/tabs/StatementTab";
 import { FilesCard } from "../files/FilesCard";
 import { useAddTaskComment, useMyId, useTask, useTaskTypes, useTeam, useUpdateTask } from "./api";
 import { EDITABLE_STATUSES, TASK_STATUS, tint } from "./labels";
-import { arParts, durationLabel, shortDay, spanMinutes, toHHMM, toInstant } from "./time";
+import { clashText, isOverlapError, useAvailability, useOverlapGate } from "./availability";
+import { SlotPicker } from "./SlotPicker";
+import { arParts, durationLabel, shiftEnd, shortDay, spanMinutes, toHHMM, toInstant } from "./time";
+
+const isOpenStatus = (s: TaskStatus) => s !== "hecha" && s !== "cancelada";
 
 interface Edit {
   title: string;
@@ -121,6 +127,11 @@ function TaskBody({
   /** Contenedor de archivos de la tarea, en un modal encima de este. */
   const [filesOpen, setFilesOpen] = useState(false);
   const showMoney = useAccess().can("finanzas", "read");
+  // Enter pasa de campo en campo (título → … → responsable) y en el último pide confirmar.
+  const flow = useEnterFlow();
+  // Agenda del responsable ese día (sin contar esta tarea): turnos libres y choques.
+  const availability = useAvailability({ assigneeId: edit?.assigneeId, date: edit?.date, start: edit?.start, end: edit?.end, excludeId: id });
+  const overlap = useOverlapGate(edit ? `${edit.date}|${edit.start}|${edit.end}|${edit.assigneeId}` : "");
 
   useEffect(() => {
     if (task.data && !edit) setEdit(editOf(task.data));
@@ -160,8 +171,11 @@ function TaskBody({
   const titleError = titleCheck.success ? undefined : titleCheck.error.issues[0]?.message;
   const badRange = !!scheduleError || !!titleError;
   const type = types.data?.find((x) => x.id === edit.typeId) ?? t.type;
-  const set = (k: keyof Edit) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (k: keyof Edit) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setEdit({ ...edit, [k]: e.target.value });
+  // Mover "desde" corre "hasta" con la misma duración (1 h si no había una válida).
+  const setStart = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setEdit({ ...edit, start: e.target.value, end: shiftEnd(edit.start, edit.end, e.target.value) });
 
   const guard = (action: () => void) => (dirty ? setPending(() => action) : action());
   requestClose.current = () => guard(onClose);
@@ -171,7 +185,7 @@ function TaskBody({
     if (Object.keys(body).length) await update.mutateAsync({ id, ...body });
     const who = body.assigneeId ? team.data?.find((u) => u.id === body.assigneeId)?.name : null;
     const when = body.startsAt ? ` para el ${shortDay(edit.date)} ${edit.start}` : "";
-    const name = body.title ?? t.title;
+    const name = clip(body.title ?? t.title);
     onSaved?.(
       body.status === "hecha"
         ? `Finalizada "${name}".`
@@ -179,11 +193,21 @@ function TaskBody({
     );
   };
 
+  // Solo importa si se pisa cuando cambió cuándo o de quién es y la tarea sigue abierta.
+  const moved = scheduleChanged || edit.assigneeId !== saved.assigneeId;
+  const clash = moved && isOpenStatus(edit.status) ? availability.clash : undefined;
+  const whoName = edit.assigneeId === me ? "vos" : (team.data?.find((u) => u.id === edit.assigneeId)?.name ?? "el responsable");
+
   const saveAnd = async (after: () => void, extra?: TaskUpdate) => {
-    await save(extra);
-    setPending(null);
-    after();
+    const askFirst = clash && isOpenStatus(extra?.status ?? edit.status) ? clashText(clash, whoName) : null;
+    await overlap.run(askFirst, async (allowOverlap) => {
+      await save({ ...extra, ...(allowOverlap && { allowOverlap }) });
+      setPending(null);
+      after();
+    });
   };
+  // Lo mismo que el botón "Guardar": sin cambios, cierra.
+  const saveAndClose = () => void (dirty ? saveAnd(onClose) : onClose());
 
   const sendComment = async () => {
     // Enter dos veces rápido duplicaba el comentario.
@@ -195,16 +219,17 @@ function TaskBody({
   const resp = t.assignee.id === me ? "vos" : t.assignee.name;
   const passedBy = originOf(t, me);
   const when = t.startsAt ? `${shortDay(arParts(t.startsAt).date)} ${arParts(t.startsAt).time}` : "Sin fecha";
+  const contactLine = t.contact ? [t.contact.name, t.contact.phone, t.contact.email].filter(Boolean).join(" · ") : "";
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex min-h-full flex-col gap-4 md:h-full" {...flow.container(() => dirty && !badRange && !update.isPending)}>
       {t.client && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl bg-slate-50 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="min-w-0">
             <Link
               to="/clientes/$clientId"
               params={{ clientId: t.client.id }}
-              className="font-bold text-ink hover:underline"
+              className="font-bold break-words text-ink hover:underline"
               onClick={(e) => {
                 // Salir al cliente también pasa por el aviso de cambios sin guardar.
                 if (!dirty || !t.client) return;
@@ -216,62 +241,65 @@ function TaskBody({
               {t.client.name} ↗
             </Link>
             {t.contact && (
-              <p className="truncate text-xs text-muted">
-                {[t.contact.name, t.contact.phone, t.contact.email].filter(Boolean).join(" · ")}
+              <p className="truncate text-xs text-muted" title={contactLine}>
+                {contactLine}
               </p>
             )}
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setPanel("contactos")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
+          <div className="flex gap-2 max-sm:w-full max-sm:*:flex-1">
+            <Button size="sm" variant="secondary" onClick={() => setPanel("contactos")}>
               <Users size={14} aria-hidden /> Contactos
-            </button>
+            </Button>
             {showMoney && (
-              <button type="button" onClick={() => setPanel("cuenta")} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
+              <Button size="sm" variant="secondary" onClick={() => setPanel("cuenta")}>
                 <Receipt size={14} aria-hidden /> Cta. cte.
-              </button>
+              </Button>
             )}
           </div>
         </div>
       )}
 
-      <div className={cn("grid gap-4 md:min-h-0 md:flex-1", t.client && "md:grid-cols-[320px_1fr]")}>
+      <div className={cn("grid gap-4 md:min-h-72 md:flex-1 md:grid-rows-[minmax(0,1fr)]", t.client && "md:grid-cols-[320px_1fr]")}>
         {t.client && <ClientTasks clientId={t.client.id} currentId={id} onPick={(next) => guard(() => onSwitch(next))} />}
 
-        <section className="flex min-h-0 min-w-0 flex-col gap-3">
+        {/* En desktop la columna tiene alto fijo: los comentarios ocupan lo que necesitan y,
+            si no entra todo (título muy largo, pantalla baja), scrollea la columna entera. */}
+        <section className="flex min-h-0 min-w-0 flex-col gap-3 md:-mx-1 md:overflow-y-auto md:px-1">
           <div
-            className="flex flex-wrap items-start justify-between gap-3 rounded-xl px-4 py-3"
+            className="flex shrink-0 flex-col gap-2 rounded-xl px-3 py-3 sm:px-4"
             style={{ background: tint(type.color), boxShadow: `inset 5px 0 0 ${type.color}` }}
           >
-            <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-              <Input
-                aria-label="Título de la tarea"
-                value={edit.title}
-                onChange={set("title")}
-                maxLength={200}
-                aria-invalid={!!titleError}
-                className={cn("h-9 bg-white/80 font-bold", (t.status === "hecha" || t.status === "cancelada") && "line-through")}
-              />
-              {titleError && (
-                <p role="alert" className="text-xs text-red-700">
-                  {titleError}
-                </p>
+            {/* El título ocupa todo el ancho y crece con el texto (hasta ~12 líneas; después, scroll). */}
+            <TextArea
+              singleLine
+              aria-label="Título de la tarea"
+              {...flow.field}
+              value={edit.title}
+              onChange={set("title")}
+              aria-invalid={!!titleError}
+              className={cn(
+                "max-h-64 bg-white/80 text-[15px] leading-6 font-bold",
+                (t.status === "hecha" || t.status === "cancelada") && "line-through",
               )}
-              <p className="text-xs text-slate-600">
+            />
+            {titleError && (
+              <p role="alert" className="text-xs text-red-700">
+                {titleError}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <p className="min-w-0 text-xs break-words text-slate-600">
                 {when} · responsable: {resp}
                 {passedBy}
               </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setFilesOpen(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
-              >
+              {/* En el celular: tipo y estado lado a lado a todo el ancho, el contenedor debajo. */}
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:max-w-full sm:min-w-0 sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+              <Button size="sm" variant="secondary" onClick={() => setFilesOpen(true)} className="max-sm:order-last max-sm:col-span-2">
                 <FolderOpen size={14} aria-hidden /> Contenedor
-              </button>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+              </Button>
+              <label className="flex max-w-full min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:gap-2">
                 Tipo
-                <Select aria-label="Tipo de tarea" value={edit.typeId} onChange={set("typeId")} className="h-8 w-auto max-w-48 bg-white">
+                <Select aria-label="Tipo de tarea" {...flow.field} value={edit.typeId} onChange={set("typeId")} className="h-10 min-w-0 bg-white sm:h-8 sm:w-auto sm:max-w-48">
                   {/* Mientras cargan los tipos, el de la tarea (para no mostrar otro). */}
                   {(types.data ?? [t.type]).map((x) => (
                     <option key={x.id} value={x.id}>
@@ -280,9 +308,9 @@ function TaskBody({
                   ))}
                 </Select>
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+              <label className="flex max-w-full min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:gap-2">
                 Estado
-                <Select aria-label="Estado de la tarea" value={edit.status} onChange={set("status")} className="h-8 w-auto bg-white">
+                <Select aria-label="Estado de la tarea" {...flow.field} value={edit.status} onChange={set("status")} className="h-10 min-w-0 bg-white sm:h-8 sm:w-auto">
                   {EDITABLE_STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {TASK_STATUS[s].label}
@@ -290,19 +318,21 @@ function TaskBody({
                   ))}
                 </Select>
               </label>
+              </div>
             </div>
           </div>
 
-          <h4 className="text-sm font-bold">Comentarios</h4>
-          <ol className="flex max-h-80 min-h-24 flex-col gap-2.5 overflow-y-auto md:max-h-none md:flex-1">
+          <h3 className="shrink-0 text-sm font-bold">Comentarios</h3>
+          {/* Solo el alto que necesitan (cada comentario entero), con el campo para comentar justo debajo. */}
+          <ol className="flex shrink-0 flex-col gap-2.5">
             {t.comments.length === 0 && <li className="text-sm text-muted">Todavía no hay comentarios en esta tarea.</li>}
             {t.comments.map((c) => (
               <li key={c.id} className="flex gap-2.5">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-800">
+                <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-800">
                   {initials(c.authorName ?? "Sistema")}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm">{c.body}</p>
+                  <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{c.body}</p>
                   <p className="text-xs text-muted">
                     {c.authorName ?? "Sistema"} · {ago(c.createdAt)}
                   </p>
@@ -310,18 +340,24 @@ function TaskBody({
               </li>
             ))}
           </ol>
-          <div className="flex gap-2">
+          {/* Si son muchos, la columna scrollea y el campo queda siempre a mano abajo. */}
+          <div className="flex shrink-0 flex-col gap-2 bg-white sm:flex-row sm:items-start md:sticky md:bottom-0 md:pt-1 md:pb-0.5">
             <label className="min-w-0 flex-1">
               <span className="sr-only">Comentario</span>
-              <Input
+              <TextArea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void sendComment())}
+                // Enter manda el comentario; Shift+Enter agrega un renglón.
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), void sendComment())}
                 placeholder="Escribí un comentario sobre la tarea…"
-                maxLength={2000}
               />
             </label>
-            <Button variant="secondary" onClick={() => void sendComment()} disabled={!comment.trim() || addComment.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => void sendComment()}
+              disabled={!comment.trim() || addComment.isPending}
+              className="max-sm:w-full"
+            >
               Comentar
             </Button>
           </div>
@@ -346,19 +382,20 @@ function TaskBody({
       </Dialog>
 
       <footer className="flex flex-col gap-3 border-t border-line pt-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Fecha">
-            <Input type="date" value={edit.date} onChange={set("date")} className="w-40" />
+        {/* En el celular, grilla de dos columnas: fecha y responsable a lo ancho, desde/hasta lado a lado. */}
+        <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+          <Field label="Fecha" className="col-span-2">
+            <Input type="date" {...flow.field} value={edit.date} onChange={set("date")} className="sm:w-40" />
           </Field>
-          <Field label="De">
-            <Input type="time" step={300} value={edit.start} onChange={set("start")} className="w-28" />
+          <Field label="De" className="min-w-0">
+            <Input type="time" step={300} {...flow.field} value={edit.start} onChange={setStart} className="min-w-0 sm:w-28" />
           </Field>
-          <Field label="Hasta" error={scheduleError}>
-            <Input type="time" step={300} value={edit.end} onChange={set("end")} aria-invalid={badRange} className="w-28" />
+          <Field label="Hasta" error={scheduleError} className="min-w-0">
+            <Input type="time" step={300} {...flow.field} value={edit.end} onChange={set("end")} aria-invalid={badRange} className="min-w-0 sm:w-28" />
           </Field>
-          {minutes > 0 && <span className="pb-2.5 text-xs text-muted">{durationLabel(minutes)}</span>}
-          <Field label="Responsable" className="ml-auto max-w-full">
-            <Select value={edit.assigneeId} onChange={set("assigneeId")} className="w-auto min-w-44 max-w-full">
+          {minutes > 0 && <span className="col-span-2 -mt-1.5 text-xs text-muted sm:mt-0 sm:pb-2.5">{durationLabel(minutes)}</span>}
+          <Field label="Responsable" className="col-span-2 max-w-full sm:ml-auto">
+            <Select {...flow.field} value={edit.assigneeId} onChange={set("assigneeId")} className="max-w-full sm:w-auto sm:min-w-44">
               {team.data?.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.id === me ? `${u.name} (yo)` : u.name}
@@ -368,18 +405,41 @@ function TaskBody({
           </Field>
         </div>
 
-        {(update.error ?? addComment.error) && (
-          <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">
-            {(update.error ?? addComment.error)?.message}
-          </p>
+        {isOpenStatus(edit.status) && (
+          <SlotPicker
+            availability={{ ...availability, clash: overlap.ask ? undefined : clash }}
+            start={edit.start}
+            duration={minutes > 0 ? minutes : 60}
+            who={whoName}
+            onPick={(next) => setEdit({ ...edit, start: next, end: shiftEnd(edit.start, edit.end, next) })}
+          />
         )}
 
-        {pending ? (
+        {/* El 409 de horario ocupado no es un error: se pregunta si guardar igual. */}
+        {((isOverlapError(update.error) ? null : update.error) ?? addComment.error) && (
+          <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">
+            {((isOverlapError(update.error) ? null : update.error) ?? addComment.error)?.message}
+          </p>
+        )}
+      </footer>
+
+      {/* En el celular, siempre a mano abajo de la hoja (fuera del pie, para poder quedar pegada). */}
+      <DialogActions className="-mt-1">
+        {overlap.ask ? (
+          <InlineConfirm
+            message={overlap.ask.message}
+            confirmLabel="Agendar igual"
+            cancelLabel="Elegir otro horario"
+            onConfirm={overlap.ask.retry}
+            onCancel={overlap.cancel}
+            disabled={update.isPending}
+          />
+        ) : pending ? (
           <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
             <span>
               <strong>Tenés cambios sin guardar.</strong> Si salís ahora se pierden.
             </span>
-            <span className="flex gap-2">
+            <span className="flex flex-wrap gap-2 max-sm:w-full max-sm:*:flex-1">
               <Button size="sm" variant="secondary" onClick={() => (pending(), setPending(null))}>
                 Descartar y salir
               </Button>
@@ -388,8 +448,17 @@ function TaskBody({
               </Button>
             </span>
           </div>
+        ) : flow.confirming ? (
+          <InlineConfirm
+            message="¿Guardar los cambios?"
+            confirmLabel="Guardar"
+            cancelLabel="Seguir editando"
+            onConfirm={() => flow.accept(saveAndClose)}
+            onCancel={flow.cancel}
+            disabled={badRange || update.isPending}
+          />
         ) : (
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2 max-sm:*:flex-1">
             <Button variant="secondary" onClick={() => guard(onClose)}>
               Cerrar
             </Button>
@@ -403,12 +472,12 @@ function TaskBody({
               </Button>
             )}
             {/* Siempre activo: tras "Comentar" no queda nada pendiente y apagarlo parecía un error; sin cambios, cierra. */}
-            <Button onClick={() => void (dirty ? saveAnd(onClose) : onClose())} disabled={badRange || update.isPending}>
+            <Button onClick={saveAndClose} disabled={badRange || update.isPending}>
               Guardar
             </Button>
           </div>
         )}
-      </footer>
+      </DialogActions>
     </div>
   );
 }
@@ -452,6 +521,9 @@ type ListFilter = "pend" | "res" | "todas";
 function ClientTasks({ clientId, currentId, onPick }: { clientId: string; currentId: string; onPick: (id: string) => void }) {
   const tasks = useClientTasks(clientId);
   const [filter, setFilter] = useState<ListFilter>("pend");
+  /** En el celular la lista arranca plegada: primero se ve la tarea abierta. */
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
   const all = tasks.data ?? [];
   const done = (s: TaskStatus) => s === "hecha" || s === "cancelada";
   const counts = { pend: all.filter((x) => !done(x.status)).length, res: all.filter((x) => done(x.status)).length, todas: all.length };
@@ -464,17 +536,29 @@ function ClientTasks({ clientId, currentId, onPick }: { clientId: string; curren
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col gap-2.5">
-      <h3 className="text-sm font-bold">Tareas del cliente</h3>
-      <div role="tablist" aria-label="Filtrar tareas del cliente" className="flex gap-0.5 rounded-[10px] bg-slate-100 p-0.5">
+      <h3 className="text-sm font-bold max-md:hidden">Tareas del cliente</h3>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={listId}
+        onClick={() => setExpanded((x) => !x)}
+        className="flex min-h-10 items-center justify-between gap-2 rounded-[10px] border border-line bg-white px-3 text-left text-sm font-bold md:hidden"
+      >
+        <span>
+          Tareas del cliente <span className="font-normal text-muted">· {counts.pend} pendientes</span>
+        </span>
+        <ChevronDown size={16} aria-hidden className={cn("shrink-0 text-slate-500 transition", expanded && "rotate-180")} />
+      </button>
+      <div id={listId} className={cn("min-h-0 flex-col gap-2.5 md:flex md:flex-1", expanded ? "flex" : "hidden")}>
+      <div role="group" aria-label="Filtrar tareas del cliente" className="flex gap-0.5 rounded-[10px] bg-slate-100 p-0.5">
         {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
-            role="tab"
-            aria-selected={filter === key}
+            aria-pressed={filter === key}
             onClick={() => setFilter(key)}
             className={cn(
-              "flex-1 rounded-lg px-2 py-1 text-xs",
+              "min-h-9 flex-1 rounded-lg px-2 py-1 text-xs md:min-h-0",
               filter === key ? "bg-white font-semibold text-ink shadow-sm" : "text-slate-600",
             )}
           >
@@ -482,34 +566,35 @@ function ClientTasks({ clientId, currentId, onPick }: { clientId: string; curren
           </button>
         ))}
       </div>
-      <div className="flex max-h-80 flex-col gap-1.5 overflow-y-auto md:max-h-none md:min-h-0 md:flex-1">
+      {/* En desktop la columna scrollea sola; en el celular la lista va en el flujo (un solo scroll). */}
+      <div className="flex flex-col gap-1.5 md:min-h-0 md:flex-1 md:overflow-y-auto">
         {tasks.isPending && <Skeleton className="h-16" />}
         {shown.map((x) => (
           <button
             key={x.id}
             type="button"
             onClick={() => x.id !== currentId && onPick(x.id)}
-            aria-current={x.id === currentId}
+            aria-current={x.id === currentId ? "true" : undefined}
             className={cn(
-              "flex items-start gap-2.5 rounded-[10px] border bg-white px-3 py-2 text-left",
+              "flex shrink-0 items-stretch gap-2.5 rounded-[10px] border bg-white px-3 py-2 text-left",
               x.id === currentId ? "border-indigo-400 ring-2 ring-indigo-100" : "border-line hover:bg-slate-50",
             )}
           >
-            <span className="mt-1 h-8 w-1 shrink-0 rounded-full" style={{ background: x.typeColor }} aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className={cn("block truncate text-sm font-medium", done(x.status) && "text-muted line-through")}>
-                {x.title}
-              </span>
-              <span className="block text-xs text-muted">
-                {x.startsAt ? `${shortDay(arParts(x.startsAt).date)} ${arParts(x.startsAt).time}` : "Sin fecha"} · {x.assigneeName}
+            <span className="w-1 shrink-0 rounded-full" style={{ background: x.typeColor }} aria-hidden />
+            {/* El texto entero arriba; fecha, responsable y estado debajo, sin robarle ancho. */}
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={cn("text-sm font-medium break-words", done(x.status) && "text-muted line-through")}>{x.title}</span>
+              <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <span className="text-xs text-muted">
+                  {x.startsAt ? `${shortDay(arParts(x.startsAt).date)} ${arParts(x.startsAt).time}` : "Sin fecha"} · {x.assigneeName}
+                </span>
+                <Chip tone={TASK_STATUS[x.status].tone}>{TASK_STATUS[x.status].label}</Chip>
               </span>
             </span>
-            <Chip tone={TASK_STATUS[x.status].tone} className="shrink-0">
-              {TASK_STATUS[x.status].label}
-            </Chip>
           </button>
         ))}
         {!tasks.isPending && shown.length === 0 && <p className="text-xs text-muted">No hay tareas en este filtro.</p>}
+      </div>
       </div>
     </aside>
   );

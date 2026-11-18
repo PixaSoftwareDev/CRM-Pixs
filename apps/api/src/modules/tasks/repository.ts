@@ -3,7 +3,17 @@
  * "Mi día" y el detalle, así el front recibe siempre el mismo DTO.
  */
 import { type DbOrTx, type SQL, sql } from "@crm/db";
-import type { TaskCommentDto, TaskDetailDto, TaskDto, TaskStatus, TaskTypeDto, TeamMember, TicketTaskRole } from "@crm/shared";
+import {
+  BUSY_STATUSES,
+  type BusyTaskDto,
+  type TaskCommentDto,
+  type TaskDetailDto,
+  type TaskDto,
+  type TaskStatus,
+  type TaskTypeDto,
+  type TeamMember,
+  type TicketTaskRole,
+} from "@crm/shared";
 import { toIso, toNumber } from "../../lib/sql";
 
 const AR_TZ = "America/Argentina/Buenos_Aires";
@@ -191,3 +201,37 @@ export const listTasksOfProject = (db: DbOrTx, projectId: string) => listTasksWh
 /** En el ticket se ven también las canceladas: cuentan la historia de las reasignaciones. */
 export const listTasksOfTicket = (db: DbOrTx, ticketId: string) =>
   listTasksWhere(db, sql`t.ticket_id = ${ticketId}`, { cancelled: true });
+
+/**
+ * Tareas abiertas de una persona que se pisan con [from, to): ocupan su agenda.
+ * Las finalizadas, canceladas o archivadas no ocupan lugar.
+ */
+export async function listBusy(
+  db: DbOrTx,
+  assigneeId: string,
+  from: Date,
+  to: Date,
+  excludeId?: string,
+): Promise<BusyTaskDto[]> {
+  const rows = await db.execute<{ id: string; title: string; starts_at: Date | string; duration_minutes: number }>(sql`
+    select t.id, t.title, t.starts_at, t.duration_minutes
+    from tasks t
+    where t.assignee_id = ${assigneeId}
+      and t.archived_at is null
+      and t.status in (${sql.join(BUSY_STATUSES.map((s) => sql`${s}`), sql`, `)})
+      and t.starts_at is not null
+      and t.starts_at < ${to.toISOString()}::timestamptz
+      and t.starts_at + make_interval(mins => t.duration_minutes) > ${from.toISOString()}::timestamptz
+      ${excludeId ? sql`and t.id <> ${excludeId}` : sql``}
+    order by t.starts_at
+    limit 200`);
+  return rows.map((r) => {
+    const startsAt = toIso(r.starts_at);
+    return {
+      id: r.id,
+      title: r.title,
+      startsAt,
+      endsAt: new Date(Date.parse(startsAt) + r.duration_minutes * 60_000).toISOString(),
+    };
+  });
+}

@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Button } from "../../components/ui/Button";
 import { authClient } from "../../lib/auth-client";
 import { signOut } from "./api";
 import { LoginPage } from "./LoginPage";
@@ -39,18 +40,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [isPending, session, queryClient]);
 
   if (isPending && !expired) {
-    return <div className="flex min-h-dvh items-center justify-center text-sm text-muted">Cargando…</div>;
+    return (
+      <div role="status" className="flex min-h-dvh items-center justify-center text-sm text-muted">
+        Cargando…
+      </div>
+    );
   }
   if (session && !expired) return children;
   // Si no se pudo consultar la sesión (sin red, 429, server reiniciando) no es "sin sesión":
   // mandar al login a alguien logueado lo obligaba a volver a entrar sin motivo.
   if (error && !expired) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 text-sm text-muted">
+      <div role="alert" className="flex min-h-dvh flex-col items-center justify-center gap-3 px-4 text-center text-sm text-muted">
         <p>No se pudo verificar la sesión. Reintentá en unos segundos.</p>
-        <button type="button" onClick={() => void refetch()} className="rounded-[10px] border border-line bg-white px-3 py-1.5 font-semibold text-ink hover:bg-slate-50">
+        <Button variant="secondary" onClick={() => void refetch()}>
           Reintentar
-        </button>
+        </Button>
       </div>
     );
   }

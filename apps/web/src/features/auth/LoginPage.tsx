@@ -37,7 +37,7 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
 
   return (
     <div className="flex min-h-dvh flex-wrap">
-      <section className="flex flex-[1_1_420px] flex-col justify-between gap-10 bg-ink p-10 text-white sm:p-14">
+      <section className="flex flex-[1_1_420px] flex-col justify-between gap-8 bg-ink p-6 text-white sm:gap-10 sm:p-14">
         <div className="flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-[10px] bg-brand-soft font-bold">
             C
@@ -45,7 +45,7 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
           <span className="text-lg font-bold">CRM</span>
         </div>
         <div>
-          <h1 className="max-w-[440px] text-4xl leading-tight font-bold tracking-tight sm:text-[40px]">
+          <h1 className="max-w-[440px] text-3xl leading-tight font-bold tracking-tight sm:text-[40px]">
             Tus clientes, tareas y cobros en un solo lugar.
           </h1>
           <p className="mt-4 max-w-[420px] text-base leading-relaxed text-slate-300">
@@ -65,10 +65,15 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
               type="email"
               autoComplete="username"
               aria-invalid={errors.email ? true : undefined}
+              aria-describedby={errors.email ? "login-email-error" : undefined}
               className={inputClass}
               {...register("email")}
             />
-            {errors.email && <span className="text-xs text-red-600">{errors.email.message}</span>}
+            {errors.email && (
+              <span id="login-email-error" aria-hidden className="text-xs text-red-600">
+                {errors.email.message}
+              </span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1.5 text-sm font-medium">
@@ -77,11 +82,14 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
               type="password"
               autoComplete="current-password"
               aria-invalid={errors.password ? true : undefined}
+              aria-describedby={errors.password ? "login-password-error" : undefined}
               className={inputClass}
               {...register("password")}
             />
             {errors.password && (
-              <span className="text-xs text-red-600">{errors.password.message}</span>
+              <span id="login-password-error" aria-hidden className="text-xs text-red-600">
+                {errors.password.message}
+              </span>
             )}
           </label>
 
@@ -101,7 +109,7 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-1.5 h-[46px] rounded-[10px] bg-brand text-[15px] font-semibold text-white transition hover:bg-brand-hover disabled:opacity-60"
+            className="mt-1.5 h-[46px] rounded-[10px] bg-brand text-[15px] font-semibold text-white transition outline-none hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-1 disabled:opacity-60"
           >
             {isSubmitting ? "Entrando…" : "Entrar"}
           </button>
@@ -112,7 +120,7 @@ export function LoginPage({ notice = null, onSignedIn }: { notice?: string | nul
                 type="button"
                 onClick={quickLogin}
                 disabled={isSubmitting}
-                className="h-10 rounded-[10px] border border-line bg-white text-sm font-medium transition hover:bg-slate-50 disabled:opacity-60"
+                className="h-10 rounded-[10px] border border-line bg-white text-sm font-medium transition outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-1 disabled:opacity-60"
               >
                 {quickAccess.label}
               </button>

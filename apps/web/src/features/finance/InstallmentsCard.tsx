@@ -87,7 +87,7 @@ export function InstallmentsCard({
       {plans.data.length === 0 ? (
         <>
           <p className="text-sm text-muted">Armá las cuotas de la venta: aparecen en Finanzas → Por cobrar y se facturan al cobrarlas.</p>
-          <div className="grid gap-3 sm:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <Field label="Descripción" className="sm:col-span-2">
               <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="50% anticipo + 2 cuotas" />
             </Field>
@@ -95,7 +95,7 @@ export function InstallmentsCard({
               <Input inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} />
             </Field>
             <Field label="Anticipo (%)" error={advancePct > 100 ? "Máximo 100%" : undefined}>
-              <Input inputMode="numeric" value={advance} onChange={(e) => setAdvance(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+              <Input inputMode="numeric" aria-invalid={advancePct > 100} value={advance} onChange={(e) => setAdvance(e.target.value.replace(/\D/g, "").slice(0, 3))} />
             </Field>
             <Field label="Cuotas" hint={advancePct === 100 ? "Con 100% de anticipo no hay cuotas" : undefined}>
               <Input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, "").slice(0, 2))} />
@@ -113,7 +113,7 @@ export function InstallmentsCard({
               ))}
             </ul>
           )}
-          {problem && <p className="text-sm text-amber-700">{problem}</p>}
+          {problem && <p role="status" className="text-sm text-amber-700">{problem}</p>}
           {create.error && <p role="alert" className="text-sm text-red-700">{create.error.message}</p>}
           <Button
             className="self-start"
@@ -156,6 +156,7 @@ export function InstallmentsCard({
                         <Button
                           size="sm"
                           variant="secondary"
+                          aria-label={`Cobrada: ${i.number === 0 ? "Anticipo" : `Cuota ${i.number}`}`}
                           onClick={() =>
                             setPay({
                               clientId: p.client.id,

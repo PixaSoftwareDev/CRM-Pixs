@@ -20,12 +20,13 @@ import {
   sql,
   users,
 } from "@crm/db";
-import { cuitSearchDigits } from "@crm/shared";
+import { cuitSearchDigits, formatCuit, numberSearchDigits } from "@crm/shared";
 import type {
   ActivityDto,
   ClientDetail,
   ClientListItem,
   ClientListQuery,
+  ClientSearchOption,
   ClientProjectDto,
   ClientSummaryCounts,
   ClientTaskDto,
@@ -460,4 +461,129 @@ export async function listClientOptions(db: DbOrTx): Promise<{ id: string; name:
   const rows = await db.execute<{ id: string; name: string }>(sql`
     select id, name from clients where status <> 'baja' order by name limit 2000`);
   return rows.map((r) => ({ id: r.id, name: r.name }));
+}
+
+/** Cada palabra de `words` aparece en la columna (sin acentos ni mayúsculas): "maria hongos" encuentra "María Bárbara Hongos". */
+function allWords(col: unknown, words: string[]): SQL {
+  return sql.join(
+    words.map((w) => matches(col, likePattern(w))),
+    sql` and `,
+  );
+}
+
+/** La columna, sin separadores, contiene esos dígitos ("011 4567-8910" ↔ "45678910"). */
+const digitsLike = (col: unknown, digits: string) =>
+  sql`regexp_replace(coalesce(${col}::text, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}`;
+
+type SearchKind = "name" | "legal" | "cuit" | "phone" | "email" | "billing" | "contact";
+
+/**
+ * Buscador de clientes vigentes para los selectores: por nombre, razón social,
+ * CUIT, teléfono, email (del cliente o de facturación) y por nombre, teléfono o
+ * email de cualquiera de sus contactos. Devuelve por qué coincidió (`hint`) si no
+ * fue por el nombre. Sin texto, los primeros por nombre.
+ */
+export async function searchClientOptions(
+  db: DbOrTx,
+  { q, limit }: { q?: string | undefined; limit: number },
+): Promise<ClientSearchOption[]> {
+  const text = q?.trim() ?? "";
+  if (!text) {
+    const rows = await db.execute<{ id: string; name: string }>(sql`
+      select id, name from clients where status <> 'baja' order by name limit ${limit}`);
+    return rows.map((r) => ({ id: r.id, name: r.name, hint: null }));
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const pattern = likePattern(text);
+  const digits = numberSearchDigits(text);
+  const cuit = cuitSearchDigits(text);
+  const no = sql`false`;
+
+  const byName = allWords(sql`c.name`, words);
+  const byLegal = allWords(sql`c.legal_name`, words);
+  const byCuit = cuit ? sql`c.tax_id like ${`%${cuit}%`}` : no;
+  const byPhone = digits ? digitsLike(sql`c.phone`, digits) : no;
+  const byEmail = matches(sql`c.email`, pattern);
+  const byBilling = matches(sql`b.billing_email`, pattern);
+  const contactMatch = sql`(${allWords(sql`cc.name`, words)} or ${matches(sql`cc.email`, pattern)}${
+    digits ? sql` or ${digitsLike(sql`cc.phone`, digits)}` : sql``
+  })`;
+
+  const rows = await db.execute<{
+    id: string;
+    name: string;
+    kind: SearchKind;
+    legal_name: string | null;
+    tax_id: string | null;
+    phone: string | null;
+    email: string | null;
+    billing_email: string | null;
+    contact_name: string | null;
+    contact_phone: string | null;
+    contact_email: string | null;
+  }>(sql`
+    select c.id, c.name, c.legal_name, c.tax_id, c.phone, c.email, b.billing_email,
+      m.name as contact_name, m.phone as contact_phone, m.email as contact_email,
+      case
+        when ${byName} then 'name'
+        when ${byLegal} then 'legal'
+        when ${byCuit} then 'cuit'
+        when ${byPhone} then 'phone'
+        when ${byEmail} then 'email'
+        when ${byBilling} then 'billing'
+        else 'contact'
+      end as kind
+    from clients c
+    left join client_billing_profiles b on b.client_id = c.id
+    left join lateral (
+      select cc.name, cc.phone, cc.email from client_contacts cc
+      where cc.client_id = c.id and ${contactMatch}
+      order by cc.is_decision_maker desc, cc.name
+      limit 1
+    ) m on true
+    where c.status <> 'baja'
+      and (${byName} or ${byLegal} or ${byCuit} or ${byPhone} or ${byEmail} or ${byBilling} or m.name is not null)
+    order by (${byName}) desc, c.name
+    limit ${limit}`);
+
+  return rows.map((r) => ({ id: r.id, name: r.name, hint: searchHint(r.kind, r, digits, text) }));
+}
+
+function searchHint(
+  kind: SearchKind,
+  r: {
+    legal_name: string | null;
+    tax_id: string | null;
+    phone: string | null;
+    email: string | null;
+    billing_email: string | null;
+    contact_name: string | null;
+    contact_phone: string | null;
+    contact_email: string | null;
+  },
+  digits: string | null,
+  q: string,
+): string | null {
+  switch (kind) {
+    case "name":
+      return null;
+    case "legal":
+      return `Razón social: ${r.legal_name}`;
+    case "cuit":
+      return `CUIT ${formatCuit(r.tax_id ?? "")}`;
+    case "phone":
+      return `Tel. ${r.phone}`;
+    case "email":
+      return r.email;
+    case "billing":
+      return `Facturación: ${r.billing_email}`;
+    case "contact": {
+      // Muestra el dato del contacto que coincidió: su teléfono si se buscó un número, si no su email.
+      const phoneHit = !!digits && !!r.contact_phone?.replace(/\D/g, "").includes(digits);
+      const emailHit = !!q && !!r.contact_email?.toLowerCase().includes(q.toLowerCase());
+      const detail = phoneHit ? r.contact_phone : emailHit ? r.contact_email : null;
+      return `Contacto: ${r.contact_name}${detail ? ` · ${detail}` : ""}`;
+    }
+  }
 }

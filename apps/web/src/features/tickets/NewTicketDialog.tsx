@@ -1,11 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_TYPES } from "@crm/shared";
+import { bodyText, TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_TYPES, ticketCreate } from "@crm/shared";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
-import { Field, Input, Select } from "../../components/ui/Field";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
+import { Field, Input, Select, TextArea } from "../../components/ui/Field";
 import { day } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useProjects } from "../projects/api";
@@ -28,8 +28,8 @@ const schema = z
     workTime: z.string(),
     dueOn: z.string(),
     priority: z.enum(TICKET_PRIORITIES),
-    title: z.string().trim().min(1, { message: "Poné un título" }).max(200),
-    description: z.string().max(8000),
+    title: ticketCreate.shape.title,
+    description: bodyText(),
   })
   .refine((v) => !v.dueOn || v.dueOn >= v.receivedDate, { message: "No puede ser antes de la carga", path: ["dueOn"] })
   .refine((v) => !v.assigneeId || (/^\d{4}-\d{2}-\d{2}$/.test(v.workDate) && /^\d{2}:\d{2}$/.test(v.workTime)), {
@@ -39,7 +39,7 @@ const schema = z
 type Values = z.infer<typeof schema>;
 
 const textarea =
-  "w-full rounded-[10px] border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
+  "w-full resize-y rounded-[10px] border border-line bg-white px-3 py-2 text-sm break-words text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
 
 /** "Cargar ticket": si ya se sabe quién lo hace, queda asignado y agendado de una. */
 export function NewTicketDialog({
@@ -96,7 +96,9 @@ export function NewTicketDialog({
   }, [clientId, clientProjects.length]);
 
   const onSubmit = form.handleSubmit(async (v) => {
-    const res = await create.mutateAsync({
+    // Si falla, el error queda en `create.error` y se muestra en el formulario.
+    const res = await create
+      .mutateAsync({
       clientId: v.clientId,
       projectId: v.projectId || null,
       type: v.type,
@@ -108,7 +110,9 @@ export function NewTicketDialog({
       receivedAt: toInstant(v.receivedDate, v.receivedTime),
       dueOn: v.dueOn || null,
       ...(v.assigneeId && { assignTo: { assigneeId: v.assigneeId, scheduledAt: toInstant(v.workDate, v.workTime) } }),
-    });
+      })
+      .catch(() => null);
+    if (!res) return;
     onCreated(res.id, res.number);
     onClose();
   });
@@ -121,7 +125,7 @@ export function NewTicketDialog({
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cliente" error={err.clientId?.message}>
-            <Select autoFocus aria-invalid={!!err.clientId} {...form.register("clientId")}>
+            <Select autoFocus data-autofocus aria-invalid={!!err.clientId} {...form.register("clientId")}>
               <option value="">Elegí…</option>
               {clients.data?.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -179,10 +183,10 @@ export function NewTicketDialog({
             </Select>
           </Field>
           <Field label="Fecha de carga" error={err.receivedDate?.message}>
-            <Input type="date" max={todayAr()} {...form.register("receivedDate")} />
+            <Input type="date" max={todayAr()} aria-invalid={!!err.receivedDate} {...form.register("receivedDate")} />
           </Field>
           <Field label="Hora" error={err.receivedTime?.message}>
-            <Input type="time" {...form.register("receivedTime")} />
+            <Input type="time" aria-invalid={!!err.receivedTime} {...form.register("receivedTime")} />
           </Field>
           <Field label="Se le entrega a">
             <Select {...form.register("assigneeId")}>
@@ -197,21 +201,21 @@ export function NewTicketDialog({
           {assigneeId ? (
             <>
               <Field label="Lo trabaja el día" error={err.workDate?.message}>
-                <Input type="date" {...form.register("workDate")} />
+                <Input type="date" aria-invalid={!!err.workDate} {...form.register("workDate")} />
               </Field>
               <Field label="A las">
                 <Input type="time" step={300} {...form.register("workTime")} />
               </Field>
             </>
           ) : (
-            <div className="sm:col-span-2" />
+            <div className="hidden sm:col-span-2 sm:block" aria-hidden />
           )}
           <Field label="Compromiso con el cliente" error={err.dueOn?.message}>
-            <Input type="date" min={form.watch("receivedDate")} {...form.register("dueOn")} />
+            <Input type="date" min={form.watch("receivedDate")} aria-invalid={!!err.dueOn} {...form.register("dueOn")} />
           </Field>
         </div>
         <Field label="Título" error={err.title?.message}>
-          <Input placeholder="Ej: No imprime la factura desde la caja 2" aria-invalid={!!err.title} {...form.register("title")} />
+          <TextArea singleLine placeholder="Ej: No imprime la factura desde la caja 2" aria-invalid={!!err.title} {...form.register("title")} />
         </Field>
         <Field label="Descripción">
           <textarea rows={3} placeholder="Qué pasa, qué pidió el cliente, datos para resolverlo…" className={textarea} {...form.register("description")} />
@@ -222,14 +226,14 @@ export function NewTicketDialog({
             : "Queda como Nuevo, sin asignar, hasta que alguien lo tome."}
         </p>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2">
+        <DialogActions className="flex justify-end gap-2 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
             Cargar ticket
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

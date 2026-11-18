@@ -75,18 +75,20 @@ export function PipelinePage() {
         </div>
       )}
 
-      <div className="grid gap-[18px] lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-[18px] lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="flex flex-col items-center gap-1.5 p-5">
           {p.stages.map((s, i) => (
             <button
               key={s.id}
               type="button"
               onClick={() => setStageId(s.id)}
+              title={s.description ? `${s.name}: ${s.description}` : s.name}
               className={cn(
-                "flex min-h-14 items-center justify-between gap-3 rounded-xl px-4 py-2 text-left text-white transition hover:brightness-110",
+                "flex min-h-14 max-w-full items-center justify-between gap-3 rounded-xl px-4 py-2 text-left text-white transition hover:brightness-110",
                 i === last && "mt-2",
               )}
-              style={{ width: `${100 - i * (40 / last)}%`, background: s.color }}
+              // En móvil el embudo no se angosta tanto que el nombre no entre.
+              style={{ width: `${100 - i * (40 / last)}%`, minWidth: "min(100%, 15rem)", background: s.color }}
             >
               <span className="min-w-0">
                 <strong className="block truncate">{s.name}</strong>
@@ -111,11 +113,12 @@ export function PipelinePage() {
                 key={s.id}
                 type="button"
                 onClick={() => setStageId(s.id)}
+                title={s.name}
                 className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50"
               >
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                <span className="text-xs text-muted">{plural(s.openTasks, "tarea abierta", "tareas abiertas")}</span>
+                <span className="shrink-0 text-xs text-muted">{plural(s.openTasks, "tarea abierta", "tareas abiertas")}</span>
                 <strong className="w-6 text-right">{s.count}</strong>
               </button>
             ))}
@@ -130,7 +133,7 @@ export function PipelinePage() {
                 {p.todayMoves.map((m) => (
                   <li key={`${m.opportunityId}-${m.at}`} className="flex gap-3 text-sm">
                     <span className="w-11 shrink-0 text-xs font-semibold text-muted tabular-nums">{arParts(m.at).time}</span>
-                    <span>
+                    <span className="min-w-0 break-words">
                       <strong>{m.clientName}</strong> pasó a <strong>{m.stageName}</strong>
                       {m.reason && <span className="text-muted"> · {m.actorName ? `${m.actorName}: ` : ""}{m.reason}</span>}
                     </span>
@@ -254,10 +257,10 @@ function OpportunityCard({
     <article className="flex flex-col gap-2.5 rounded-xl border border-line p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link to="/clientes/$clientId" params={{ clientId: o.client.id }} className="font-bold hover:underline">
+          <Link to="/clientes/$clientId" params={{ clientId: o.client.id }} className="font-bold break-words hover:underline">
             {o.client.name}
           </Link>
-          <p className="text-sm text-muted">{o.title}</p>
+          <p className="text-sm break-words text-muted">{o.title}</p>
         </div>
         <strong className="shrink-0">{money(o.amount)}</strong>
       </div>
@@ -271,12 +274,13 @@ function OpportunityCard({
         <button
           type="button"
           onClick={() => onOpenTask(t.id)}
+          title={t.title}
           className="flex flex-col gap-0.5 rounded-[10px] px-3 py-2 text-left hover:brightness-95"
           style={{ background: tint(t.typeColor, t.status === "hecha"), boxShadow: `inset 4px 0 0 ${t.typeColor}` }}
         >
           <span className="flex items-center justify-between gap-2">
-            <strong className={cn("truncate text-sm", t.status === "hecha" && "line-through")}>{t.title}</strong>
-            <Chip tone={TASK_STATUS[t.status].tone} className="bg-white/70">
+            <strong className={cn("min-w-0 truncate text-sm", t.status === "hecha" && "line-through")}>{t.title}</strong>
+            <Chip tone={TASK_STATUS[t.status].tone} className="shrink-0 bg-white/70">
               {TASK_STATUS[t.status].label}
             </Chip>
           </span>

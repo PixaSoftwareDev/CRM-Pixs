@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { cn } from "../../components/ui/cn";
 import { Notice, useNotice } from "../../components/ui/Notice";
-import { ErrorBox, Skeleton } from "../../components/ui/States";
+import { Empty, ErrorBox, Skeleton } from "../../components/ui/States";
 import { useAccess } from "../../hooks/useAccess";
 import { api } from "../../lib/api";
 import { ago, plural } from "../../lib/format";
@@ -54,6 +54,7 @@ export function AutomationsPage() {
         </p>
       )}
 
+      {rules.data.length === 0 && <Empty>Todavía no hay reglas de automatización.</Empty>}
       <div className="flex flex-col gap-3">
         {ready.map((r) => (
           <RuleCard
@@ -109,7 +110,7 @@ function RuleCard({
           : `Activa · todavía no hizo nada este mes${r.lastRunAt ? ` · última corrida ${ago(r.lastRunAt)}` : ""}`;
 
   return (
-    <Card className={cn("flex flex-wrap items-center gap-4 p-4", !on && "opacity-70")}>
+    <Card className="flex flex-wrap items-center gap-4 p-4">
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-xl",
@@ -135,12 +136,12 @@ function RuleCard({
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label={`${on ? "Pausar" : "Activar"}: ${r.name}`}
+        aria-label={r.name}
         title={!r.available ? `Para activarla: ${r.requires}` : r.builtIn ? "Es parte de «Venta ganada»: no se pausa" : undefined}
         disabled={!onToggle || !r.available || r.builtIn || busy}
         onClick={onToggle}
         className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed",
+          "relative h-6 w-11 shrink-0 rounded-full transition outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed",
           on ? "bg-brand" : "bg-slate-300",
         )}
       >

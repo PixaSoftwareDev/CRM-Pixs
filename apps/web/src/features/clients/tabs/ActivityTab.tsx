@@ -3,7 +3,7 @@ import { Bot, CalendarCheck, FileText, LifeBuoy, Mail, MessageCircle, Phone, Sti
 import { type FormEvent, useRef, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
-import { Input, Select } from "../../../components/ui/Field";
+import { Select, TextArea } from "../../../components/ui/Field";
 import { Empty, ErrorBox, Skeleton } from "../../../components/ui/States";
 import { when } from "../../../lib/format";
 import { useActivities, useAddActivity } from "../api";
@@ -55,7 +55,7 @@ export function ActivityTab({ clientId }: { clientId: string }) {
 
   return (
     <Card className="flex flex-col gap-4 p-5">
-      <form onSubmit={submit} className="flex flex-wrap gap-2">
+      <form onSubmit={submit} className="flex flex-wrap items-start gap-2">
         <label className="w-36">
           <span className="sr-only">Tipo</span>
           <Select value={kind} onChange={(e) => setKind(e.target.value as ActivityCreate["kind"])}>
@@ -68,10 +68,15 @@ export function ActivityTab({ clientId }: { clientId: string }) {
         </label>
         <label className="min-w-[220px] flex-1">
           <span className="sr-only">Qué pasó</span>
-          <Input
+          <TextArea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            maxLength={2000}
+            // Enter guarda (como antes); Shift+Enter agrega un renglón.
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }}
             placeholder="¿Qué pasó? Ej: confirmaron que transfieren el viernes"
           />
         </label>
@@ -98,14 +103,14 @@ export function ActivityTab({ clientId }: { clientId: string }) {
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
                   <Icon size={15} aria-hidden />
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
-                    <strong className="text-sm">{a.title}</strong>
+                    <strong className="text-sm [overflow-wrap:anywhere]">{a.title}</strong>
                     <span className="text-xs text-muted">
                       {when(a.occurredAt)} · {a.actorName ?? "automático"}
                     </span>
                   </div>
-                  {a.body && <p className="mt-0.5 text-sm whitespace-pre-line text-slate-700">{a.body}</p>}
+                  {a.body && <p className="mt-0.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-slate-700">{a.body}</p>}
                 </div>
               </li>
             );

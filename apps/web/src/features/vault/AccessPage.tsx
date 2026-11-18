@@ -90,12 +90,12 @@ export function AccessPage() {
           return (
             <Card key={g.client.id} className="overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-800">
                     {initials(g.client.name)}
                   </span>
-                  <div>
-                    <Link to="/clientes/$clientId" params={{ clientId: g.client.id }} className="font-bold hover:underline">
+                  <div className="min-w-0">
+                    <Link to="/clientes/$clientId" params={{ clientId: g.client.id }} className="font-bold break-words hover:underline">
                       {g.client.name}
                     </Link>
                     <p className="text-xs text-muted">
@@ -109,8 +109,9 @@ export function AccessPage() {
                   </Button>
                 )}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] table-fixed text-sm">
+              <div className="relative lg:overflow-x-auto">
+                {/* En el celular cada acceso es una ficha (stack-table), sin scroll de costado. */}
+                <table className="stack-table w-full table-fixed text-sm lg:min-w-[820px]">
                   <thead>
                     <tr className="text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
                       <th className="w-[15%] px-4 py-2">Tipo</th>
@@ -177,27 +178,36 @@ function CredentialRow({ cred: c, onEdit, onNotice }: { cred: CredentialDto; onE
 
   return (
     <tr>
-      <td className="px-4 py-3">
+      <td data-cell="end" className="px-4 py-3">
         <Chip tone="slate">{KIND[c.kind]}</Chip>
       </td>
-      <td className="px-4 py-3 font-medium">
+      <td className="px-4 py-3 font-medium break-words max-lg:order-first max-lg:flex-1">
         {c.label}
         {c.notes && <span className="block text-xs font-normal text-muted">{c.notes}</span>}
       </td>
-      <td className="truncate px-4 py-3 font-mono text-xs">{c.username ?? "—"}</td>
-      <td className="truncate px-4 py-3 font-mono text-xs">
-        {secret ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-950">{secret}</span> : "••••••••••"}
+      <td data-cell="full" data-label="Usuario:" className="truncate px-4 py-3 font-mono text-xs" title={c.username ?? undefined}>
+        {c.username ?? "—"}
       </td>
-      <td className="px-4 py-3">
-        <span className="flex justify-end gap-1">
+      {/* Visible, la clave se ve entera (cortada no sirve para copiarla a mano). */}
+      <td data-cell="full" data-label="Clave:" className={secret ? "px-4 py-3 font-mono text-xs break-all" : "truncate px-4 py-3 font-mono text-xs"}>
+        {secret ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-950">{secret}</span> : (
+          <>
+            <span aria-hidden>••••••••••</span>
+            <span className="sr-only">Clave oculta</span>
+          </>
+        )}
+      </td>
+      <td data-cell="full" className="px-4 py-3">
+        <span className="flex flex-wrap justify-end gap-1 max-lg:-ml-2.5 max-lg:justify-start">
           {c.connectUrl && (
             <a
               href={c.connectUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1 rounded-[10px] px-2.5 text-xs font-semibold text-brand hover:bg-indigo-50"
+              className="inline-flex h-10 items-center gap-1 rounded-[10px] px-2.5 text-xs font-semibold text-brand hover:bg-indigo-50 sm:h-8"
             >
               <ExternalLink size={13} aria-hidden /> Conectar
+              <span className="sr-only"> a {c.label} (se abre en otra pestaña)</span>
             </a>
           )}
           <Button size="sm" variant="ghost" onClick={() => void show()} disabled={reveal.isPending} aria-label={secret ? "Ocultar clave" : `Ver la clave de ${c.label}`}>
@@ -314,7 +324,7 @@ function CredentialDialog({ value, onClose, onDone }: { value: CredentialDto | "
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           {editing && isAdmin ? (
             confirmDelete ? (
-              <span className="flex items-center gap-2 text-sm">
+              <span className="flex flex-wrap items-center gap-2 text-sm">
                 ¿Borrar este acceso?
                 <Button
                   size="sm"
@@ -387,7 +397,7 @@ function HistoryDialog({ filter, onClose }: { filter: { clientId?: string } | nu
   return (
     <Dialog open={!!filter} onClose={onClose} title="Historial de accesos" description="Quién vio o copió cada clave, de más nuevo a más viejo." size="xl">
       <div className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="Buscar">
             <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Acceso, cliente, usuario…" />
           </Field>
@@ -418,9 +428,10 @@ function HistoryDialog({ filter, onClose }: { filter: { clientId?: string } | nu
             </Select>
           </Field>
         </div>
-        {logs.error && <ErrorBox error={logs.error} />}
-        <div className="max-h-[50vh] overflow-auto rounded-xl border border-line">
-          <table className="w-full min-w-[680px] text-sm">
+        {logs.error && <ErrorBox error={logs.error} onRetry={() => void logs.refetch()} />}
+        {/* En el celular, fichas en el flujo del modal (un solo scroll); desde md, tabla con su propio scroll. */}
+        <div className="relative rounded-xl border border-line lg:max-h-[50vh] lg:overflow-auto">
+          <table className="stack-table w-full text-sm lg:min-w-[680px]">
             <thead className="sticky top-0 bg-slate-50">
               <tr className="text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
                 <th className="px-3 py-2">Fecha y hora</th>
@@ -432,16 +443,24 @@ function HistoryDialog({ filter, onClose }: { filter: { clientId?: string } | nu
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {logs.isPending &&
+                Array.from({ length: 4 }, (_, i) => (
+                  <tr key={i}>
+                    <td colSpan={6} data-cell="full" className="px-3 py-3">
+                      <Skeleton />
+                    </td>
+                  </tr>
+                ))}
               {rows.map((l) => (
                 <tr key={l.id}>
                   <td className="px-3 py-2 tabular-nums">{when(l.at)}</td>
                   <td className="px-3 py-2">{l.user.name}</td>
-                  <td className="px-3 py-2">
+                  <td data-cell="end" className="px-3 py-2">
                     <Chip tone={l.action === "copiar" ? "amber" : l.action === "eliminar" ? "red" : "slate"}>{ACTION_LABEL[l.action]}</Chip>
                   </td>
-                  <td className="px-3 py-2">{l.credentialLabel}</td>
-                  <td className="px-3 py-2">{l.client.name}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-muted">{l.ipAddress ?? "—"}</td>
+                  <td data-cell="full" data-label="Acceso:" className="px-3 py-2">{l.credentialLabel}</td>
+                  <td data-cell="full" data-label="Cliente:" className="px-3 py-2">{l.client.name}</td>
+                  <td data-cell="full" data-label="IP:" className="px-3 py-2 font-mono text-xs text-muted">{l.ipAddress ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

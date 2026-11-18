@@ -3,7 +3,7 @@ import { CLIENT_PRIORITIES, type ClientCreate, clientCreate } from "@crm/shared"
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { useCreateClient } from "./api";
 import { PRIORITY } from "./labels";
@@ -38,7 +38,7 @@ export function NewClientDialog({ open, onClose }: { open: boolean; onClose: () 
     <Dialog open={open} onClose={close} title="Nuevo cliente" description="Después completás el resto en su ficha.">
       <form onSubmit={onSubmit} noValidate className="grid gap-3 sm:grid-cols-2">
         <Field label="Nombre" error={errors.name?.message} className="sm:col-span-2">
-          <Input autoFocus placeholder="Ej: Óptica Central" {...form.register("name")} />
+          <Input autoFocus data-autofocus placeholder="Ej: Óptica Central" {...form.register("name")} />
         </Field>
         <Field label="CUIT" error={errors.taxId?.message} hint="Opcional">
           <Input inputMode="numeric" placeholder="30-12345678-1" {...form.register("taxId")} />
@@ -71,14 +71,14 @@ export function NewClientDialog({ open, onClose }: { open: boolean; onClose: () 
           </p>
         )}
 
-        <div className="flex justify-end gap-2 pt-1 sm:col-span-2">
+        <DialogActions className="flex justify-end gap-2 pt-1 sm:col-span-2 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={close}>
             Cancelar
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Guardando…" : "Guardar"}
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

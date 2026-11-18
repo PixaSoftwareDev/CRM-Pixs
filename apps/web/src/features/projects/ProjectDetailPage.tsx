@@ -82,8 +82,8 @@ function Header({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold tracking-wide text-muted uppercase">Proyecto</p>
-          <h1 className="text-2xl font-bold tracking-tight">{p.name}</h1>
-          <Link to="/clientes/$clientId" params={{ clientId: p.client.id }} className="text-sm font-medium text-brand hover:underline">
+          <h1 className="text-2xl font-bold tracking-tight break-words">{p.name}</h1>
+          <Link to="/clientes/$clientId" params={{ clientId: p.client.id }} className="text-sm font-medium break-words text-brand hover:underline">
             {p.client.name}
           </Link>
         </div>
@@ -116,7 +116,14 @@ function Header({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m
         <div className="flex flex-col gap-1">
           <dt className="text-xs text-muted">Avance</dt>
           <dd className="flex items-center gap-2">
-            <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <span
+              className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"
+              role="progressbar"
+              aria-valuenow={p.progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Avance"
+            >
               <span className="block h-full rounded-full" style={{ width: `${Math.max(p.progress, 2)}%`, background: h.bar }} />
             </span>
             <strong className="text-sm">{p.progress}%</strong>
@@ -181,9 +188,9 @@ function Header({ project: p, onNotice }: { project: ProjectDetail; onNotice: (m
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className="font-bold">{value}</dd>
+      <dd className="font-bold break-words">{value}</dd>
     </div>
   );
 }
@@ -221,10 +228,10 @@ function ContactCard({ project: p }: { project: ProjectDetail }) {
       {c ? (
         <>
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-800">
+            <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-800">
               {initials(c.name)}
             </span>
-            <div>
+            <div className="min-w-0 break-words">
               <strong>{c.name}</strong>
               {c.jobTitle && <p className="text-xs text-muted">{c.jobTitle}</p>}
             </div>
@@ -236,10 +243,11 @@ function ContactCard({ project: p }: { project: ProjectDetail }) {
             ({ key, icon, value }) =>
               value && (
                 <div key={key} className="flex items-center justify-between gap-2 rounded-[10px] bg-slate-50 px-3 py-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2 truncate">
-                    {icon} {value}
+                  <span className="flex min-w-0 items-center gap-2" title={value}>
+                    <span className="shrink-0">{icon}</span>
+                    <span className="truncate">{value}</span>
                   </span>
-                  <Button size="sm" variant="ghost" aria-label={`Copiar ${value}`} onClick={() => void copy(key, value)}>
+                  <Button size="sm" variant="ghost" className="shrink-0" aria-label={`Copiar ${value}`} onClick={() => void copy(key, value)}>
                     {copied === key ? <Check size={13} aria-hidden className="text-green-700" /> : <Copy size={13} aria-hidden />}
                   </Button>
                 </div>
@@ -278,8 +286,9 @@ function TicketsCard({ project: p, onNotice }: { project: ProjectDetail; onNotic
       {p.tickets.length === 0 ? (
         <p className="text-sm text-muted">Todavía no hay tickets en este proyecto.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+        <div className="lg:overflow-x-auto">
+          {/* En el celular cada ticket es una ficha (stack-table), sin scroll de costado. */}
+          <table className="stack-table w-full text-sm [--stack-px:0] lg:min-w-[640px]">
             <thead>
               <tr className="border-b border-line text-left text-xs text-muted">
                 <th className="py-2 pr-3 font-medium">Nro.</th>
@@ -301,20 +310,24 @@ function TicketsCard({ project: p, onNotice }: { project: ProjectDetail; onNotic
                         #{t.number}
                       </Link>
                     </td>
-                    <td className={cn("py-2.5 pr-3", closed ? "text-muted" : "font-semibold")}>
+                    <td className={cn("py-2.5 pr-3 max-lg:flex-1", closed ? "text-muted" : "font-semibold")}>
                       <Link to="/tickets/$ticketId" params={{ ticketId: t.id }} className="hover:underline">
                         {t.title}
                       </Link>
                     </td>
-                    <td className="py-2.5 pr-3">{TICKET_TYPE[t.type as keyof typeof TICKET_TYPE]?.label ?? t.type}</td>
+                    <td className="py-2.5 pr-3 max-lg:order-1 max-lg:text-xs max-lg:text-muted">
+                      {TICKET_TYPE[t.type as keyof typeof TICKET_TYPE]?.label ?? t.type}
+                    </td>
                     <td className="py-2.5 pr-3">
                       <Chip tone={st.tone}>{st.label}</Chip>
                     </td>
-                    <td className={cn("py-2.5 pr-3", t.overdue && "font-bold text-red-700")}>
+                    <td data-label="Compromiso:" className={cn("py-2.5 pr-3 max-lg:order-1 max-lg:text-xs", t.overdue && "font-bold text-red-700")}>
                       {t.dueAt ? when(t.dueAt, false) : "—"}
                       {t.overdue && " · vencido"}
                     </td>
-                    <td className="py-2.5">{t.assigneeName ?? "—"}</td>
+                    <td data-cell="end" data-label="Lo tiene:" className="py-2.5 max-lg:order-1 max-lg:text-xs">
+                      {t.assigneeName ?? "—"}
+                    </td>
                   </tr>
                 );
               })}
@@ -357,10 +370,11 @@ function TasksCard({ project: p, onNotice }: { project: ProjectDetail; onNotice:
                 key={t.id}
                 type="button"
                 onClick={() => setOpenId(t.id)}
+                title={t.title}
                 className={cn("flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left hover:brightness-95", isDone && "opacity-70")}
                 style={{ background: tint(t.type.color, isDone), boxShadow: `inset 4px 0 0 ${t.type.color}` }}
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold">
+                <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold">
                   {initials(t.assignee.name)}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -371,7 +385,7 @@ function TasksCard({ project: p, onNotice }: { project: ProjectDetail; onNotice:
                     {t.type.name} · {t.assignee.name} · {when(t.startsAt)}
                   </span>
                 </span>
-                <Chip tone={overdue ? "red" : TASK_STATUS[t.status].tone} className="bg-white/70">
+                <Chip tone={overdue ? "red" : TASK_STATUS[t.status].tone} className="shrink-0 bg-white/70">
                   {overdue ? "Vencida" : TASK_STATUS[t.status].label}
                 </Chip>
               </button>

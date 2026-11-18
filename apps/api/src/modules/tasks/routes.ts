@@ -1,7 +1,7 @@
 /**
  * Rutas HTTP de Tareas, tipos de tarea y equipo. Todas exigen sesión.
  */
-import { idParams, taskCommentCreate, taskCreate, taskRangeQuery, taskTypeCreate, taskUpdate } from "@crm/shared";
+import { idParams, taskBusyQuery, taskCommentCreate, taskCreate, taskRangeQuery, taskTypeCreate, taskUpdate } from "@crm/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { db } from "../../lib/db";
 import { access, requireArea, requireUser, sessionOf } from "../auth/guard";
@@ -19,6 +19,9 @@ export const taskRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   app.get("/api/tasks/unscheduled", () => service.listUnscheduled(db));
+
+  /** Horarios ocupados de una persona en un día (para ofrecer solo turnos libres). */
+  app.get("/api/tasks/busy", { schema: { querystring: taskBusyQuery } }, (req) => service.listBusy(db, req.query));
 
   app.post("/api/tasks", { schema: { body: taskCreate } }, async (req, reply) => {
     const task = await service.createTask(db, sessionOf(req).user.id, req.body);

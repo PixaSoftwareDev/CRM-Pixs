@@ -113,7 +113,7 @@ export function StatementTab({ client }: { client: ClientDetail }) {
               Hasta
               <Input type="date" value={to ?? ""} min={from} onChange={(e) => setTo(e.target.value || undefined)} className="w-40" />
             </label>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {QUICK.map((q) => (
                 <button
                   key={q.label}
@@ -146,8 +146,9 @@ export function StatementTab({ client }: { client: ClientDetail }) {
             {st.data.rows.length === 0 ? (
               <Empty>No hay movimientos entre esas fechas.</Empty>
             ) : (
-              <div className={cn("overflow-x-auto rounded-xl border border-line print:overflow-visible", st.isPlaceholderData && "opacity-60")}>
-                <table className="w-full min-w-[760px] border-collapse text-sm print:min-w-0">
+              <div className={cn("rounded-xl border border-line lg:overflow-x-auto print:overflow-visible", st.isPlaceholderData && "opacity-60")}>
+                {/* En el celular cada movimiento es una ficha (stack-table); impreso, siempre tabla. */}
+                <table className="stack-table w-full border-collapse text-sm lg:min-w-[760px] print:min-w-0">
                   <thead>
                     <tr className="bg-slate-50 text-left text-[11px] font-semibold tracking-wider text-muted uppercase">
                       <th className="px-3 py-2">Fecha</th>
@@ -165,7 +166,7 @@ export function StatementTab({ client }: { client: ClientDetail }) {
                         <td className="px-3 py-2 italic" colSpan={4}>
                           Saldo anterior
                         </td>
-                        <td className="px-3 py-2 text-right">{money(st.data.openingBalance)}</td>
+                        <td data-cell="end" className="px-3 py-2 text-right">{money(st.data.openingBalance)}</td>
                       </tr>
                     )}
                     {st.data.rows.map((r) => {
@@ -180,7 +181,7 @@ export function StatementTab({ client }: { client: ClientDetail }) {
                               <span className="text-xs text-muted">{r.number}</span>
                             </span>
                           </td>
-                          <td className="px-3 py-2">
+                          <td data-cell="full" className="px-3 py-2">
                             {r.concept}
                             {r.pendingAmount > 0 && (
                               <Chip tone={overdue ? "red" : "amber"} className="ml-2">
@@ -188,19 +189,23 @@ export function StatementTab({ client }: { client: ClientDetail }) {
                               </Chip>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right">{r.debit ? money(r.debit) : ""}</td>
-                          <td className="px-3 py-2 text-right">{r.credit ? money(r.credit) : ""}</td>
-                          <td className="px-3 py-2 text-right font-medium">{money(r.balance)}</td>
+                          <td data-label={r.debit ? "Debe:" : undefined} className={cn("px-3 py-2 text-right", !r.debit && "max-lg:hidden")}>
+                            {r.debit ? money(r.debit) : ""}
+                          </td>
+                          <td data-label={r.credit ? "Haber:" : undefined} className={cn("px-3 py-2 text-right", !r.credit && "max-lg:hidden")}>
+                            {r.credit ? money(r.credit) : ""}
+                          </td>
+                          <td data-cell="end" data-label="Saldo:" className="px-3 py-2 text-right font-medium">{money(r.balance)}</td>
                         </tr>
                       );
                     })}
                     <tr className="border-t border-line bg-slate-50 font-semibold">
-                      <td className="px-3 py-2" colSpan={3}>
+                      <td data-cell="full" className="px-3 py-2" colSpan={3}>
                         Totales del período
                       </td>
-                      <td className="px-3 py-2 text-right">{money(st.data.totalDebit)}</td>
-                      <td className="px-3 py-2 text-right">{money(st.data.totalCredit)}</td>
-                      <td className="px-3 py-2 text-right">{money(st.data.closingBalance)}</td>
+                      <td data-label="Debe:" className="px-3 py-2 text-right">{money(st.data.totalDebit)}</td>
+                      <td data-label="Haber:" className="px-3 py-2 text-right">{money(st.data.totalCredit)}</td>
+                      <td data-cell="end" data-label="Saldo:" className="px-3 py-2 text-right">{money(st.data.closingBalance)}</td>
                     </tr>
                   </tbody>
                 </table>

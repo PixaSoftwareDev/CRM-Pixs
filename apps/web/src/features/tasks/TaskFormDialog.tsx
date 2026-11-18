@@ -1,17 +1,24 @@
+import { taskTitle } from "@crm/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
-import { Field, Input, Select } from "../../components/ui/Field";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
+import { Field, Input, Select, TextArea } from "../../components/ui/Field";
+import { InlineConfirm } from "../../components/ui/InlineConfirm";
+import { useEnterFlow } from "../../hooks/useEnterFlow";
+import { ClientCombobox } from "../clients/ClientCombobox";
+import { clip } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
 import { useClientOptions, useCreateTask, useMyId, useTaskTypes, useTeam } from "./api";
-import { durationLabel, spanMinutes, toHHMM, toInstant, toMinutes } from "./time";
+import { clashText, isOverlapError, useAvailability, useOverlapGate } from "./availability";
+import { SlotPicker } from "./SlotPicker";
+import { dayTitle, durationLabel, shiftEnd, spanMinutes, toHHMM, toInstant, toMinutes, todayAr } from "./time";
 
 const formSchema = z
   .object({
-    title: z.string().trim().min(1, { message: "Escribí qué hay que hacer" }).max(200),
+    title: taskTitle,
     clientId: z.string(),
     typeId: z.string().min(1, { message: "Elegí un tipo" }),
     assigneeId: z.string().min(1),
@@ -67,8 +74,16 @@ export function TaskFormDialog({
   const clients = useClientOptions();
   const create = useCreateTask();
   const form = useForm<FormValues>({ resolver: zodResolver(formSchema) });
-  const serverError = useServerErrors(form, create.error);
-  const [start, end] = form.watch(["start", "end"]);
+  // El 409 de horario ocupado no es un error: se pregunta si agendar igual.
+  const serverError = useServerErrors(form, isOverlapError(create.error) ? null : create.error);
+  const [start, end, clientId, date, assigneeId] = form.watch(["start", "end", "clientId", "date", "assigneeId"]);
+  // Agenda del responsable ese día: turnos libres y si el horario se pisa con algo.
+  const availability = useAvailability({ assigneeId, date, start, end });
+  const overlap = useOverlapGate(`${date}|${start}|${end}|${assigneeId}`);
+  const whoName = assigneeId === me ? "vos" : (team.data?.find((u) => u.id === assigneeId)?.name ?? "el responsable");
+  // Enter pasa de campo en campo y en el último pide confirmar (no agenda directo).
+  const flow = useEnterFlow();
+  const startField = form.register("start");
 
   const typeOf = (d: TaskDraft) =>
     types.data?.find((t) => t.id === d.typeId) ?? types.data?.find((t) => t.name === d.typeName) ?? types.data?.[0];
@@ -76,6 +91,7 @@ export function TaskFormDialog({
   useEffect(() => {
     if (!draft) return;
     create.reset();
+    flow.reset();
     form.reset({
       title: draft.title ?? "",
       clientId: draft.clientId ?? "",
@@ -100,14 +116,16 @@ export function TaskFormDialog({
     if (sending.current) return;
     sending.current = true;
     try {
-      await save(v);
+      const clash = availability.clash ? clashText(availability.clash, whoName) : null;
+      await overlap.run(clash, (allowOverlap) => save(v, allowOverlap));
     } finally {
       sending.current = false;
     }
   });
 
-  const save = async (v: FormValues) => {
+  const save = async (v: FormValues, allowOverlap = false) => {
     await create.mutateAsync({
+      ...(allowOverlap && { allowOverlap }),
       title: v.title,
       typeId: v.typeId,
       clientId: v.clientId || null,
@@ -118,7 +136,7 @@ export function TaskFormDialog({
       durationMinutes: spanMinutes(v.start, v.end),
     });
     const who = team.data?.find((u) => u.id === v.assigneeId);
-    onCreated?.(`Agendada "${v.title}"${v.assigneeId !== me && who ? ` en la agenda de ${who.name}` : ""}.`);
+    onCreated?.(`Agendada "${clip(v.title)}"${v.assigneeId !== me && who ? ` en la agenda de ${who.name}` : ""}.`);
     onClose();
   };
 
@@ -127,9 +145,9 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={!!draft} onClose={onClose} title={title}>
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3" {...flow.container()}>
         <Field label="Tarea" error={err.title?.message}>
-          <Input autoFocus placeholder="Qué hay que hacer…" aria-invalid={!!err.title} {...form.register("title")} />
+          <TextArea singleLine autoFocus data-autofocus placeholder="Qué hay que hacer…" aria-invalid={!!err.title} {...flow.field} {...form.register("title")} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           {draft?.ticketId ? (
@@ -138,18 +156,16 @@ export function TaskFormDialog({
             </Field>
           ) : (
             <Field label="Cliente">
-              <Select {...form.register("clientId")}>
-                <option value="">Sin cliente</option>
-                {clients.data?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+              <ClientCombobox
+                value={clientId ?? ""}
+                selectedName={clients.data?.find((c) => c.id === clientId)?.name}
+                onChange={(id) => form.setValue("clientId", id, { shouldDirty: true })}
+                inputProps={flow.field}
+              />
             </Field>
           )}
           <Field label="Tipo de tarea" error={err.typeId?.message}>
-            <Select {...form.register("typeId")}>
+            <Select aria-invalid={!!err.typeId} {...flow.field} {...form.register("typeId")}>
               {types.data?.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -157,19 +173,34 @@ export function TaskFormDialog({
               ))}
             </Select>
           </Field>
-          <Field label="Día" error={err.date?.message}>
-            <Input type="date" {...form.register("date")} />
+          <Field label="Día" error={err.date?.message} hint={dayHint(date)}>
+            <Input type="date" aria-invalid={!!err.date} {...flow.field} {...form.register("date")} />
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Desde" error={err.start?.message}>
-              <Input type="time" step={300} {...form.register("start")} />
+              <Input
+                type="time"
+                step={300}
+                aria-invalid={!!err.start}
+                {...flow.field}
+                {...startField}
+                onChange={(e) => {
+                  // Mover "desde" corre "hasta" con la misma duración (1 h si no había una válida).
+                  const v = form.getValues();
+                  form.setValue("end", shiftEnd(v.start, v.end, e.target.value), {
+                    shouldDirty: true,
+                    shouldValidate: form.formState.isSubmitted,
+                  });
+                  return startField.onChange(e);
+                }}
+              />
             </Field>
             <Field label="Hasta" error={err.end?.message} hint={minutes > 0 ? durationLabel(minutes) : undefined}>
-              <Input type="time" step={300} aria-invalid={!!err.end} {...form.register("end")} />
+              <Input type="time" step={300} aria-invalid={!!err.end} {...flow.field} {...form.register("end")} />
             </Field>
           </div>
           <Field label="Responsable" className="sm:col-span-2">
-            <Select {...form.register("assigneeId")}>
+            <Select {...flow.field} {...form.register("assigneeId")}>
               {team.data?.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.id === me ? `${u.name} (yo)` : u.name}
@@ -177,17 +208,61 @@ export function TaskFormDialog({
               ))}
             </Select>
           </Field>
+          <SlotPicker
+            className="sm:col-span-2"
+            // Con la pregunta "¿agendar igual?" a la vista, el aviso no se repite.
+            availability={overlap.ask ? { ...availability, clash: undefined } : availability}
+            start={start ?? ""}
+            duration={minutes > 0 ? minutes : 60}
+            who={whoName}
+            onPick={(next) => {
+              // Igual que mover "desde" a mano: "hasta" acompaña con la misma duración.
+              const opts = { shouldDirty: true, shouldValidate: form.formState.isSubmitted };
+              form.setValue("end", shiftEnd(form.getValues("start"), form.getValues("end"), next), opts);
+              form.setValue("start", next, opts);
+            }}
+          />
         </div>
         {serverError && <p role="alert" className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{serverError}</p>}
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            Confirmar y agendar
-          </Button>
-        </div>
+        <DialogActions>
+          {overlap.ask ? (
+            <InlineConfirm
+              message={overlap.ask.message}
+              confirmLabel="Agendar igual"
+              cancelLabel="Elegir otro horario"
+              onConfirm={overlap.ask.retry}
+              onCancel={overlap.cancel}
+              disabled={create.isPending}
+            />
+          ) : flow.confirming ? (
+            <InlineConfirm
+              message="¿Agendar la tarea?"
+              confirmLabel="Agendar"
+              cancelLabel="Seguir editando"
+              onConfirm={() => flow.accept(() => void onSubmit())}
+              onCancel={flow.cancel}
+              disabled={form.formState.isSubmitting}
+            />
+          ) : (
+            <div className="flex flex-wrap justify-end gap-2 pt-1 max-sm:pt-0 max-sm:[&>:last-child]:flex-1">
+              <Button variant="secondary" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                Confirmar y agendar
+              </Button>
+            </div>
+          )}
+        </DialogActions>
       </form>
     </Dialog>
   );
+}
+
+/** Debajo del día: "Hoy", o qué día es si no es hoy (para que no se agende en otra fecha sin querer). */
+function dayHint(date: string | undefined): string | undefined {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  const today = todayAr();
+  if (date === today) return "Hoy";
+  return `${dayTitle(date)}${date < today ? " · ya pasó" : ""}`;
 }

@@ -21,7 +21,7 @@ import { type FieldValues, type UseFormReturn, useForm } from "react-hook-form";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Chip } from "../../../components/ui/Chip";
-import { Dialog } from "../../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../../components/ui/Dialog";
 import { Field, Input, Select } from "../../../components/ui/Field";
 import { Empty } from "../../../components/ui/States";
 import { clientKeys, useRemoveContact, useSaveBilling, useSaveContact, useUpdateClient } from "../api";
@@ -55,7 +55,9 @@ function SectionTitle({ title, hint, action }: { title: string; hint?: string | 
 function SaveBar({ dirty, saving, saved }: { dirty: boolean; saving: boolean; saved: boolean }) {
   return (
     <div className="flex items-center justify-end gap-3 sm:col-span-2">
-      {saved && !dirty && <span className="text-xs text-green-700">Guardado ✓</span>}
+      <span role="status" className="text-xs text-green-700">
+        {saved && !dirty ? "Guardado ✓" : ""}
+      </span>
       <Button type="submit" disabled={!dirty || saving}>
         {saving ? "Guardando…" : "Guardar cambios"}
       </Button>
@@ -204,10 +206,10 @@ export function ContactsSection({ client }: { client: ClientDetail }) {
       ) : (
         <ul className="divide-y divide-slate-100">
           {client.contacts.map((p) => (
-            <li key={p.id} className="flex items-start justify-between gap-3 py-3">
-              <div className="min-w-0">
+            <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+              <div className="min-w-0 flex-[1_1_12rem]">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <strong className="text-sm">{p.name}</strong>
+                  <strong className="text-sm break-words">{p.name}</strong>
                   {p.jobTitle && <span className="text-xs text-muted">· {p.jobTitle}</span>}
                 </div>
                 <div className="mt-0.5 text-xs break-all text-slate-600">
@@ -224,7 +226,7 @@ export function ContactsSection({ client }: { client: ClientDetail }) {
                   <Pencil size={14} aria-hidden />
                 </Button>
                 {removing === p.id ? (
-                  <span className="flex items-center gap-1.5 text-xs">
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs">
                     ¿Quitar a {p.name}?
                     <Button
                       variant="danger"
@@ -304,7 +306,7 @@ function ContactDialog({
     <Dialog open={contact !== null} onClose={onClose} title={isNew ? "Agregar persona" : "Editar persona"}>
       <form onSubmit={onSubmit} noValidate className="grid gap-3 sm:grid-cols-2">
         <Field label="Nombre" error={errors.name?.message}>
-          <Input autoFocus {...form.register("name")} />
+          <Input autoFocus data-autofocus {...form.register("name")} />
         </Field>
         <Field label="Cargo" error={errors.jobTitle?.message}>
           <Input placeholder="Ej: Dueña, administración…" {...form.register("jobTitle")} />
@@ -335,14 +337,14 @@ function ContactDialog({
             {serverError}
           </p>
         )}
-        <div className="flex justify-end gap-2 sm:col-span-2">
+        <DialogActions className="flex justify-end gap-2 sm:col-span-2 max-sm:[&>:last-child]:flex-1">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             Guardar
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   );

@@ -36,8 +36,15 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
+      {/* Para teclado: salta el menú y va directo a la pantalla. Se ve solo al recibir foco. */}
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-[10px] focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
       <Sidebar />
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-9 sm:py-7">
+      <main id="contenido" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 outline-none sm:px-9 sm:py-7">
         <div className="mx-auto flex max-w-[1240px] flex-col gap-[18px]">
           {!ready ? (
             // Hasta saber los permisos no se muestra la pantalla (no se piden datos que capaz no puede ver).
@@ -45,6 +52,9 @@ export function AppLayout() {
               <ErrorBox error={access.error} onRetry={access.retry} />
             ) : (
               <div aria-busy className="flex flex-col gap-3">
+                <span className="sr-only" role="status">
+                  Cargando…
+                </span>
                 <Skeleton className="h-8 w-1/3" />
                 <Skeleton className="h-4 w-1/2" />
               </div>
@@ -91,7 +101,7 @@ export function PageHeader({
 }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
-      <div>
+      <div className="min-w-0 break-words">
         <h1 className="text-[28px] font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>

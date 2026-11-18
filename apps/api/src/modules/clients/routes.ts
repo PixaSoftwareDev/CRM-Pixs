@@ -7,6 +7,7 @@ import {
   billingProfileInput,
   clientCreate,
   clientListQuery,
+  clientSearchQuery,
   clientStatusChange,
   clientUpdate,
   contactInput,
@@ -38,6 +39,11 @@ export const clientRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   app.get("/api/clients/options", { config: { access: "any" } }, () => service.listClientOptions(db));
+
+  // Mismo acceso que /options: lo usan los selectores de cliente de otros sectores (agendar tarea).
+  app.get("/api/clients/search", { config: { access: "any" }, schema: { querystring: clientSearchQuery } }, (req) =>
+    service.searchClientOptions(db, req.query),
+  );
 
   app.post("/api/clients", { schema: { body: clientCreate } }, async (req, reply) => {
     const client = await service.createClient(db, sessionOf(req).user.id, req.body);

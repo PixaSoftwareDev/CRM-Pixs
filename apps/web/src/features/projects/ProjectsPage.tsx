@@ -72,10 +72,10 @@ export function ProjectsPage() {
         </span>
       </p>
 
-      <Card className="flex flex-col gap-3 p-4" aria-label="Filtros de proyectos">
+      <Card className="flex flex-col gap-3 p-4" role="group" aria-label="Filtros de proyectos">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <strong>Filtros</strong>
-          <span className="flex items-center gap-3 text-muted">
+          <span className="flex flex-wrap items-center gap-3 text-muted">
             {shown.length} de {all.length} {kind}
             <Button
               size="sm"
@@ -170,8 +170,12 @@ function ProjectCard({ project: p }: { project: ProjectListItem }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-bold">{p.name}</h2>
-          <p className="truncate text-sm text-muted">{p.client.name}</p>
+          <h2 className="truncate font-bold" title={p.name}>
+            {p.name}
+          </h2>
+          <p className="truncate text-sm text-muted" title={p.client.name}>
+            {p.client.name}
+          </p>
         </div>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <Chip tone={h.tone}>{h.label}</Chip>
@@ -180,7 +184,7 @@ function ProjectCard({ project: p }: { project: ProjectListItem }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="flex size-7 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-800">
+        <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-800">
           {p.implementer ? initials(p.implementer.name) : "?"}
         </span>
         <span className="text-muted">Implementa</span> <strong>{p.implementer?.name ?? "sin asignar"}</strong>
@@ -218,7 +222,7 @@ function ProjectCard({ project: p }: { project: ProjectListItem }) {
       </dl>
 
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-semibold text-red-700">{alerts.join(" · ")}</span>
+        <span className="min-w-0 font-semibold text-red-700">{alerts.join(" · ")}</span>
         <span className="shrink-0 font-semibold text-brand">Ver desglose →</span>
       </div>
     </Link>

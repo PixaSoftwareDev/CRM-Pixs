@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Building2,
   CalendarDays,
@@ -7,16 +7,20 @@ import {
   LifeBuoy,
   LogOut,
   type LucideIcon,
+  Menu,
   Sun,
   TrendingUp,
   UserCog,
   Wallet,
   Workflow,
+  X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { signOut } from "../../features/auth/api";
 import type { Area } from "@crm/shared";
 import { useAccess } from "../../hooks/useAccess";
 import { authClient } from "../../lib/auth-client";
+import { cn } from "../ui/cn";
 
 interface NavItem {
   to: string;
@@ -69,22 +73,52 @@ export function Sidebar() {
   const { data: session } = authClient.useSession();
   const { isAdmin, can } = useAccess();
   const name = session?.user.name ?? "";
+  const sections = allowedSections(can, isAdmin);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // En el celular el menú es una barra con un botón que lo despliega (sin scroll de costado).
+  const [open, setOpen] = useState(false);
+  const current = sections
+    .flatMap((x) => x.items)
+    .find((i) => (i.to === "/" ? pathname === "/" : pathname === i.to || pathname.startsWith(`${i.to}/`)));
+
+  // Al ir a otra pantalla se pliega; Esc también.
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
-    <aside className="flex min-w-0 flex-col gap-4 bg-ink px-3.5 py-5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0">
-      <div className="flex items-center gap-2.5 px-2">
+    <aside className="flex min-w-0 flex-col gap-4 bg-ink px-3.5 py-2.5 text-slate-200 md:sticky md:top-0 md:h-dvh md:w-[248px] md:shrink-0 md:py-5">
+      <div className="flex min-h-10 items-center gap-2.5 px-2 max-md:pr-0">
         <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-soft font-bold text-white">C</span>
         <span className="text-[17px] font-bold tracking-tight text-white">CRM</span>
-        {/* En el celular el menú es una barra arriba: el usuario y "Cerrar sesión" van en esta fila. */}
-        <div className="ml-auto flex min-w-0 items-center gap-2 md:hidden">
-          <Avatar name={name} />
-          <span className="max-w-[140px] truncate text-sm">{name}</span>
-          <LogoutButton withLabel />
-        </div>
+        {current && (
+          <span className="min-w-0 truncate text-sm text-slate-400 md:hidden">
+            <span aria-hidden>/ </span>
+            {current.label}
+          </span>
+        )}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="menu-principal"
+          onClick={() => setOpen((o) => !o)}
+          className="ml-auto flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-slate-200 hover:bg-slate-800 md:hidden"
+        >
+          {open ? <X size={18} aria-hidden /> : <Menu size={18} aria-hidden />}
+          Menú
+        </button>
       </div>
 
-      <nav aria-label="Principal" className="flex gap-0.5 overflow-x-auto md:flex-1 md:flex-col md:overflow-visible">
-        {allowedSections(can, isAdmin).map((section) => (
+      <nav
+        id="menu-principal"
+        aria-label="Principal"
+        className={cn("grid-cols-2 gap-1 pb-1 md:flex md:flex-1 md:flex-col md:gap-0.5 md:overflow-y-auto md:pb-0", open ? "grid" : "hidden")}
+      >
+        {sections.map((section) => (
           <div key={section.title ?? "inicio"} className="contents md:flex md:flex-col md:gap-0.5">
             {section.title && (
               <span className="mx-2.5 mt-3.5 mb-1 hidden text-[11px] font-semibold tracking-[.08em] text-slate-400 uppercase md:block">
@@ -96,7 +130,7 @@ export function Sidebar() {
                 key={to}
                 to={to}
                 activeOptions={{ exact: to === "/" }}
-                className="flex items-center gap-3 rounded-[9px] px-2.5 py-2 text-sm whitespace-nowrap text-slate-300 transition hover:bg-slate-800 hover:text-white data-[status=active]:bg-slate-800 data-[status=active]:font-semibold data-[status=active]:text-white data-[status=active]:shadow-[inset_3px_0_0_#818cf8]"
+                className="flex min-h-11 min-w-0 items-center gap-3 rounded-[9px] px-2.5 py-2 text-sm whitespace-nowrap md:min-h-0 text-slate-300 transition hover:bg-slate-800 hover:text-white data-[status=active]:bg-slate-800 data-[status=active]:font-semibold data-[status=active]:text-white data-[status=active]:shadow-[inset_3px_0_0_#818cf8]"
               >
                 <Icon size={18} aria-hidden />
                 {label}
@@ -106,10 +140,12 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="hidden items-center gap-2.5 border-t border-slate-800 px-2 pt-4 md:flex">
+      <div className={cn("items-center gap-2.5 border-t border-slate-800 px-2 pt-3 pb-1 md:flex md:pt-4 md:pb-0", open ? "flex" : "hidden")}>
         <Avatar name={name} />
-        <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
-        <LogoutButton />
+        <span className="min-w-0 flex-1 truncate text-sm" title={name}>
+          {name}
+        </span>
+        <LogoutButton withLabel={open} />
       </div>
     </aside>
   );

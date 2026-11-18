@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
+import { Dialog, DialogActions } from "../../components/ui/Dialog";
 import { Field, Input, Select } from "../../components/ui/Field";
 import { centsToInput, money, parsePesos } from "../../lib/format";
 import { useServerErrors } from "../clients/useServerErrors";
@@ -49,14 +49,14 @@ const errorBox = (msg: string | null) =>
 
 function Actions({ onClose, label, busy, danger }: { onClose: () => void; label: string; busy: boolean; danger?: boolean }) {
   return (
-    <div className="flex justify-end gap-2 pt-1">
+    <DialogActions className="flex justify-end gap-2 pt-1 max-sm:[&>:last-child]:flex-1">
       <Button variant="secondary" onClick={onClose}>
         Cancelar
       </Button>
       <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy}>
         {label}
       </Button>
-    </div>
+    </DialogActions>
   );
 }
 
@@ -119,10 +119,10 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Importe ($)" error={err.amount?.message} className="sm:col-span-1">
-            <Input inputMode="decimal" autoFocus={!fixed} disabled={fixed} {...form.register("amount")} />
+            <Input inputMode="decimal" autoFocus data-autofocus={!fixed} disabled={fixed} aria-invalid={!!err.amount} {...form.register("amount")} />
           </Field>
           <Field label="Medio" error={err.method?.message}>
-            <Select {...form.register("method")}>
+            <Select aria-invalid={!!err.method} {...form.register("method")}>
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
                   {METHOD_LABEL[m]}
@@ -131,12 +131,12 @@ export function PaymentDialog({ target, onClose, onDone }: { target: PaymentTarg
             </Select>
           </Field>
           <Field label="Fecha" error={err.receivedOn?.message}>
-            <Input type="date" max={todayAr()} {...form.register("receivedOn")} />
+            <Input type="date" max={todayAr()} aria-invalid={!!err.receivedOn} {...form.register("receivedOn")} />
           </Field>
         </div>
         {!fixed && (
           <Field label="Nota (opcional)" error={err.note?.message}>
-            <Input placeholder="Ej: transferencia del Banco Galicia" {...form.register("note")} />
+            <Input placeholder="Ej: transferencia del Banco Galicia" aria-invalid={!!err.note} {...form.register("note")} />
           </Field>
         )}
         <p className="text-xs text-muted">
@@ -196,17 +196,17 @@ export function InvoiceDialog({
     <Dialog open={!!client} onClose={onClose} title="Nueva factura" description={client ? `${client.name} · comprobante interno (sin AFIP)` : undefined}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <Field label="Concepto" error={err.concept?.message}>
-          <Input autoFocus placeholder="Ej: Desarrollo extra · formulario de contacto" {...form.register("concept")} />
+          <Input autoFocus data-autofocus placeholder="Ej: Desarrollo extra · formulario de contacto" aria-invalid={!!err.concept} {...form.register("concept")} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Importe ($)" error={err.amount?.message}>
-            <Input inputMode="decimal" {...form.register("amount")} />
+            <Input inputMode="decimal" aria-invalid={!!err.amount} {...form.register("amount")} />
           </Field>
           <Field label="Emisión" error={err.issuedOn?.message}>
-            <Input type="date" max={todayAr()} {...form.register("issuedOn")} />
+            <Input type="date" max={todayAr()} aria-invalid={!!err.issuedOn} {...form.register("issuedOn")} />
           </Field>
           <Field label="Vence" error={err.dueOn?.message} hint="Vacío: según el plazo del cliente">
-            <Input type="date" {...form.register("dueOn")} />
+            <Input type="date" aria-invalid={!!err.dueOn} {...form.register("dueOn")} />
           </Field>
         </div>
         {errorBox(serverError)}
@@ -280,30 +280,30 @@ export function CashDialog({ draft, onClose, onDone }: { draft: CashDraft | null
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Tipo" error={err.direction?.message}>
-            <Select {...form.register("direction")}>
+            <Select aria-invalid={!!err.direction} {...form.register("direction")}>
               <option value="egreso">Gasto</option>
               <option value="ingreso">Ingreso</option>
             </Select>
           </Field>
           <Field label="Importe ($)" error={err.amount?.message}>
-            <Input inputMode="decimal" autoFocus {...form.register("amount")} />
+            <Input inputMode="decimal" autoFocus data-autofocus aria-invalid={!!err.amount} {...form.register("amount")} />
           </Field>
           <Field label="Fecha" error={err.occurredOn?.message}>
-            <Input type="date" max={todayAr()} {...form.register("occurredOn")} />
+            <Input type="date" max={todayAr()} aria-invalid={!!err.occurredOn} {...form.register("occurredOn")} />
           </Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
           <Field label="Concepto" error={err.concept?.message}>
-            <Input {...form.register("concept")} />
+            <Input aria-invalid={!!err.concept} {...form.register("concept")} />
           </Field>
           <Field label="Categoría (opcional)" error={err.category?.message}>
-            <Input placeholder="Software, Infraestructura…" {...form.register("category")} />
+            <Input placeholder="Software, Infraestructura…" aria-invalid={!!err.category} {...form.register("category")} />
           </Field>
         </div>
         {direction === "egreso" && (
           <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
             <Field label="Lo pagó" error={err.paidById?.message}>
-              <Select {...form.register("paidById")}>
+              <Select aria-invalid={!!err.paidById} {...form.register("paidById")}>
                 <option value="">La empresa</option>
                 {team.data?.map((u) => (
                   <option key={u.id} value={u.id}>
@@ -332,8 +332,8 @@ const subSchema = z.object({
   clientId: z.string().min(1, { message: "Elegí el cliente" }),
   name: z.string().trim().min(1, { message: "Poné el nombre del abono" }).max(120),
   amount: pesosField(),
-  billingDay: z.coerce.number().int().min(1).max(28),
-  startsOn: z.iso.date(),
+  billingDay: z.coerce.number({ message: "Del 1 al 28" }).int({ message: "Del 1 al 28" }).min(1, { message: "Del 1 al 28" }).max(28, { message: "Del 1 al 28" }),
+  startsOn: z.iso.date({ message: "Fecha inválida" }),
 });
 
 export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (m: string) => void }) {
@@ -361,7 +361,7 @@ export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; o
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cliente" error={err.clientId?.message}>
-            <Select autoFocus {...form.register("clientId")}>
+            <Select autoFocus data-autofocus aria-invalid={!!err.clientId} {...form.register("clientId")}>
               <option value="">Elegí…</option>
               {clients.data?.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -371,18 +371,18 @@ export function SubscriptionDialog({ open, onClose, onDone }: { open: boolean; o
             </Select>
           </Field>
           <Field label="Plan" error={err.name?.message}>
-            <Input placeholder="Mantenimiento web" {...form.register("name")} />
+            <Input placeholder="Mantenimiento web" aria-invalid={!!err.name} {...form.register("name")} />
           </Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Valor mensual ($)" error={err.amount?.message}>
-            <Input inputMode="decimal" {...form.register("amount")} />
+            <Input inputMode="decimal" aria-invalid={!!err.amount} {...form.register("amount")} />
           </Field>
           <Field label="Se factura el día" error={err.billingDay?.message}>
-            <Input type="number" min={1} max={28} {...form.register("billingDay")} />
+            <Input type="number" min={1} max={28} aria-invalid={!!err.billingDay} {...form.register("billingDay")} />
           </Field>
           <Field label="Desde" error={err.startsOn?.message}>
-            <Input type="date" {...form.register("startsOn")} />
+            <Input type="date" aria-invalid={!!err.startsOn} {...form.register("startsOn")} />
           </Field>
         </div>
         {errorBox(serverError)}
